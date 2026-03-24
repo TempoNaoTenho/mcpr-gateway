@@ -1,0 +1,9 @@
+node_modules/
+dist/
+config/gateway.json
+.env
+test/
+coverage/
+*.tsbuildinfo
+.gitnexus
+.git/

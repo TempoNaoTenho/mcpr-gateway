@@ -1,0 +1,61 @@
+{
+  "name": "mcp-session-gateway",
+  "version": "0.1.0",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-session-gateway": "./dist/index.js"
+  },
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup --config tsup.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:benchmark-runner": "vitest run --config vitest.benchmark-runner.config.ts",
+    "benchmark:retrieval": "node --import tsx bench/runner.ts",
+    "benchmark:e2e": "node --import tsx bench/runner.ts",
+    "benchmark:code_mode": "node --import tsx bench/runner.ts",
+    "benchmark:real_usage_benchmark": "node --import tsx bench/runner.ts --fixture real_usage_benchmark",
+    "benchmark:compare": "node --import tsx bench/runner.ts",
+    "benchmark:prepare-local": "node --import tsx bench/prepare-local.ts",
+    "lint": "eslint src",
+    "format": "prettier --write .",
+    "docker:build": "docker build -f docker/Dockerfile .",
+    "docker:up": "docker compose -f docker/docker-compose.yml up --build",
+    "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "build:all": "npm run build:ui && npm run build",
+    "dev:all": "node scripts/dev-all.mjs"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.2.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/sensible": "^6.0.3",
+    "@fastify/static": "^9.0.0",
+    "better-sqlite3": "^11.8.1",
+    "drizzle-orm": "^0.41.0",
+    "fastify": "^5.2.1",
+    "isolated-vm": "^6.1.2",
+    "nanoid": "^5.1.5",
+    "pino": "^9.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.10",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "@vitest/coverage-v8": "^3.0.8",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}

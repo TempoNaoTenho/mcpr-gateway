@@ -1,0 +1,14 @@
+{
+  "auth": {
+    "mode": "static_key",
+    "staticKeys": {
+      "${GATEWAY_API_KEY}": {
+        "userId": "service",
+        "roles": ["user"]
+      }
+    }
+  },
+  "debug": {
+    "enabled": false
+  }
+}

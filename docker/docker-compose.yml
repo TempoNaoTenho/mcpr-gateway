@@ -1,0 +1,25 @@
+# Run `npm run setup` first (creates config/bootstrap.json at repo root), then either:
+#   From repo root:  docker compose -f docker/docker-compose.yml up --build
+#   From docker/:     docker compose up --build
+#
+# Paths below are relative to this file (docker/): ../ = repository root.
+name: mcp-session-gateway
+
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: mcp-session-gateway:local
+    ports:
+      - '3000:3000'
+    volumes:
+      - ../config:/config:ro
+      - ../data:/app/data # SQLite persistence — backup: cp data/gateway.db data/gateway.db.bak
+    environment:
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      DATABASE_PATH: /app/data/gateway.db
+      UI_STATIC_DIR: /app/ui/dist
+      # ADMIN_TOKEN: change-me   # required to enable /admin/* endpoints
+      # Define any env vars referenced by ${VAR} in bootstrap.json (if present)

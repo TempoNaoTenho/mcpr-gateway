@@ -1,0 +1,32 @@
+# Personal
+implementation
+.claude
+gateway.json
+.cursor 
+AGENTS.md
+CLAUDE.md
+.sisyphus
+.codex
+bench
+
+
+# Node
+node_modules/
+dist/
+.env
+
+# Local config (copy from *.example.json)
+config/gateway.json
+config/bootstrap.json
+
+# Coverage
+coverage/
+
+# Build artifacts
+*.tsbuildinfo
+.gitnexus
+# SQLite persistence
+data/
+bench/datasets/local/
+bench/reports/
+

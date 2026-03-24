@@ -1,0 +1,8 @@
+{
+  "auth": {
+    "mode": "mock_dev"
+  },
+  "debug": {
+    "enabled": true
+  }
+}

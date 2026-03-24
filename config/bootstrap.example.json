@@ -1,0 +1,24 @@
+/**
+ * Bootstrap configuration template for the gateway.
+ *
+ * SETUP INSTRUCTIONS:
+ * 1. Copy this file to bootstrap.json: cp config/bootstrap.example.json config/bootstrap.json
+ * 2. Generate a static key: openssl rand -hex 32
+ * 3. Replace ${GATEWAY_API_KEY} with your generated key
+ * 4. Optionally customize userId (default: "admin")
+ *
+ * This file uses static_key auth mode. The key in staticKeys is the secret
+ * clients must pass as Bearer token in the Authorization header.
+ */
+
+{
+  "auth": {
+    "mode": "static_key",
+    "staticKeys": {
+      "${GATEWAY_API_KEY}": {
+        "userId": "admin",
+        "roles": ["user"]
+      }
+    }
+  }
+}

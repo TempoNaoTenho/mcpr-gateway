@@ -1,0 +1,1 @@
+{"error":"UNAUTHORIZED_NAMESPACE","message":"Access to the requested namespace is not authorized"}
