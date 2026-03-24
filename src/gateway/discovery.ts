@@ -52,13 +52,9 @@ export const isGatewayDiscoveryTool = isGatewayInternalTool
 function buildGatewaySearchTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_SEARCH_TOOL_NAME,
-    description: `Search for tools across all connected servers in this namespace.
-      Returns matching tool names and server IDs.
-      Use gateway_call_tool with these results to execute a tool.
-      
-      Suggestions: 
-      1. First use 2-3 words for a optimal search, like "github issues list".
-      2. If no results are found, try using less words like "github issues"`,
+    description: `Find tools by keyword across all connected servers. Returns matches ranked by relevance, each with a name and serverId.
+      Use gateway_call_tool with the returned name+serverId to execute a match.
+      Tips: use 2–3 distinctive words ("github list issues"); if no matches, try fewer words ("github issues").`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -89,12 +85,12 @@ function buildGatewayCallTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_CALL_TOOL_NAME,
     description:
-      'Execute a tool from any connected server by name and serverId. First use gateway_search_tools to discover available tools and their serverIds, then call this tool with the returned name and serverId.',
+      'Execute a named tool by providing its name and serverId. Use gateway_search_tools first to discover available tools and obtain their name and serverId.',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Tool name to execute.' },
-        serverId: { type: 'string', description: 'Server ID that hosts the tool.' },
+        name: { type: 'string', description: 'Tool name as returned by gateway_search_tools.' },
+        serverId: { type: 'string', description: 'Server ID as returned by gateway_search_tools.' },
         arguments: { type: 'object', description: 'Arguments to pass to the tool.', default: {} },
       },
       required: ['name', 'serverId'],
@@ -110,14 +106,20 @@ function buildGatewayCallTool(namespace: string): VisibleTool {
 function buildGatewayRunCodeTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_RUN_CODE_TOOL_NAME,
-    description:
-      'Execute JavaScript inside the gateway runtime. Use catalog.search(), catalog.describe(), mcp.call(), result.pick(), and artifacts.save() to discover tools, call downstream MCP servers, and return only a minimal final result.',
+    description: `Execute JavaScript in the gateway sandbox to orchestrate multiple tools in one call.
+      Workflow:
+        catalog.search(q) / catalog.list()         — discover tools, returns handles
+        mcp.call(handle, args) / mcp.batch([...])  — execute one or many tools
+        result.pick/limit/grep/groupBy/summarize() — transform output
+        artifacts.save(data)                       — store oversized results
+      Always await async calls. Call gateway_help for the full API reference and examples.`,
     inputSchema: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description: 'JavaScript source to execute inside the gateway runtime.',
+          description:
+            'JavaScript to execute. Available globals: catalog, mcp, result, artifacts. Always await async calls. Return a value directly or call artifacts.save() for large data.',
         },
       },
       required: ['code'],
@@ -134,7 +136,7 @@ function buildGatewayHelpTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_HELP_TOOL_NAME,
     description:
-      'Return the gateway runtime API reference and short examples for gateway_run_code.',
+      'Return the gateway_run_code runtime API reference with usage examples. Call this when unsure about catalog, mcp, result, or artifacts method signatures.',
     inputSchema: {
       type: 'object',
       properties: {
