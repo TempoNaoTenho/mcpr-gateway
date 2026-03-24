@@ -1,4 +1,4 @@
-# Codeuctor MCP Gateway - MCP Managment and Sandboxed
+# Codeunctor MCP Gateway - MCP Managment and Sandboxed
 
 **A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them.**
 
