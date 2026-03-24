@@ -20,5 +20,84 @@
         "roles": ["user"]
       }
     }
-  }
+  },
+  "servers": [],
+  "namespaces": {},
+  "roles": {},
+  "selector": {
+    "lexical": {
+      "enabled": true
+    },
+    "vector": {
+      "enabled": false
+    },
+    "penalties": {
+      "write": 0.15,
+      "admin": 0.35,
+      "unhealthyDownstream": 0.5
+    },
+    "focus": {
+      "enabled": true,
+      "lookback": 5,
+      "minDominantSuccesses": 2,
+      "reserveSlots": 1,
+      "crossDomainPenalty": 1
+    },
+    "publication": {
+      "descriptionCompression": "conservative",
+      "schemaCompression": "conservative",
+      "descriptionMaxLength": 160
+    },
+    "discoveryTool": {
+      "enabled": false,
+      "resultLimit": 8,
+      "promoteCount": 3
+    }
+  },
+  "session": {
+    "ttlSeconds": 1800,
+    "cleanupIntervalSeconds": 60
+  },
+  "triggers": {
+    "refreshOnSuccess": false,
+    "refreshOnTimeout": true,
+    "refreshOnError": true,
+    "replaceOrAppend": "replace",
+    "cooldownSeconds": 30
+  },
+  "resilience": {
+    "timeouts": {
+      "connectMs": 5000,
+      "responseMs": 10000,
+      "totalMs": 30000
+    },
+    "rateLimit": {
+      "perSession": {
+        "maxRequests": 100,
+        "windowSeconds": 60
+      },
+      "perUser": {
+        "maxRequests": 500,
+        "windowSeconds": 60
+      },
+      "perDownstreamConcurrency": 10
+    },
+    "circuitBreaker": {
+      "degradedAfterFailures": 3,
+      "offlineAfterFailures": 5,
+      "resetAfterSeconds": 60
+    }
+  },
+  "debug": {
+    "enabled": false
+  },
+  "codeMode": {
+    "memoryLimitMb": 128,
+    "executionTimeoutMs": 10000,
+    "maxToolCallsPerExecution": 20,
+    "maxResultSizeBytes": 1048576,
+    "artifactStoreTtlSeconds": 300
+  },
+  "starterPacks": {}
+}
 }
