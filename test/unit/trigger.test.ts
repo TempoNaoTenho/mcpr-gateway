@@ -433,6 +433,75 @@ describe('TriggerEngine', () => {
     ])
   })
 
+  it('rebuilds the downstream catalog directly in default mode', async () => {
+    writeConfig({ refreshOnError: true })
+
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    await store.set(
+      SessionIdSchema.parse('session-1'),
+      makeSession({
+        toolWindow: [makeTool('stale_tool', 'gmail-server')],
+        resolvedPolicy: {
+          namespacePolicy: {
+            candidatePoolSize: 8,
+            gatewayMode: GatewayMode.Default,
+          },
+        },
+        recentOutcomes: [makeOutcome('read_email', OutcomeClass.ToolError, 'gmail-server', { error: 'failed' })],
+      }),
+    )
+
+    const selector = {
+      select: vi.fn(),
+      rerank: vi.fn(),
+    }
+    const registry = {
+      getToolsByNamespace: vi.fn().mockReturnValue([
+        {
+          server: makeServer('gmail-server'),
+          records: [
+            makeToolRecord('read_email', 'gmail-server'),
+            makeToolRecord('delete_email', 'gmail-server'),
+          ],
+        },
+      ]),
+      getHealthStates: vi.fn().mockReturnValue({}),
+    }
+
+    const previousConfig = getConfig()
+    setConfig({
+      ...previousConfig,
+      namespaces: {
+        ...previousConfig.namespaces,
+        gmail: {
+          ...previousConfig.namespaces.gmail,
+          gatewayMode: GatewayMode.Default,
+          disabledTools: [{ serverId: 'gmail-server', name: 'delete_email' }],
+        },
+      },
+    })
+
+    try {
+      const engine = new TriggerEngine(store, registry as never, selector as never)
+      await engine.evaluate(
+        SessionIdSchema.parse('session-1'),
+        makeOutcome('read_email', OutcomeClass.ToolError, 'gmail-server', { error: 'failed' }),
+      )
+
+      const updated = await store.get(SessionIdSchema.parse('session-1'))
+      expect(selector.select).not.toHaveBeenCalled()
+      expect(updated?.toolWindow.map((tool) => tool.name)).toEqual(['read_email'])
+      expect(updated?.lastSelectorDecision?.reasoning).toBe('direct_catalog')
+      expect(updated?.refreshHistory.at(-1)?.toolCount).toBe(1)
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
   it('treats downstream tool errors as refresh-on-error triggers', async () => {
     writeConfig({ refreshOnError: true })
 

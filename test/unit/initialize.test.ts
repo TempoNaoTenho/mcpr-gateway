@@ -357,6 +357,49 @@ describe('handleInitialize', () => {
     }
   })
 
+  it('publishes enabled downstream tools directly when the namespace uses default mode', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            gatewayMode: GatewayMode.Default,
+            disabledTools: [{ serverId: 'gmail-server', name: 'delete_message' }],
+          },
+        },
+      })
+
+      const registry = makeRegistry([
+        makeToolRecord('read_message'),
+        makeToolRecord('delete_message'),
+      ])
+
+      const response = await handleInitialize(
+        makeRequest(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never,
+      )
+
+      const session = await store.get(response.id)
+      expect(session?.toolWindow.map((tool) => tool.name)).toEqual(['read_message'])
+      expect(session?.toolWindow).toHaveLength(1)
+      expect(session?.lastSelectorDecision?.reasoning).toBe('direct_catalog')
+      expect(session?.toolWindow.map((tool) => tool.name)).not.toContain(GATEWAY_SEARCH_TOOL_NAME)
+      expect(session?.toolWindow.map((tool) => tool.name)).not.toContain(GATEWAY_CALL_TOOL_NAME)
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
   it('filters offline downstream tools out of the bootstrap pool', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {

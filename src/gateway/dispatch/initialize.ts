@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { FastifyRequest } from 'fastify'
 import { SessionIdSchema } from '../../types/identity.js'
-import { SessionStatus, Mode, RefreshTriggerType, ToolRiskLevel } from '../../types/enums.js'
+import { SessionStatus, Mode, RefreshTriggerType, ToolRiskLevel, GatewayMode } from '../../types/enums.js'
 import { GatewayError } from '../../types/errors.js'
 import { getConfig } from '../../config/index.js'
 import { resolveIdentity } from '../../auth/index.js'
@@ -17,6 +17,8 @@ import { logRequest } from '../../observability/structured-log.js'
 import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { resolveFocusFromOutcomes } from '../../selector/focus.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
+import { buildVisibleToolCatalog } from '../../session/catalog.js'
+import type { SelectorDecision } from '../../types/selector.js'
 
 interface JsonRpcBody {
   jsonrpc: string
@@ -67,39 +69,11 @@ export async function handleInitialize(
     generateToolcards(records, server, server.toolOverrides),
   )
   const healthStates = registry.getHealthStates()
+  const disabledToolKeys = disabledToolKeysForNamespace(config, namespace)
 
   // Resolve starter pack from config using starterPackKey
   const starterPackKey = decision.starterPackKey
   const starterPack = starterPackKey ? config.starterPacks[starterPackKey] : undefined
-
-  // Phase 8: build candidate pool
-  const candidateInput: CandidateInput = {
-    namespace,
-    mode: requestedMode,
-    candidatePoolSize: namespacePolicy.candidatePoolSize,
-    currentToolWindow: [],
-    recentOutcomes: [],
-    initialIntentText,
-    starterPackHints: starterPack?.preferredTags ?? [],
-    includeRiskLevels: starterPack?.includeRiskLevels ?? [ToolRiskLevel.Low],
-    allToolcards: toolcards,
-    healthStates,
-    disabledToolKeys: disabledToolKeysForNamespace(config, namespace),
-  }
-  const { pool } = buildCandidatePool(candidateInput)
-
-  const bootstrapWindow = buildBootstrapWindowFromConfig(
-    pool,
-    config,
-    namespace,
-    requestedMode,
-  )
-  const selectorDecision = {
-    selected: bootstrapWindow,
-    reasoning: 'bootstrap_window',
-    triggeredBy: RefreshTriggerType.ExplicitRequest,
-    timestamp: now,
-  }
 
   const clientCaps = body.params?.capabilities as
     | {
@@ -113,13 +87,62 @@ export async function handleInitialize(
     clientCaps?.experimental?.toolListChanged === true
 
   const focus = resolveFocusFromOutcomes([], config.selector.focus)
+  const gatewayMode =
+    namespacePolicy.gatewayMode === GatewayMode.Code
+      ? GatewayMode.Code
+      : namespacePolicy.gatewayMode === GatewayMode.Default
+        ? GatewayMode.Default
+        : GatewayMode.Compat
+  const directCatalog = buildVisibleToolCatalog(toolcards, disabledToolKeys)
+
+  let selectorDecision: SelectorDecision
+  if (gatewayMode === GatewayMode.Default) {
+    selectorDecision = {
+      selected: directCatalog,
+      reasoning: 'direct_catalog',
+      triggeredBy: RefreshTriggerType.ExplicitRequest,
+      timestamp: now,
+    }
+  } else {
+    // Phase 8: build candidate pool
+    const candidateInput: CandidateInput = {
+      namespace,
+      mode: requestedMode,
+      candidatePoolSize: namespacePolicy.candidatePoolSize,
+      currentToolWindow: [],
+      recentOutcomes: [],
+      initialIntentText,
+      starterPackHints: starterPack?.preferredTags ?? [],
+      includeRiskLevels: starterPack?.includeRiskLevels ?? [ToolRiskLevel.Low],
+      allToolcards: toolcards,
+      healthStates,
+      disabledToolKeys,
+    }
+    const { pool } = buildCandidatePool(candidateInput)
+
+    const bootstrapWindow = buildBootstrapWindowFromConfig(
+      pool,
+      config,
+      namespace,
+      requestedMode,
+    )
+    selectorDecision = {
+      selected: bootstrapWindow,
+      reasoning: 'bootstrap_window',
+      triggeredBy: RefreshTriggerType.ExplicitRequest,
+      timestamp: now,
+    }
+  }
   const session = {
     id: sessionId,
     userId: identity.sub,
     namespace,
     mode: requestedMode,
     status: SessionStatus.Active,
-    toolWindow: buildGatewayToolWindowForMode(namespace, namespacePolicy.gatewayMode),
+    toolWindow:
+      gatewayMode === GatewayMode.Default
+        ? directCatalog
+        : buildGatewayToolWindowForMode(namespace, gatewayMode),
     createdAt: now,
     lastActiveAt: now,
     refreshCount: 0,
@@ -156,7 +179,7 @@ export async function handleInitialize(
   auditLogger?.emit({
     type: AuditEventType.BootstrapWindowPublished,
     sessionId,
-    toolCount: bootstrapWindow.length,
+    toolCount: selectorDecision.selected.length,
     triggerUsed: RefreshTriggerType.ExplicitRequest,
     timestamp: now,
   })

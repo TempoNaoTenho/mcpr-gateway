@@ -31,7 +31,7 @@
     bootstrapWindowSize: number;
     candidatePoolSize: number;
     allowedModes: string[];
-    gatewayMode: 'compat' | 'code';
+    gatewayMode: 'compat' | 'code' | 'default';
     selectedServerIds: string[];
     disabledTools: { serverId: string; name: string }[];
   } | null>(null);
@@ -173,7 +173,9 @@
   onMount(load);
 
   let selectedNamespace = $derived(namespaces.find((entry) => entry.key === selectedNamespaceKey) ?? null);
+  let defaultModeActive = $derived(draft?.gatewayMode === 'default');
   let codeModeActive = $derived(draft?.gatewayMode === 'code');
+  let budgetControlsDisabled = $derived(codeModeActive || defaultModeActive);
 
   /** Servers that only have this namespace; deleting would leave them with zero namespaces. */
   let serverIdsBlockingDelete = $derived.by(() => {
@@ -313,9 +315,20 @@
           <div class="space-y-3">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
               Gateway mode
-              <InfoTooltip text="Compat mode exposes search/call meta-tools. Code mode exposes gateway_run_code and help; runtime catalog is not limited by bootstrap or candidate pool settings." />
+              <InfoTooltip text="Default mode exposes enabled downstream tools directly. Compat mode exposes search/call meta-tools. Code mode exposes gateway_run_code and help." />
             </div>
             <div class="flex gap-4">
+              <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input
+                  type="radio"
+                  name="gatewayMode"
+                  value="default"
+                  checked={draft.gatewayMode === 'default'}
+                  onchange={() => { if (draft) draft.gatewayMode = 'default' }}
+                  class="border-slate-300 dark:border-slate-600"
+                />
+                default
+              </label>
               <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input
                   type="radio"
@@ -341,12 +354,14 @@
             </div>
           </div>
 
-          <div class="space-y-3" class:opacity-50={codeModeActive}>
+          <div class="space-y-3" class:opacity-50={budgetControlsDisabled}>
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
               Runtime budget
               <InfoTooltip
                 text={codeModeActive
-                  ? 'Bootstrap window and candidate pool apply to the compat-mode selector and audit pipeline, not to the code-mode catalog (gateway_run_code). Switch to compat to edit these values.'
+                  ? 'Bootstrap window and candidate pool apply to compat-mode selection, not to the code-mode runtime catalog. Switch to compat to edit these values.'
+                  : defaultModeActive
+                    ? 'Bootstrap window and candidate pool do not apply in default mode because the client receives the enabled downstream catalog directly. Switch to compat to edit these values.'
                   : 'These values control how many tools can participate in selection and how much schema enters the client-visible window over time in compat mode.'}
               />
             </div>
@@ -360,7 +375,7 @@
                   type="number"
                   bind:value={draft.bootstrapWindowSize}
                   min="1"
-                  disabled={codeModeActive}
+                  disabled={budgetControlsDisabled}
                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-60"
                 />
               </label>
@@ -373,7 +388,7 @@
                   type="number"
                   bind:value={draft.candidatePoolSize}
                   min="1"
-                  disabled={codeModeActive}
+                  disabled={budgetControlsDisabled}
                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-60"
                 />
               </label>

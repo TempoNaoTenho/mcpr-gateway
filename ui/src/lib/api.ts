@@ -453,7 +453,7 @@ export interface NamespaceSummary {
   key: string
   allowedRoles: string[]
   allowedModes: string[]
-  gatewayMode: 'compat' | 'code'
+  gatewayMode: 'compat' | 'code' | 'default'
   bootstrapWindowSize: number
   candidatePoolSize: number
   servers: Array<{
@@ -639,7 +639,7 @@ export interface PoliciesConfig {
       bootstrapWindowSize: number
       candidatePoolSize: number
       allowedModes: string[]
-      gatewayMode: 'compat' | 'code'
+      gatewayMode: 'compat' | 'code' | 'default'
       disabledTools?: { serverId: string; name: string }[]
     }
   >

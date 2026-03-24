@@ -43,6 +43,14 @@ function findVisibleToolsByName(
   return toolWindow.filter((tool) => tool.name === toolName)
 }
 
+function isToolVisible(
+  toolWindow: Array<{ name: string; serverId: string }>,
+  toolName: string,
+  serverId: string
+): boolean {
+  return toolWindow.some((tool) => tool.name === toolName && tool.serverId === serverId)
+}
+
 export class ExecutionRouter implements IExecutionRouter {
   constructor(
     private readonly registry: IRegistryAdapter,
@@ -111,7 +119,10 @@ export class ExecutionRouter implements IExecutionRouter {
     // --- Gateway internal tools (handled before visibility check) ---
 
     // gateway_search_tools — substring search across all tools
-    if (toolName === GATEWAY_SEARCH_TOOL_NAME) {
+    if (
+      toolName === GATEWAY_SEARCH_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_SEARCH_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
       const { result } = await executeGatewaySearch(session, args, this.registry)
       return {
         toolName,
@@ -125,15 +136,24 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     // gateway_call_tool — proxy to any downstream tool (bypasses visibility)
-    if (toolName === GATEWAY_CALL_TOOL_NAME) {
+    if (
+      toolName === GATEWAY_CALL_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_CALL_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
       return this.handleGatewayCall(session, sessionId, args, rateLimiter)
     }
 
-    if (toolName === GATEWAY_RUN_CODE_TOOL_NAME) {
+    if (
+      toolName === GATEWAY_RUN_CODE_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_RUN_CODE_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
       return this.handleGatewayRunCode(session, sessionId, args, rateLimiter)
     }
 
-    if (toolName === GATEWAY_HELP_TOOL_NAME) {
+    if (
+      toolName === GATEWAY_HELP_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_HELP_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
       const topic =
         args &&
         typeof args === 'object' &&
@@ -146,7 +166,11 @@ export class ExecutionRouter implements IExecutionRouter {
         unknown
       >
       const gatewayMode: GatewayMode =
-        namespacePolicy['gatewayMode'] === GatewayMode.Code ? GatewayMode.Code : GatewayMode.Compat
+        namespacePolicy['gatewayMode'] === GatewayMode.Code
+          ? GatewayMode.Code
+          : namespacePolicy['gatewayMode'] === GatewayMode.Default
+            ? GatewayMode.Default
+            : GatewayMode.Compat
       return {
         toolName,
         serverId: GATEWAY_SERVER_ID,
@@ -159,7 +183,10 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     // gateway_find_tools — legacy BM25 discovery
-    if (toolName === GATEWAY_DISCOVERY_TOOL_NAME) {
+    if (
+      toolName === GATEWAY_DISCOVERY_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_DISCOVERY_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
       const { updatedSession, result } = await executeGatewayDiscovery(
         session,
         args,

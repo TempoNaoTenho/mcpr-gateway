@@ -1,13 +1,6 @@
 import { spawn } from 'node:child_process'
 import type { DownstreamServer } from '../../types/server.js'
 import type { ToolSchema } from '../../types/tools.js'
-import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
-import {
-  isAllowedCommand,
-  hasDangerousArgs,
-  sanitizeEnv,
-} from '../../security/command-validation.js'
-import { getConfig } from '../../config/index.js'
 
 const DEFAULT_TIMEOUT_MS = 15_000
 const STDERR_TAIL_LIMIT = 600
@@ -270,54 +263,6 @@ function buildSpawnError(command: string, err: Error, stderrTail: string): Error
     message += `; stderr: ${summary}`
   }
   return new Error(message)
-}
-
-function validateAndSanitizeStdio(
-  server: DownstreamServer,
-  command: string,
-  args: string[],
-  env: Record<string, string>
-): Record<string, string> {
-  const config = getConfig()
-  const allowedCommands = (config as { allowedCommands?: string[] }).allowedCommands ?? []
-
-  if (!isAllowedCommand(command, allowedCommands)) {
-    const reason = `Command '${command}' is not in the allowed list`
-    console.error(
-      JSON.stringify({
-        type: 'COMMAND_NOT_ALLOWED',
-        serverId: server.id,
-        command,
-        args,
-        reason,
-        timestamp: new Date().toISOString(),
-      })
-    )
-    throw new GatewayError(
-      GatewayErrorCode.COMMAND_NOT_ALLOWED,
-      `Command '${command}' is not allowed: ${reason}`
-    )
-  }
-
-  if (hasDangerousArgs(args)) {
-    const reason = 'Command arguments contain dangerous patterns'
-    console.error(
-      JSON.stringify({
-        type: 'COMMAND_NOT_ALLOWED',
-        serverId: server.id,
-        command,
-        args,
-        reason,
-        timestamp: new Date().toISOString(),
-      })
-    )
-    throw new GatewayError(
-      GatewayErrorCode.COMMAND_NOT_ALLOWED,
-      `Command '${command}' has dangerous arguments: ${reason}`
-    )
-  }
-
-  return sanitizeEnv(env)
 }
 
 export async function callToolStdio(

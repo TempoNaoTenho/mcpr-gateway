@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadConfig, mergeWithAdminConfig, type AdminConfig } from '../../src/config/loader.js'
 import { getConfig, initConfig } from '../../src/config/index.js'
+import { GatewayMode } from '../../src/types/enums.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_config__')
@@ -193,6 +194,22 @@ describe('loadConfig — valid config', () => {
       resultLimit: 8,
       promoteCount: 3,
     })
+  })
+
+  it('accepts default as a namespace gateway mode', () => {
+    const base = validGatewayBase()
+    writeGatewayJson(TMP, {
+      ...base,
+      namespaces: {
+        test: {
+          ...base.namespaces.test,
+          gatewayMode: GatewayMode.Default,
+        },
+      },
+    })
+
+    const loaded = loadConfig(TMP)
+    expect(loaded.namespaces['test'].gatewayMode).toBe(GatewayMode.Default)
   })
 
   it('loads and returns a GatewayConfig without errors', () => {

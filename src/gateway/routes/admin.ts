@@ -3,7 +3,7 @@ import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance } from 'fastify'
 import { ZodError } from 'zod'
 import { GatewayErrorCode } from '../../types/errors.js'
-import { sanitizeError, logErrorInternal, isProductionMode } from '../../utils/error-sanitize.js'
+import { logErrorInternal, isProductionMode } from '../../utils/error-sanitize.js'
 import type { IAuditRepository, AuditQueryFilters } from '../../repositories/audit/interface.js'
 import type { IConfigRepository } from '../../repositories/config/interface.js'
 import type { ISessionStore } from '../../types/interfaces.js'
@@ -740,10 +740,15 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
           max: 10,
           timeWindow: '15 minute',
           keyGenerator: (request) => request.ip,
-          errorResponseBuilder: (_request, context) => ({
-            error: 'RATE_LIMIT_EXCEEDED',
-            retryAfter: context.after,
-          }),
+          errorResponseBuilder: (_request, context) => {
+            const err = new Error('RATE_LIMIT_EXCEEDED') as Error & {
+              statusCode: number
+              rateLimitRetryAfter: string
+            }
+            err.statusCode = 429
+            err.rateLimitRetryAfter = context.after
+            return err
+          },
         },
       },
     },

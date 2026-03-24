@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import { nanoid } from 'nanoid'
 import { ZodError } from 'zod'
-import { GatewayError, GatewayErrorCode } from '../types/errors.js'
+import { GatewayError } from '../types/errors.js'
 import { sanitizeError, logErrorInternal, isProductionMode } from '../utils/error-sanitize.js'
 
 export function buildServer(opts?: { logLevel?: string }): FastifyInstance {
@@ -51,6 +51,25 @@ export function buildServer(opts?: { logLevel?: string }): FastifyInstance {
     if (err instanceof ZodError) {
       logErrorInternal(err, (e) => app.log.error(e))
       return reply.status(400).send(sanitizeError(err, production))
+    }
+
+    if (err instanceof Error) {
+      const sc = (err as Error & { statusCode?: number }).statusCode
+      if (
+        typeof sc === 'number' &&
+        sc === 429 &&
+        err.message === 'RATE_LIMIT_EXCEEDED'
+      ) {
+        logErrorInternal(err, (e) => app.log.error(e))
+        const after = (err as { rateLimitRetryAfter?: string }).rateLimitRetryAfter
+        return reply.status(429).send({
+          error: 'RATE_LIMIT_EXCEEDED',
+          ...(after ? { retryAfter: after } : {}),
+        })
+      }
+
+      logErrorInternal(err, (e) => app.log.error(e))
+      return reply.status(500).send(sanitizeError(err, production))
     }
 
     logErrorInternal(err, (e) => app.log.error(e))

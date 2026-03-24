@@ -1404,14 +1404,17 @@ describe('adminRoutes', () => {
     })
 
     expect(res.statusCode).toBe(400)
-    expect(res.json()).toEqual(expect.objectContaining({
-      error: 'Invalid downstream auth configuration',
-      issues: expect.arrayContaining([
-        expect.objectContaining({
-          message: 'Managed bearer secrets require SQLite and DOWNSTREAM_AUTH_ENCRYPTION_KEY',
-        }),
-      ]),
-    }))
+    expect(res.json()).toEqual(
+      expect.objectContaining({
+        error: 'INTERNAL_GATEWAY_ERROR',
+        message: 'Invalid downstream auth configuration',
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            message: 'Managed bearer secrets require SQLite and DOWNSTREAM_AUTH_ENCRYPTION_KEY',
+          }),
+        ]),
+      })
+    )
 
     await app.close()
   })

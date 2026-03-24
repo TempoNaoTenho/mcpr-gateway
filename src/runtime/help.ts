@@ -60,6 +60,16 @@ const HELP_TOPICS: Record<string, string> = {
 }
 
 const MODE_GUIDANCE: Record<string, string[]> = {
+  [GatewayMode.Default]: [
+    '',
+    '═══════════════════════════════════════════════════════════',
+    'DEFAULT MODE — Use the published downstream tools directly',
+    '═══════════════════════════════════════════════════════════',
+    '',
+    '1. DISCOVER: Tools are already visible in the session window',
+    '2. CALL: Invoke the tool name directly with its arguments',
+    '3. NO WRAPPERS: gateway_search_tools / gateway_call_tool are not used',
+  ],
   [GatewayMode.Compat]: [
     '',
     '═══════════════════════════════════════════════════════════',

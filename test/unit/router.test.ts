@@ -11,7 +11,9 @@ import { setConfig } from '../../src/config/index.js'
 import {
   GATEWAY_DISCOVERY_SERVER_ID,
   GATEWAY_DISCOVERY_TOOL_NAME,
+  GATEWAY_CALL_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
+  GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
 import { defaultDebug, defaultResilience, defaultSelector, defaultSession, defaultTriggers } from '../fixtures/bootstrap-json.js'
@@ -214,6 +216,35 @@ describe('ExecutionRouter', () => {
     expect(outcome.outcome).toBe(OutcomeClass.Success)
     expect(outcome.serverId).toBe(GATEWAY_SERVER_ID)
     expect((outcome.result as { topic: string }).topic).toBe('catalog')
+    expect(registry.getServer).not.toHaveBeenCalled()
+  })
+
+  it('rejects gateway meta-tools when they are not visible in the session window', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const session = makeSession([makeTool('read_email', 'gmail-primary')])
+    await store.set(session.id, session)
+
+    const registry = {
+      getServer: vi.fn(),
+      getToolsByNamespace: vi.fn(),
+    }
+
+    const router = new ExecutionRouter(registry as never, store)
+    const searchOutcome = await router.route(GATEWAY_SEARCH_TOOL_NAME, { query: 'email' }, session.id)
+    const callOutcome = await router.route(
+      GATEWAY_CALL_TOOL_NAME,
+      { name: 'read_email', serverId: 'gmail-primary', arguments: {} },
+      session.id,
+    )
+
+    expect(searchOutcome.outcome).toBe(OutcomeClass.ToolError)
+    expect(searchOutcome.error).toBe('TOOL_NOT_VISIBLE')
+    expect(callOutcome.outcome).toBe(OutcomeClass.ToolError)
+    expect(callOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(registry.getServer).not.toHaveBeenCalled()
   })
 })

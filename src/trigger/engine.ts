@@ -12,6 +12,7 @@ import { buildGatewayToolWindowForMode, isGatewayInternalTool } from '../gateway
 import { GatewayMode } from '../types/enums.js'
 import { resolveFocusFromOutcomes } from '../selector/focus.js'
 import { disabledToolKeysForNamespace } from '../config/disabled-tool-keys.js'
+import { buildVisibleToolCatalog } from '../session/catalog.js'
 
 export class TriggerEngine {
   constructor(
@@ -119,11 +120,14 @@ export class TriggerEngine {
     >
     const gatewayMode = namespacePolicy['gatewayMode'] === GatewayMode.Code
       ? GatewayMode.Code
-      : GatewayMode.Compat
+      : namespacePolicy['gatewayMode'] === GatewayMode.Default
+        ? GatewayMode.Default
+        : GatewayMode.Compat
     const candidatePoolSize =
       typeof namespacePolicy['candidatePoolSize'] === 'number'
         ? namespacePolicy['candidatePoolSize']
         : 20
+    const disabledToolKeys = disabledToolKeysForNamespace(config, session.namespace)
     const { pool } = buildCandidatePool({
       namespace: session.namespace,
       mode: session.mode,
@@ -135,8 +139,51 @@ export class TriggerEngine {
       includeRiskLevels: starterPack?.includeRiskLevels ?? [ToolRiskLevel.Low],
       allToolcards: toolcards,
       healthStates,
-      disabledToolKeys: disabledToolKeysForNamespace(config, session.namespace),
+      disabledToolKeys,
     })
+
+    if (gatewayMode === GatewayMode.Default) {
+      const now = new Date().toISOString()
+      const directCatalog = buildVisibleToolCatalog(toolcards, disabledToolKeys)
+      const focus = resolveFocusFromOutcomes(session.recentOutcomes, config.selector.focus)
+      const updatedSession: SessionState = {
+        ...session,
+        toolWindow: directCatalog,
+        refreshCount: session.refreshCount + 1,
+        lastSelectorDecision: {
+          selected: directCatalog,
+          reasoning: 'direct_catalog',
+          triggeredBy: triggerType,
+          timestamp: now,
+        },
+        focusProfile: {
+          dominantCapability: focus.dominantCapability,
+          recentCapabilities: focus.recentCapabilities,
+          totalSignals: focus.totalSignals,
+          updatedAt: now,
+        },
+        pendingToolListChange: true,
+        refreshHistory: [
+          ...session.refreshHistory,
+          {
+            triggeredBy: triggerType,
+            timestamp: now,
+            toolCount: directCatalog.length,
+          },
+        ],
+      }
+
+      await this.store.set(session.id as SessionId, updatedSession)
+
+      this.auditLogger?.emit({
+        type: AuditEventType.ActiveWindowRecomputed,
+        sessionId: session.id,
+        toolCount: directCatalog.length,
+        triggerUsed: triggerType,
+        timestamp: now,
+      })
+      return
+    }
 
     const decision = await this.selector.select({
       sessionId: session.id,

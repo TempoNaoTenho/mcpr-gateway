@@ -68,6 +68,7 @@ export enum Mode {
 }
 
 export enum GatewayMode {
+  Default = 'default',
   Compat = 'compat',
   Code = 'code',
 }
