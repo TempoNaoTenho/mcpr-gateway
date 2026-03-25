@@ -56,7 +56,6 @@
     clientAuth: 'bearer_tokens',
     clientTokensConfigured: 0,
     adminTokenConfigured: false,
-    devModeEnabled: false,
   });
   let namespaces = $state<NamespaceRow[]>([]);
   let roles = $state<RoleRow[]>([]);
@@ -679,12 +678,6 @@
       <div class="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{configSource === 'db' ? 'SQLite' : 'bootstrap.json'} · {authSummary.adminTokenConfigured ? 'Admin protected' : 'Admin open'}</div>
     </div>
   </div>
-
-  {#if authSummary.devModeEnabled}
-    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
-      mock_dev bootstrap fallback is enabled. Persisted client tokens still win over ad-hoc dev Bearer values.
-    </div>
-  {/if}
 
   <!-- Tab bar -->
   <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">

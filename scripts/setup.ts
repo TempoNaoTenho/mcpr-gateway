@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   if (profile === '1') {
     console.log('  1. Set required environment variables:')
     console.log(
-      '       Set ADMIN_TOKEN, then add client tokens in the Web UI.'
+      '       Set ADMIN_TOKEN (enables admin login) and GATEWAY_ADMIN_*, then add client tokens in the Web UI.'
     )
     console.log('')
     console.log('  2. Start the gateway and open the WebUI to configure servers and policies.')

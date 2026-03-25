@@ -147,7 +147,7 @@ Managed downstream credentials are stored in SQLite separately from `configJson`
 
 Before parsing JSON, the file is read as text and **placeholders** in the form `${VAR_NAME}` are replaced with the value of that environment variable. Names must match `[A-Z_][A-Z0-9_]*`.
 
-If any referenced variable is **missing**, the process logs an error and **exits**. This is commonly used for API keys in `auth.staticKeys` (see `gateway.production.example.json`).
+If any referenced variable is **missing**, the process logs an error and **exits**. This is commonly used for API keys in `auth.staticKeys` (see `config/bootstrap.example.json`).
 
 ## Missing file
 
@@ -177,7 +177,7 @@ In the SQLite case:
 ## Which token do I use?
 
 - **Client access token**: used by MCP clients on `/mcp/:namespace`
-- **Admin panel token**: used by the WebUI and `/admin/*`
+- **Admin access**: not a Bearer token. When `ADMIN_TOKEN` is set, call `POST /admin/auth/login` with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`, then send the `admin_session` cookie on `/admin/*` (the WebUI does this automatically).
 
 Typical MCP client header:
 
@@ -194,40 +194,33 @@ url = "http://127.0.0.1:3000/mcp/all"
 bearer_token_env_var = "MCP_SESSION_GATEWAY_TOKEN"
 ```
 
-Typical admin header:
+Typical admin request after login:
 
 ```http
-Authorization: Bearer <ADMIN_TOKEN>
+Cookie: admin_session=<value-from-set-cookie>
 ```
 
-## `mock_dev` authentication behavior
+## Client bearer authentication (`static_key`)
 
-`mock_dev` is intentionally strict about roles:
+Bootstrap auth uses **`static_key` only**. The legacy `auth.mode` value `mock_dev` is rejected at startup.
 
-- No `Authorization` header means the request resolves to `sub = "anonymous"` and `roles = []`.
-- `Authorization: Bearer <userId>` gives that `userId` but still no roles.
-- `Authorization: Bearer <userId>:<role1,role2>` sets both the user id and roles.
+For each MCP request, the gateway resolves the caller from `Authorization: Bearer <token>`:
 
-This matters for namespace access because a request is allowed only when:
+- If the token matches an entry in effective `auth.staticKeys` (bootstrap and/or admin-managed tokens), `sub` and `roles` come from that entry.
+- If the header is missing or the token is unknown, the caller is `sub = "anonymous"` and `roles = []`.
 
-- the namespace includes at least one of the caller roles in `namespaces[namespace].allowedRoles`, and
-- the matching role also includes that namespace in `roles[role].allowNamespaces`.
+Namespace access requires both:
 
-For local tools like MCP Inspector, a typical header is:
-
-```http
-Authorization: Bearer inspector:user
-```
+- the namespace lists at least one of the caller roles in `namespaces[namespace].allowedRoles`, and
+- that role includes the namespace in `roles[role].allowNamespaces`.
 
 ## Examples
 
 In `config/`:
 
-- `gateway.example.json` — sample server + `static_key` auth (placeholder keys).
-- `gateway.local.example.json` — minimal local bootstrap (`mock_dev` + debug enabled).
-- `gateway.production.example.json` — minimal production bootstrap (`static_key` with `${GATEWAY_API_KEY}`).
+- `bootstrap.example.json` — template `bootstrap.json` with `static_key` (no placeholder keys; add tokens via the Web UI or `auth.staticKeys`).
 
-Run `npm run setup` to copy a local or production bootstrap profile to `config/bootstrap.json`, then use the WebUI for the rest.
+Run `npm run setup` to copy it to `config/bootstrap.json` (interactive profile choice), then use the WebUI for downstream servers and policies.
 
 For Docker Compose, set `HOST=0.0.0.0` and, if needed, `UI_STATIC_DIR=/app/ui/dist` so the bundled server can always locate the built WebUI inside the container.
 

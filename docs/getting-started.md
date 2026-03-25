@@ -14,16 +14,15 @@ npm ci
 npm run setup
 ```
 
-[`npm run setup`](../scripts/setup.ts) interactively copies a profile into `config/bootstrap.json`. Example sources live in [`config/`](../config/) (`gateway.local.example.json`, `gateway.production.example.json`, `gateway.example.json`).
+[`npm run setup`](../scripts/setup.ts) interactively copies a profile into `config/bootstrap.json`. Example sources live in [`config/`](../config/) (`bootstrap.example.json`). The current example is pretty minimal. It is recommended for testing and reproducible instances only.
 
-For anything beyond local experimentation, choose the production profile (`static_key`). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN`, or put a real token in `auth.staticKeys` in `bootstrap.json`. The production **example** file uses `${GATEWAY_API_KEY}` interpolation only as an optional bootstrap pattern — define that env var **if** you keep the placeholder, or replace/remove it in JSON.
+For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`, or define entries under `auth.staticKeys` in `bootstrap.json` (optionally using `${VAR}` placeholders — missing env vars cause startup failure).
 
 If you skip `setup`, you can copy an example manually:
 
 ```bash
-cp config/gateway.production.example.json config/bootstrap.json
-# Either: export GATEWAY_API_KEY=<token>  (only while the file still has ${GATEWAY_API_KEY})
-# Or: edit staticKeys in bootstrap.json / create tokens in the Web UI
+cp config/bootstrap.example.json config/bootstrap.json
+# Then: add tokens via the Web UI, or edit auth.staticKeys in bootstrap.json
 ```
 
 When `bootstrap.json` is missing, the process still starts with built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)).
@@ -125,17 +124,18 @@ export MCP_SERVER_TOKEN=<your-downstream-token>
 
 Configured in `bootstrap.json` under `auth`:
 
-| `auth.mode`  | Behavior                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mock_dev`   | Bearer token optional. Token `user:role1,role2` maps to subject and roles; bare token → subject only. No token → `anonymous` with no roles. |
-| `static_key` | Bearer token matched against `auth.staticKeys` → `userId` and `roles`. Unknown or missing token → `anonymous`.                              |
+| `auth.mode`  | Behavior                                                                                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static_key` | `Authorization: Bearer <token>` must match a key in `auth.staticKeys` to obtain `userId` and `roles`. Otherwise the request is treated as `anonymous` with no roles. |
+
+The legacy value `mock_dev` is **not** accepted in `bootstrap.json` — the process exits at startup if it appears.
 
 Implementation: [`src/auth/service.ts`](../src/auth/service.ts).
 
 Recommended usage:
 
-- `mock_dev`: local-only debugging with tokens like `Authorization: Bearer alice:user`
-- `static_key`: bootstrap only; production and shared environments should use client access tokens created in the Access Control panel
+- Prefer **client access tokens** created in the Access Control panel (stored in the DB when using SQLite).
+- You may seed `auth.staticKeys` in `bootstrap.json` for bootstrap-only keys; optional `${VAR}` interpolation applies to string values in that file.
 
 Authorization to use a namespace and mode is enforced in policy resolution during `initialize` ([`src/gateway/dispatch/initialize.ts`](../src/gateway/dispatch/initialize.ts)).
 
@@ -153,4 +153,4 @@ See [Development](development.md#web-ui) for day-to-day UI work.
 
 - [Configuration](CONFIGURATION.md) — all `bootstrap.json` sections and `${VAR}` interpolation
 - [HTTP API](http-api.md) — health, admin, debug routes
-- [Deployment](deployment.md) — Compose, persistence, admin panel token, and `NODE_ENV`
+- [Deployment](deployment.md) — Compose, persistence, admin protection (`ADMIN_TOKEN` / `GATEWAY_ADMIN_*`), and `NODE_ENV`

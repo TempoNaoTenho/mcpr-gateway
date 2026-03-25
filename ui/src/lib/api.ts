@@ -538,7 +538,6 @@ export interface AuthSummary {
   clientAuth: 'bearer_tokens'
   clientTokensConfigured: number
   adminTokenConfigured: boolean
-  devModeEnabled: boolean
 }
 
 export type ConfigSource = 'db' | 'file'

@@ -193,7 +193,9 @@ Changes made via the admin panel are written to SQLite and persist across restar
 | `CONFIG_PATH`                    | `./config`          | Directory containing `bootstrap.json`               |
 | `DATABASE_PATH`                  | `./data/gateway.db` | SQLite file path                                    |
 | `SESSION_BACKEND`                | _(unset = SQLite)_  | Set to `memory` for ephemeral sessions              |
-| `ADMIN_TOKEN`                    | _(unset)_           | Protects `/admin/*` when set                        |
+| `ADMIN_TOKEN`                    | _(unset)_           | When set (any non-empty value), `/admin/*` requires login (cookie), not the password itself |
+| `GATEWAY_ADMIN_USER`             | `mcpgateway`        | Admin UI login username when `ADMIN_TOKEN` is set  |
+| `GATEWAY_ADMIN_PASSWORD`         | _(unset)_           | When set, required with username; when unset, username-only login |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | _(unset)_           | Base64 32-byte key for encrypted downstream secrets |
 | `LOG_LEVEL`                      | `info`              | Pino log level                                      |
 | `AUDIT_RETENTION_DAYS`           | `90`                | Default audit log retention                         |
@@ -208,7 +210,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full schema reference
 
 - **Local bind by default** — `HOST=127.0.0.1` prevents accidental network exposure
 - **Client auth** — `static_key`: MCP clients use Bearer tokens created in the admin UI / admin API (bootstrap only carries `auth.mode`; tokens are not embedded in `bootstrap.json`)
-- **Admin API protection** — set `ADMIN_TOKEN`; in `NODE_ENV=production` with debug off and no token, admin routes are not mounted at all
+- **Admin API protection** — set `ADMIN_TOKEN` to require `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` via `/admin/auth/login` (session cookie); in `NODE_ENV=production` with debug off and no `ADMIN_TOKEN`, admin routes are not mounted at all
 - **Downstream credentials** — stored AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set
 - **Rate limiting** — per-session and per-user request limits via `@fastify/rate-limit`
 - **Security headers** — `@fastify/helmet` applied to all responses

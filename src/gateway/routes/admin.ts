@@ -305,7 +305,6 @@ function buildAuthSummary(effectiveAuth: {
     clientAuth: 'bearer_tokens' as const,
     clientTokensConfigured: Object.keys(effectiveAuth.staticKeys ?? {}).length,
     adminTokenConfigured: Boolean(process.env['ADMIN_TOKEN']),
-    devModeEnabled: false,
   }
 }
 
@@ -655,9 +654,8 @@ function getGatewayAdminUser(): string {
 
 /**
  * For the UI routes (`/admin/auth/*`): no pre-authentication required.
- * For all other `/admin/*` routes: accept either:
- *   - Bearer token (original API usage)
- *   - admin_session cookie (UI usage)
+ * For all other `/admin/*` routes: require a valid `admin_session` cookie
+ * from `POST /admin/auth/login` (username / password).
  */
 function requireAdminAuth(app: FastifyInstance): void {
   const adminToken = process.env['ADMIN_TOKEN']
@@ -666,10 +664,6 @@ function requireAdminAuth(app: FastifyInstance): void {
   app.addHook('preHandler', async (request, reply) => {
     // Skip the auth endpoints themselves
     if (request.url.startsWith('/admin/auth/')) return
-
-    // Check Bearer token
-    const auth = request.headers['authorization']
-    if (auth === `Bearer ${adminToken}`) return
 
     // Check HttpOnly cookie session
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -773,24 +767,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         return reply.send({ authenticated: true })
       }
 
-      const body = request.body as { token?: string; username?: string; password?: string } | undefined
-      const token = body?.token?.trim()
-      if (token) {
-        if (token === adminToken) {
-          const sessionId = nanoid(32)
-          adminSessions.set(sessionId, { createdAt: Date.now() })
-
-          const isProduction = process.env['NODE_ENV'] === 'production'
-          reply.header(
-            'Set-Cookie',
-            `admin_session=${sessionId}; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=${SESSION_TTL_MS / 1000}`
-          )
-
-          return reply.send({ authenticated: true })
-        }
-
-        return reply.status(401).send({ error: 'Invalid token' })
-      }
+      const body = request.body as { username?: string; password?: string } | undefined
 
       const expectedUser = getGatewayAdminUser()
       const adminPasswordEnv = process.env['GATEWAY_ADMIN_PASSWORD']

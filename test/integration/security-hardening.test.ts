@@ -20,6 +20,7 @@ const lookupMock = vi.mocked(lookup)
 describe('Security hardening integration', () => {
   const originalNodeEnv = process.env['NODE_ENV']
   const originalAdminToken = process.env['ADMIN_TOKEN']
+  const originalGatewayAdminPassword = process.env['GATEWAY_ADMIN_PASSWORD']
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -31,6 +32,9 @@ describe('Security hardening integration', () => {
 
     if (originalAdminToken === undefined) delete process.env['ADMIN_TOKEN']
     else process.env['ADMIN_TOKEN'] = originalAdminToken
+
+    if (originalGatewayAdminPassword === undefined) delete process.env['GATEWAY_ADMIN_PASSWORD']
+    else process.env['GATEWAY_ADMIN_PASSWORD'] = originalGatewayAdminPassword
   })
 
   it('rejects OAuth URLs that resolve to private IPs', async () => {
@@ -86,18 +90,24 @@ describe('Security hardening integration', () => {
   })
 
   it('applies rate limiting to admin login', async () => {
-    process.env['ADMIN_TOKEN'] = 'secret-token'
+    process.env['ADMIN_TOKEN'] = '1'
+    process.env['GATEWAY_ADMIN_PASSWORD'] = 'real-admin-password'
 
     const app = buildServer({ logLevel: 'silent' })
     await app.register(adminRoutes, {})
     await app.ready()
+
+    const badLogin = {
+      username: 'mcpgateway',
+      password: 'wrong-password',
+    }
 
     try {
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const response = await app.inject({
           method: 'POST',
           url: '/admin/auth/login',
-          payload: { token: 'wrong-token' },
+          payload: badLogin,
         })
         expect(response.statusCode).toBe(401)
       }
@@ -105,7 +115,7 @@ describe('Security hardening integration', () => {
       const limited = await app.inject({
         method: 'POST',
         url: '/admin/auth/login',
-        payload: { token: 'wrong-token' },
+        payload: badLogin,
       })
 
       expect(limited.statusCode).toBe(429)

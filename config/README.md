@@ -15,17 +15,15 @@ npm run setup   # interactive: choose profile → writes config/bootstrap.json
 npm run dev
 ```
 
-Recommendation: use the production profile unless you are intentionally doing local-only development. `mock_dev` is convenient for testing, but `static_key` is the correct path for hosted or shared use.
+Recommendation: use `npm run setup` and choose the profile that matches your environment. Auth is always **`static_key`**; use the Access Control panel (or `auth.staticKeys` in `bootstrap.json`) for client bearer tokens.
 
 By default the HTTP server binds to `127.0.0.1`, which keeps development local to the host machine. Set `HOST=0.0.0.0` only when you intentionally need Docker or remote network exposure.
 
 ### Profiles (examples)
 
-| File                              | Use case                                                                                                         |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `gateway.production.example.json` | Recommended for hosted/shared use: `static_key`; example uses optional `${GATEWAY_API_KEY}` or use UI for tokens |
-| `gateway.local.example.json`      | Local-only development: `mock_dev` auth, debug-friendly limits                                                   |
-| `gateway.example.json`            | Full sample including a downstream server + static placeholder keys                                              |
+| File                     | Use case                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `bootstrap.example.json` | Template copied to `bootstrap.json` by `npm run setup`; `static_key` auth, minimal policies    |
 
 ### Docker
 
@@ -41,8 +39,8 @@ The compose setup pins `HOST=0.0.0.0` and `UI_STATIC_DIR=/app/ui/dist` so the co
 ### Manual copy
 
 ```bash
-cp config/gateway.production.example.json config/bootstrap.json
-# If the file still contains ${GATEWAY_API_KEY}, export it before start, or replace that key in JSON / add tokens via admin UI
+cp config/bootstrap.example.json config/bootstrap.json
+# Add client tokens via the Web UI or edit auth.staticKeys; optional ${VAR} in JSON requires those env vars at startup
 ```
 
 ### Environment interpolation

@@ -485,7 +485,6 @@ describe('adminRoutes', () => {
         clientAuth: 'bearer_tokens',
         clientTokensConfigured: 2,
         adminTokenConfigured: false,
-        devModeEnabled: false,
       },
       tokens: expect.arrayContaining([
         {
@@ -573,7 +572,7 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
-  it('allows managing client access tokens in mock_dev bootstrap mode', async () => {
+  it('allows managing client access tokens with default static_key harness', async () => {
     const { configRepo, configManager, getCurrent } = createAdminHarness()
     const app = buildServer({ logLevel: 'silent' })
     await app.register(adminRoutes, {

@@ -21,5 +21,5 @@ services:
       LOG_LEVEL: info
       DATABASE_PATH: /app/data/gateway.db
       UI_STATIC_DIR: /app/ui/dist
-      # ADMIN_TOKEN: change-me   # required to enable /admin/* endpoints
+      # ADMIN_TOKEN: "1"   # any non-empty value: require admin login (GATEWAY_ADMIN_USER / GATEWAY_ADMIN_PASSWORD)
       # Define any env vars referenced by ${VAR} in bootstrap.json (if present)

@@ -14,7 +14,7 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 - **Body:** JSON-RPC object; request methods require `id`, notifications may omit it; unsupported `method` → gateway error ([`src/gateway/routes/mcp.ts`](../src/gateway/routes/mcp.ts)).
 - **Session:** After `initialize`, clients must send **`Mcp-Session-Id`** on subsequent requests (header) for `tools/list` and `tools/call`.
 - **Loopback CORS:** `OPTIONS`, `GET`, and `POST` emit CORS headers for loopback origins only (`localhost`, `127.0.0.1`, `::1`), and expose `Mcp-Session-Id` for browser-based clients.
-- **mock_dev auth:** Requests without `Authorization` are treated as anonymous with no roles. To access role-protected namespaces, send `Authorization: Bearer <userId>:<role1,role2>` such as `Authorization: Bearer inspector:user`.
+- **Client auth (`static_key`):** Send `Authorization: Bearer <client-access-token>`. The token must match a configured client token (from `auth.staticKeys` and/or tokens issued in the admin UI). Missing or unknown tokens resolve to `anonymous` with no roles, so role-protected namespaces require a valid token and matching policy.
 - **Codex CLI auth:** For Codex streamable HTTP servers, configure `bearer_token_env_var` in `~/.codex/config.toml`. A bare `Authorization = "Bearer ..."` entry in the server block is not interpreted as an HTTP header by Codex.
 
 Hybrid compatibility on the same route:
@@ -60,13 +60,13 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 ### Admin authentication
 
 - **`/admin/auth/*`** — No prior auth (used to log in).
-- **All other `/admin/*`** — If `ADMIN_TOKEN` is set: require either `Authorization: Bearer <ADMIN_TOKEN>` **or** a valid `admin_session` cookie obtained from `POST /admin/auth/login`. If `ADMIN_TOKEN` is **unset**, no admin auth hook runs (any caller can hit admin routes **when they are registered** — see [Deployment](deployment.md#admin-api-and-production)).
+- **All other `/admin/*`** — If `ADMIN_TOKEN` is set: require a valid `admin_session` cookie from `POST /admin/auth/login` (`GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`). If `ADMIN_TOKEN` is **unset**, no admin auth hook runs (any caller can hit admin routes **when they are registered** — see [Deployment](deployment.md#admin-api-and-production)).
 
 ### Core routes (always present when admin is enabled)
 
 | Method | Path                 | Description                                                          |
 | ------ | -------------------- | -------------------------------------------------------------------- |
-| `POST` | `/admin/auth/login`  | Body `{ "token": "<ADMIN_TOKEN>" }` when token required; sets cookie |
+| `POST` | `/admin/auth/login`  | Body `{ "username", "password" }`; sets `admin_session` cookie when `ADMIN_TOKEN` is set |
 | `POST` | `/admin/auth/logout` | Clears cookie                                                        |
 | `GET`  | `/admin/auth/me`     | `{ "authenticated": boolean }`                                       |
 | `GET`  | `/admin/dashboard`   | Aggregated stats (sessions, servers, tools, recent audit if SQLite)  |

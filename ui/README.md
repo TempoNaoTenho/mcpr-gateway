@@ -31,7 +31,7 @@ npm run dev:all      # gateway + UI dev servers (see root package.json)
 
 ## API usage
 
-The UI talks to the same host as the gateway, using **`/admin/*`** JSON endpoints. When `ADMIN_TOKEN` is set on the server, use the login flow or send `Authorization: Bearer <token>`. See [docs/http-api.md](../docs/http-api.md#admin-api).
+The UI talks to the same host as the gateway, using **`/admin/*`** JSON endpoints. When `ADMIN_TOKEN` is set on the server, sign in with the configured admin username and password (session cookie). See [docs/http-api.md](../docs/http-api.md#admin-api).
 
 ## Project stack
 
