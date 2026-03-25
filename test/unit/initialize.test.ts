@@ -457,6 +457,98 @@ describe('handleInitialize', () => {
     expect(selected[0]?.serverId).toBe('gmail-server')
   })
 
+  it('includes compat instructions in initialize response for compat mode', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const registry = makeRegistry([makeToolRecord('read_message')])
+
+    const response = await handleInitialize(
+      makeRequest(Mode.Read),
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+      store,
+      registry as never
+    )
+
+    const result = (response.result as { result: { instructions?: string } }).result
+    expect(result.instructions).toBeDefined()
+    expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).toContain('gateway_call_tool')
+  })
+
+  it('includes code mode instructions in initialize response for code mode', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            gatewayMode: GatewayMode.Code,
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeRequest(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toBeDefined()
+      expect(result.instructions).toContain('gateway_run_code')
+      expect(result.instructions).toContain('catalog.search')
+      expect(result.instructions).toContain('mcp.call')
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
+  it('omits instructions in initialize response for default mode', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            gatewayMode: GatewayMode.Default,
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeRequest(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toBeUndefined()
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
   it('publishes tools for the all namespace when a server is assigned there', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {

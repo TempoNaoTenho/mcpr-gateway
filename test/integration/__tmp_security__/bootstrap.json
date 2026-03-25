@@ -1,5 +1,16 @@
 {
-  "servers": [],
+  "servers": [
+    {
+      "id": "security-gmail-server",
+      "namespaces": [
+        "gmail"
+      ],
+      "transport": "streamable-http",
+      "url": "http://fake-mcp.local/a61b73fc-83cb-4488-b7f4-6ee4ce855f51/mcp",
+      "enabled": true,
+      "trustLevel": "internal"
+    }
+  ],
   "auth": {
     "mode": "static_key"
   },
@@ -7,13 +18,24 @@
     "gmail": {
       "allowedRoles": [
         "user",
-        "admin"
+        "admin",
+        "write-denied-user"
       ],
-      "bootstrapWindowSize": 4,
-      "candidatePoolSize": 16,
+      "bootstrapWindowSize": 10,
+      "candidatePoolSize": 20,
       "allowedModes": [
         "read",
         "write"
+      ]
+    },
+    "readonly-ns": {
+      "allowedRoles": [
+        "user"
+      ],
+      "bootstrapWindowSize": 4,
+      "candidatePoolSize": 10,
+      "allowedModes": [
+        "read"
       ]
     }
   },
@@ -26,10 +48,21 @@
         "admin"
       ]
     },
-    "admin": {
+    "write-denied-user": {
       "allowNamespaces": [
         "gmail"
+      ],
+      "denyModes": [
+        "write",
+        "admin"
       ]
+    },
+    "admin": {
+      "allowNamespaces": [
+        "gmail",
+        "readonly-ns"
+      ],
+      "denyModes": []
     }
   },
   "selector": {
@@ -51,7 +84,7 @@
     "publication": {
       "descriptionCompression": "off",
       "schemaCompression": "off",
-      "descriptionMaxLength": 160
+      "descriptionMaxLength": 0
     }
   },
   "session": {
@@ -97,13 +130,14 @@
       "preferredTags": [
         "email"
       ],
-      "maxTools": 4,
+      "maxTools": 10,
       "includeRiskLevels": [
-        "low"
+        "low",
+        "medium"
       ],
       "includeModes": [
         "read"
       ]
     }
   }
-}
+}/s

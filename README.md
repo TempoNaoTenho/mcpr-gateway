@@ -140,9 +140,9 @@ The MCP HTTP surface is `GET`/`POST` `/mcp/<namespace>` where `<namespace>` matc
 
 ### `npm run setup` vs `npm run dev:all`
 
-| Script | What it does |
-|--------|----------------|
-| **`npm run setup`** | One-time (or occasional) **configuration** step. Prompts for a profile label, then copies [`config/bootstrap.example.json`](config/bootstrap.example.json) to `config/bootstrap.json`. The choice only changes the **printed “next steps”**; the file content is the same. Does **not** install npm dependencies and does **not** start any process. For hand-edited bootstrap files, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md). |
+| Script                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`npm run setup`**   | One-time (or occasional) **configuration** step. Prompts for a profile label, then copies [`config/bootstrap.example.json`](config/bootstrap.example.json) to `config/bootstrap.json`. The choice only changes the **printed “next steps”**; the file content is the same. Does **not** install npm dependencies and does **not** start any process. For hand-edited bootstrap files, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md).  |
 | **`npm run dev:all`** | **Runs the stack** for local development: spawns the gateway (`npm run dev`) and the SvelteKit **Vite** dev server (`npm run dev` in `ui/`). Default ports: **UI on `PORT`** (from the environment or `.env`, usually `3000`), **gateway on `PORT + 1`** (usually `3001`). [`scripts/dev-all.mjs`](scripts/dev-all.mjs) sets `GATEWAY_PROXY_TARGET` so the UI proxies admin/health traffic to the API. Optional: copy [`.env.example`](.env.example) to `.env` for `HOST` / `PORT`. |
 
 ### Run commands
@@ -186,19 +186,19 @@ Changes made via the admin panel are written to SQLite and persist across restar
 
 ### Key Environment Variables
 
-| Variable                         | Default             | Purpose                                             |
-| -------------------------------- | ------------------- | --------------------------------------------------- |
-| `HOST`                           | `127.0.0.1`         | Bind address (`0.0.0.0` for Docker)                 |
-| `PORT`                           | `3000`              | HTTP port                                           |
-| `CONFIG_PATH`                    | `./config`          | Directory containing `bootstrap.json`               |
-| `DATABASE_PATH`                  | `./data/gateway.db` | SQLite file path                                    |
-| `SESSION_BACKEND`                | _(unset = SQLite)_  | Set to `memory` for ephemeral sessions              |
+| Variable                         | Default             | Purpose                                                                                     |
+| -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `HOST`                           | `127.0.0.1`         | Bind address (`0.0.0.0` for Docker)                                                         |
+| `PORT`                           | `3000`              | HTTP port                                                                                   |
+| `CONFIG_PATH`                    | `./config`          | Directory containing `bootstrap.json`                                                       |
+| `DATABASE_PATH`                  | `./data/gateway.db` | SQLite file path                                                                            |
+| `SESSION_BACKEND`                | _(unset = SQLite)_  | Set to `memory` for ephemeral sessions                                                      |
 | `ADMIN_TOKEN`                    | _(unset)_           | When set (any non-empty value), `/admin/*` requires login (cookie), not the password itself |
-| `GATEWAY_ADMIN_USER`             | `mcpgateway`        | Admin UI login username when `ADMIN_TOKEN` is set  |
-| `GATEWAY_ADMIN_PASSWORD`         | _(unset)_           | When set, required with username; when unset, username-only login |
-| `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | _(unset)_           | Base64 32-byte key for encrypted downstream secrets |
-| `LOG_LEVEL`                      | `info`              | Pino log level                                      |
-| `AUDIT_RETENTION_DAYS`           | `90`                | Default audit log retention                         |
+| `GATEWAY_ADMIN_USER`             | `mcpgateway`        | Admin UI login username when `ADMIN_TOKEN` is set                                           |
+| `GATEWAY_ADMIN_PASSWORD`         | _(unset)_           | When set, required with username; when unset, username-only login                           |
+| `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | _(unset)_           | Base64 32-byte key for encrypted downstream secrets                                         |
+| `LOG_LEVEL`                      | `info`              | Pino log level                                                                              |
+| `AUDIT_RETENTION_DAYS`           | `90`                | Default audit log retention                                                                 |
 
 Bootstrap `auth` is only `{"mode": "static_key"}` (see [`config/bootstrap.example.json`](config/bootstrap.example.json)); **client Bearer tokens are created in the admin WebUI / API**, not listed in `bootstrap.json`. Other bootstrap strings may still use `${VAR_NAME}` environment interpolation where the schema allows it.
 

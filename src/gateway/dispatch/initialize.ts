@@ -18,6 +18,17 @@ import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { resolveFocusFromOutcomes } from '../../selector/focus.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
+
+function buildGatewayInstructions(mode: GatewayMode): string | undefined {
+  switch (mode) {
+    case GatewayMode.Compat:
+      return 'Gateway in compatibility mode. Discover available tools with gateway_search_tools, then invoke them with gateway_call_tool. Do not attempt to call upstream tools directly.'
+    case GatewayMode.Code:
+      return 'Gateway in code mode. Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.search(query), catalog.list(), mcp.call(handle, args), mcp.batch([{handle, args}]), result.limit(n), result.pick(fields), artifacts.save(name, content). Call gateway_help for full API reference.'
+    default:
+      return undefined
+  }
+}
 import type { SelectorDecision } from '../../types/selector.js'
 
 interface JsonRpcBody {
@@ -193,6 +204,8 @@ export async function handleInitialize(
     latencyMs,
   }, 'session initialized')
 
+  const instructions = buildGatewayInstructions(gatewayMode)
+
   return {
     id: sessionId,
     result: {
@@ -209,6 +222,7 @@ export async function handleInitialize(
           name: 'mcp-session-gateway',
           version: '0.1.0',
         },
+        ...(instructions !== undefined && { instructions }),
       },
     },
   }
