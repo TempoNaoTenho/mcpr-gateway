@@ -177,9 +177,8 @@ describe('DownstreamRegistry.refreshTools()', () => {
     const rawTools: ToolSchema[] = [makeRawTool()]
 
     const reg = new DownstreamRegistry()
-    await reg.start([server])
-
     vi.mocked(fetchToolsStdio).mockResolvedValue(rawTools)
+    await reg.start([server])
 
     const records = await reg.refreshTools(server.id)
     expect(records).toHaveLength(1)
@@ -204,6 +203,7 @@ describe('DownstreamRegistry.refreshTools()', () => {
     }))
 
     const reg = new DownstreamRegistry()
+    vi.mocked(fetchToolsStdio).mockResolvedValue([makeRawTool()])
     await reg.start([server])
 
     const state = await reg.startStdioInteractiveAuth(server.id)
@@ -232,6 +232,7 @@ describe('DownstreamRegistry.refreshTools()', () => {
     }))
 
     const reg = new DownstreamRegistry()
+    vi.mocked(fetchToolsStdio).mockResolvedValue([makeRawTool()])
     await reg.start([server])
     await reg.startStdioInteractiveAuth(server.id)
 
@@ -258,6 +259,7 @@ describe('DownstreamRegistry.refreshTools()', () => {
     })
 
     const reg = new DownstreamRegistry()
+    vi.mocked(fetchToolsStdio).mockResolvedValue([makeRawTool()])
     await reg.start([server])
 
     await expect(reg.startStdioInteractiveAuth(server.id)).rejects.toThrow(
@@ -327,7 +329,7 @@ describe('DownstreamRegistry.start() and stop()', () => {
     expect(found).toEqual(server)
   })
 
-  it('skips stdio auto-refresh during start', async () => {
+  it('refreshes stdio servers during start', async () => {
     const server = makeServer({
       transport: 'stdio',
       command: 'npx',
@@ -335,10 +337,11 @@ describe('DownstreamRegistry.start() and stop()', () => {
       url: undefined,
     })
     const reg = new DownstreamRegistry()
+    vi.mocked(fetchToolsStdio).mockResolvedValue([makeRawTool()])
 
     await reg.start([server])
 
-    expect(fetchToolsStdio).not.toHaveBeenCalled()
+    expect(fetchToolsStdio).toHaveBeenCalledWith(server)
   })
 
   it('still auto-refreshes HTTP servers during start', async () => {

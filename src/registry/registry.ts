@@ -155,9 +155,7 @@ export class DownstreamRegistry implements IRegistryAdapter {
     downstreamAuthManager.syncServers(servers)
     this.stdioInteractiveAuth.syncServers(servers)
 
-    const autoRefreshableServers = servers.filter(
-      (server) => server.enabled && server.transport !== 'stdio',
-    )
+    const autoRefreshableServers = servers.filter((server) => server.enabled)
     await this.refreshMany(autoRefreshableServers)
 
     if (this.healthMonitor && resilienceConfig) {

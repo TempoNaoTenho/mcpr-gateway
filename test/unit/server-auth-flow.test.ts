@@ -53,6 +53,37 @@ describe('serverAuthFlow', () => {
     }))).toBeNull();
   });
 
+  it('auto-refreshes plain stdio when periodic catalog refresh is configured', () => {
+    const configServer = makeConfigServer({
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'srv'],
+      discovery: { mode: 'auto' },
+      refreshIntervalSeconds: 300,
+      stdioInteractiveAuth: { enabled: false },
+    });
+
+    expect(
+      getAutoRefreshReason(
+        configServer,
+        makeRuntimeServer({ transport: 'stdio', toolCount: 0 }),
+      ),
+    ).toBe('stdio-empty-catalog:auto:ok');
+
+    const manual = makeConfigServer({
+      transport: 'stdio',
+      command: 'npx',
+      args: [],
+      discovery: { mode: 'manual' },
+      refreshIntervalSeconds: undefined,
+      stdioInteractiveAuth: { enabled: false },
+    });
+
+    expect(
+      getAutoRefreshReason(manual, makeRuntimeServer({ transport: 'stdio', toolCount: 0 })),
+    ).toBeNull();
+  });
+
   it('only auto-refreshes interactive stdio after auth is ready', () => {
     const configServer = makeConfigServer({
       transport: 'stdio',
@@ -102,6 +133,16 @@ describe('serverAuthFlow', () => {
       authStatus: 'auth_required',
       authAuthorizationServer: 'https://issuer.example.com',
     }))).toBe('oauth');
+
+    expect(getAutoRefreshReason(configServer, makeRuntimeServer({
+      authStatus: 'configured',
+      authAuthorizationServer: 'https://issuer.example.com',
+    }))).toBeNull();
+
+    expect(getAutoRefreshReason(configServer, makeRuntimeServer({
+      authStatus: 'authorized',
+      authAuthorizationServer: 'https://issuer.example.com',
+    }))).toBe('http-empty-catalog:oauth');
   });
 
   it('treats managed bearer servers as manual until a secret exists', () => {

@@ -48,6 +48,17 @@ function isBlockedHttpRefresh(runtimeServer: ServerInfo | null | undefined): boo
   return runtimeServer?.authStatus === 'auth_required' || runtimeServer?.authStatus === 'misconfigured';
 }
 
+/** Matches `effectiveRefreshIntervalSeconds` in `src/registry/registry.ts` for catalog polling. */
+function effectiveRefreshIntervalSecondsConfig(configServer: ConfigServer): number | undefined {
+  if (configServer.refreshIntervalSeconds != null && configServer.refreshIntervalSeconds > 0) {
+    return configServer.refreshIntervalSeconds;
+  }
+  if (configServer.discovery?.mode === 'auto') {
+    return 300;
+  }
+  return undefined;
+}
+
 export function getAutoRefreshReason(
   configServer: ConfigServer | undefined,
   runtimeServer?: ServerInfo | null,
@@ -65,10 +76,13 @@ export function getAutoRefreshReason(
   }
 
   if (configServer.transport === 'stdio') {
-    return null;
+    if (effectiveRefreshIntervalSecondsConfig(configServer) == null) {
+      return null;
+    }
+    return `stdio-empty-catalog:${configServer.discovery?.mode ?? 'manual'}:${runtimeServer.error ? 'error' : 'ok'}`;
   }
 
-  if (configServer.auth?.mode === 'oauth') {
+  if (isOAuthServer(configServer, runtimeServer)) {
     return runtimeServer.authStatus === 'authorized' ? 'http-empty-catalog:oauth' : null;
   }
 
