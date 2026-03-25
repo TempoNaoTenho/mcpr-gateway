@@ -194,7 +194,7 @@ describe('loadConfig — valid config', () => {
     expect(merged.selector.publication).toEqual({
       descriptionCompression: 'off',
       schemaCompression: 'off',
-      descriptionMaxLength: 160,
+      descriptionMaxLength: 0,
     })
   })
 

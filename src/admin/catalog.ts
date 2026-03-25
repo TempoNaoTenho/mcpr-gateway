@@ -47,9 +47,9 @@ export function buildAdminToolEntry(
     hasSchemaOverride: override?.inputSchema !== undefined,
     hasDescriptionOverride: override?.description !== undefined,
     originalDescription: record.description,
-    effectiveDescription: toolcard.description,
+    effectiveDescription: publicShape.description,
     originalInputSchema: record.inputSchema,
-    effectiveInputSchema: toolcard.inputSchema,
+    effectiveInputSchema: publicShape.inputSchema,
     schemaTokens: estimateSerializedTokens(publicShape.inputSchema),
     totalTokens: estimateSerializedTokens(publicShape),
   }

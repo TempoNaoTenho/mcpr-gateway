@@ -13,7 +13,7 @@ export const defaultSelector = {
   publication: {
     descriptionCompression: 'off' as const,
     schemaCompression: 'off' as const,
-    descriptionMaxLength: 160,
+    descriptionMaxLength: 0,
   },
 } as const
 

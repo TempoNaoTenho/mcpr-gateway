@@ -39,7 +39,7 @@
     "publication": {
       "descriptionCompression": "off",
       "schemaCompression": "off",
-      "descriptionMaxLength": 160
+      "descriptionMaxLength": 0
     }
   },
   "session": {

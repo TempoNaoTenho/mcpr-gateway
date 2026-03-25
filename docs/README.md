@@ -7,7 +7,7 @@ Human-oriented guides for installing, configuring, operating, and developing the
 | Guide                                 | Audience               | Contents                                                         |
 | ------------------------------------- | ---------------------- | ---------------------------------------------------------------- |
 | [Getting started](getting-started.md) | Operators, integrators | Dependencies, setup, MCP client flow, auth basics                |
-| [Configuration](CONFIGURATION.md)     | Operators              | `bootstrap.json`, `CONFIG_PATH`, `DATABASE_PATH`, SQLite, Web UI |
+| [Configuration](CONFIGURATION.md)     | Operators              | `bootstrap.json`, selector publication, `CONFIG_PATH`, SQLite, Web UI |
 | [Architecture](architecture.md)       | Contributors           | Sessions, registry, selector, triggers, high-level flow          |
 | [HTTP API](http-api.md)               | Integrators            | Health, MCP JSON-RPC, admin, debug, static UI                    |
 | [Deployment](deployment.md)           | Operators              | Docker Compose, persistence, production hardening                |

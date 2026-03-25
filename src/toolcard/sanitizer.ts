@@ -1,5 +1,3 @@
-const MAX_DESCRIPTION_LENGTH = 512
-
 export function sanitizeDescription(raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
 
@@ -13,13 +11,13 @@ export function sanitizeDescription(raw: string | undefined): string | undefined
   // Remove control characters (< 0x20 except tab, newline, carriage return)
   result = result.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
 
-  // Normalize whitespace (multiple spaces/newlines → single space)
-  result = result.replace(/\s+/g, ' ').trim()
-
-  // Length-cap
-  if (result.length > MAX_DESCRIPTION_LENGTH) {
-    result = result.slice(0, MAX_DESCRIPTION_LENGTH).trimEnd()
-  }
+  // Normalize line endings, then collapse horizontal whitespace per line only (keep \n / paragraph breaks)
+  result = result.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  result = result
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trimEnd())
+    .join('\n')
+  result = result.replace(/\n{3,}/g, '\n\n').trim()
 
   return result.length === 0 ? undefined : result
 }

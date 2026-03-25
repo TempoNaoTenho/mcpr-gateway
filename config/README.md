@@ -56,6 +56,7 @@ String values may contain `${VAR_NAME}` (uppercase, underscores). Missing variab
 ### Schemas (code)
 
 - Full file: `GatewayConfigFileSchema` in [`src/config/schemas.ts`](../src/config/schemas.ts)
+- **Selector publication** (`selector.publication`): optional compression of tool descriptions and input schemas for MCP clients; defaults and behavior are documented in [docs/CONFIGURATION.md — Selector publication](../docs/CONFIGURATION.md#selector-publication).
 - Each server: `DownstreamServerSchema` in [`src/types/server.ts`](../src/types/server.ts)
 
 ### Cross-section checks

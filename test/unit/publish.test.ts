@@ -59,6 +59,23 @@ describe('publish compression', () => {
     ).toBe('Search the documentation for API details.')
   })
 
+  it('does not apply a character clamp when descriptionMaxLength is 0', () => {
+    const longFirstSentence =
+      'Resolve a user-provided package/product name to a Context7-compatible library ID and optionally load library documentation with additional parameters like topic or tokens; return structured fields for clients.'
+    const input = `${longFirstSentence} Second sentence should be dropped by conservative cleanup.`
+    const out = compressDescription(input, {
+      ...selectorConfig.publication,
+      descriptionMaxLength: 0,
+    })
+    expect(out).toBe(longFirstSentence)
+  })
+
+  it('leaves descriptions unchanged when compression config is not conservative', () => {
+    const raw = 'Hello world. Second sentence.'
+    expect(compressDescription(raw, {})).toBe(raw)
+    expect(compressDescription(raw, { descriptionCompression: 'off' })).toBe(raw)
+  })
+
   it('removes doc-only schema fields while preserving validation keys', () => {
     const compressed = compressSchema(makeVisibleTool().inputSchema, selectorConfig.publication)
 

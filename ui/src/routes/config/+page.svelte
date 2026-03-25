@@ -204,9 +204,9 @@
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Description max length <InfoTooltip text="Cap on description length when description compression is conservative (ignored when off)." />
+                Description max length <InfoTooltip text="Maximum characters after conservative cleanup (first sentence, etc.). Use 0 for no length cap. Only applies when Description compression is conservative; the off setting is the dropdown above, not this number." />
               </span>
-              <input type="number" autocomplete="off" min="1" bind:value={policies.selector.publication.descriptionMaxLength} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="0" bind:value={policies.selector.publication.descriptionMaxLength} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
           <div class="grid grid-cols-3 gap-3">

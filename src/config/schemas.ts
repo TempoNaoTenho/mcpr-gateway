@@ -57,7 +57,7 @@ const SelectorPublicationSchema = z
   .object({
     descriptionCompression: z.enum(['off', 'conservative']).default('off'),
     schemaCompression: z.enum(['off', 'conservative']).default('off'),
-    descriptionMaxLength: z.number().int().positive().default(160),
+    descriptionMaxLength: z.number().int().min(0).default(0),
   })
   .strict()
 

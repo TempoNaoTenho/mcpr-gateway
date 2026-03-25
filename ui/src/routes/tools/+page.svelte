@@ -164,7 +164,7 @@
   function syncEditorFromTool(tool: ToolRecord) {
     clearParseErrorTimer();
     editorText = JSON.stringify(tool.effectiveInputSchema, null, 2);
-    descriptionText = tool.effectiveDescription ?? tool.originalDescription ?? '';
+    descriptionText = tool.effectiveDescription ?? '';
     parseError = '';
   }
 
@@ -368,7 +368,14 @@
                   {tool.customized ? 'customized' : 'inherited'}
                 </Badge>
               </td>
-              <td class="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-xs truncate">{tool.effectiveDescription ?? '—'}</td>
+              <td 
+                class="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-xl min-w-[12rem] whitespace-normal break-words cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 truncate"
+                title="Click to customize"
+                onclick={() => openTool(tool)}
+                role="button"
+                tabindex="0"
+                onkeydown={(e) => e.key === 'Enter' && openTool(tool)}
+              >{tool.effectiveDescription ? (tool.effectiveDescription.length > 100 ? tool.effectiveDescription.slice(0, 100) + '…' : tool.effectiveDescription) : '—'}</td>
               <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{tool.serverId}</td>
               <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{tool.namespace}</td>
               <td class="px-4 py-3 text-slate-600 dark:text-slate-400">~{tool.totalTokens}</td>

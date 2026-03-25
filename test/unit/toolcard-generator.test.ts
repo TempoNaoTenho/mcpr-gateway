@@ -60,13 +60,13 @@ describe('generateToolcard', () => {
     expect(toolcard.quarantined).toBe(false)
   })
 
-  it('truncates long descriptions instead of quarantining the tool', () => {
+  it('preserves long descriptions (sanitizer strips noise only, no length cap)', () => {
     const toolcard = generateToolcard({
       ...makeRecord({ type: 'object' }),
       description: 'A'.repeat(1001),
     }, server)
 
     expect(toolcard.quarantined).toBe(false)
-    expect(toolcard.description).toHaveLength(512)
+    expect(toolcard.description).toHaveLength(1001)
   })
 })

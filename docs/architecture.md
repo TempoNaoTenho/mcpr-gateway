@@ -60,6 +60,10 @@ Session TTL and cleanup interval come from `session` in config ([`GatewayConfigF
 - **Bootstrap file** `CONFIG_PATH/bootstrap.json` — Always loaded; **`auth` always originates here** (or defaults when the file is absent). After first startup with SQLite, changes to this file are ignored (except for `auth` which is always merged from the file).
 - **Runtime / admin slice** — When the admin UI is available, servers and policy sections (except `auth`) can be updated via the admin API / UI. Persistence goes to SQLite when configured, otherwise it rewrites `CONFIG_PATH/bootstrap.json`. See [Configuration — Config persistence](CONFIGURATION.md#config-persistence).
 
+## Tool metadata: toolcards vs client-facing projection
+
+Downstream tool definitions are normalized into **toolcards** (sanitized descriptions, stable names) for ranking and storage. MCP clients do not always see that raw toolcard text: responses apply **`selector.publication`** rules to produce a **public** description and input schema (optional conservative compression and optional max length). Toolcard sanitization and publication compression are separate stages; details and defaults are documented under [Configuration — Selector publication](CONFIGURATION.md#selector-publication).
+
 ## Namespaces and downstream servers
 
 Each downstream server entry carries a `namespace`. The gateway groups tools by namespace for candidate pools and routing. Cross-references in config (`starterPacks` keys, `servers[].namespace`, `roles`) are validated at startup (warnings or errors per loader logic in [`src/config/loader.ts`](../src/config/loader.ts)).
