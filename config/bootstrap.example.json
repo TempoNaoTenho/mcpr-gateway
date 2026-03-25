@@ -3,23 +3,16 @@
  *
  * SETUP INSTRUCTIONS:
  * 1. Copy this file to bootstrap.json: cp config/bootstrap.example.json config/bootstrap.json
- * 2. Generate a static key: openssl rand -hex 32
- * 3. Replace ${GATEWAY_API_KEY} with your generated key
- * 4. Optionally customize userId (default: "admin")
+ * 2. Start the gateway and create client tokens in the Admin UI
+ * 3. Optionally import or manage downstream servers and policies
  *
- * This file uses static_key auth mode. The key in staticKeys is the secret
- * clients must pass as Bearer token in the Authorization header.
+ * This file uses static_key auth mode. Client access tokens are managed
+ * through the Admin UI and stored separately from the bootstrap config.
  */
 
 {
   "auth": {
-    "mode": "static_key",
-    "staticKeys": {
-      "${GATEWAY_API_KEY}": {
-        "userId": "admin",
-        "roles": ["user"]
-      }
-    }
+    "mode": "static_key"
   },
   "servers": [],
   "namespaces": {},
@@ -44,9 +37,9 @@
       "crossDomainPenalty": 1
     },
     "publication": {
-      "descriptionCompression": "conservative",
-      "schemaCompression": "conservative",
-      "descriptionMaxLength": 160
+      "descriptionCompression": "off",
+      "schemaCompression": "off",
+      "descriptionMaxLength": 500
     },
     "discoveryTool": {
       "enabled": false,
@@ -99,5 +92,4 @@
     "artifactStoreTtlSeconds": 300
   },
   "starterPacks": {}
-}
 }

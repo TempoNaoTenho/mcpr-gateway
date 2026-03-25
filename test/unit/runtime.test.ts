@@ -73,7 +73,7 @@ function makeToolRecord(name: string, description: string, serverId = 'github-ma
 beforeEach(() => {
   setConfig({
     servers: [],
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: {
       github: {
         allowedRoles: ['developer'],
@@ -247,7 +247,7 @@ import type { GatewayConfig } from '../../src/config/loader.js'
 function makeConfig(): GatewayConfig {
   return {
     servers: [],
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: {},
     roles: {},
     selector: defaultSelector,

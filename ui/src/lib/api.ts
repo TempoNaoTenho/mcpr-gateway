@@ -41,10 +41,10 @@ async function request<T>(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export async function login(token: string): Promise<void> {
+export async function login(username: string, password: string): Promise<void> {
   await request('/admin/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ username, password }),
   })
 }
 
@@ -476,10 +476,7 @@ export async function getNamespaces(): Promise<{ namespaces: NamespaceSummary[] 
   return request('/admin/namespaces')
 }
 
-export async function deleteNamespace(
-  key: string,
-  comment?: string
-): Promise<{ version: number }> {
+export async function deleteNamespace(key: string, comment?: string): Promise<{ version: number }> {
   return request(`/admin/namespaces/${encodeURIComponent(key)}`, {
     method: 'DELETE',
     headers: comment ? { 'x-comment': comment } : {},

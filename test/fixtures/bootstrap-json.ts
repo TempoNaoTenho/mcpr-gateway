@@ -52,3 +52,22 @@ export const defaultResilience = {
 } as const
 
 export const defaultDebug = { enabled: false }
+
+export const defaultTestStaticKeys: Record<string, { userId: string; roles: string[] }> = {
+  'alice:user': {
+    userId: 'alice',
+    roles: ['user'],
+  },
+  'bob:write-denied-user': {
+    userId: 'bob',
+    roles: ['write-denied-user'],
+  },
+  'alice:all': {
+    userId: 'alice',
+    roles: ['all'],
+  },
+  'benchmark:user': {
+    userId: 'benchmark',
+    roles: ['user'],
+  },
+}

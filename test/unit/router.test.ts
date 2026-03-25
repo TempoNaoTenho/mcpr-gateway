@@ -62,7 +62,7 @@ function makeServer(id: string): DownstreamServer {
 function enableDiscoveryTool(): void {
   setConfig({
     servers: [],
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: {
       gmail: {
         allowedRoles: ['user'],

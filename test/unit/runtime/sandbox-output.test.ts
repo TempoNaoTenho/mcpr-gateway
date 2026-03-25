@@ -40,7 +40,7 @@ function makeSession(): SessionState {
 beforeEach(() => {
   setConfig({
     servers: [],
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: {
       github: {
         allowedRoles: ['developer'],

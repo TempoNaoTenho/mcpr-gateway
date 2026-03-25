@@ -94,11 +94,19 @@ const AuthStaticKeyEntrySchema = z.object({
 const AuthStaticKeysSchema = z.record(z.string().min(1), AuthStaticKeyEntrySchema)
 
 export const AuthConfigSchema = z.object({
-  mode: z.enum(['static_key', 'mock_dev']),
+  mode: z.literal('static_key'),
   staticKeys: AuthStaticKeysSchema.optional(),
 })
 
 export type AuthConfig = z.infer<typeof AuthConfigSchema>
+
+export const BootstrapAuthConfigSchema = z
+  .object({
+    mode: z.literal('static_key'),
+  })
+  .strict()
+
+export type BootstrapAuthConfig = z.infer<typeof BootstrapAuthConfigSchema>
 
 export const SessionConfigSchema = z.object({
   ttlSeconds: z.number().int().nonnegative().default(1800),
@@ -189,7 +197,7 @@ export const StarterPacksFileSchema = z.object({
 export type StarterPacksFile = z.infer<typeof StarterPacksFileSchema>
 
 export const PoliciesFileSchema = z.object({
-  auth: AuthConfigSchema.default({ mode: 'mock_dev' }),
+  auth: AuthConfigSchema.default({ mode: 'static_key' }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema),
   roles: z.record(z.string().min(1), RolePolicySchema),
   selector: SelectorConfigSchema.default({}),
@@ -206,7 +214,7 @@ export type PoliciesFile = z.infer<typeof PoliciesFileSchema>
 /** Full on-disk config: downstream servers plus auth, policies, and tuning. */
 export const GatewayConfigFileSchema = z.object({
   servers: z.array(DownstreamServerSchema).default([]),
-  auth: AuthConfigSchema.default({ mode: 'mock_dev' }),
+  auth: AuthConfigSchema.default({ mode: 'static_key' }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema).default({}),
   roles: z.record(z.string().min(1), RolePolicySchema).default({}),
   selector: SelectorConfigSchema.default({}),

@@ -37,7 +37,7 @@ function writeConfig(): void {
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           default: {
             allowedRoles: ['user'],

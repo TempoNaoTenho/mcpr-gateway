@@ -77,7 +77,7 @@ function writeConfig(
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user'],

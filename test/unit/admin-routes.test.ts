@@ -47,7 +47,7 @@ function createAdminHarness(initial?: Partial<AdminConfig>) {
       return {
         auth: current.auth.staticKeys
           ? { mode: 'static_key' as const, staticKeys: current.auth.staticKeys }
-          : { mode: 'mock_dev' as const },
+          : { mode: 'static_key' as const },
       }
     },
     getEffective() {
@@ -79,10 +79,17 @@ function createAdminHarness(initial?: Partial<AdminConfig>) {
 function createFileModeManager() {
   mkdirSync(TMP, { recursive: true })
   const defaults = createDefaultAdminConfig(['default'])
-  writeFileSync(join(TMP, 'bootstrap.json'), JSON.stringify({
-    ...defaults,
-    auth: { mode: 'mock_dev' },
-  }, null, 2))
+  writeFileSync(
+    join(TMP, 'bootstrap.json'),
+    JSON.stringify(
+      {
+        ...defaults,
+        auth: { mode: 'static_key' },
+      },
+      null,
+      2
+    )
+  )
 
   const initial = loadConfig(TMP)
   return new RuntimeConfigManager({
@@ -93,13 +100,15 @@ function createFileModeManager() {
   })
 }
 
-function makeToolRecord(overrides?: Partial<{
-  name: string
-  description: string
-  inputSchema: Record<string, unknown>
-  serverId: string
-  namespace: string
-}>) {
+function makeToolRecord(
+  overrides?: Partial<{
+    name: string
+    description: string
+    inputSchema: Record<string, unknown>
+    serverId: string
+    namespace: string
+  }>
+) {
   return {
     name: overrides?.name ?? 'docs_search',
     description: overrides?.description ?? 'Search the docs',
@@ -120,6 +129,7 @@ function makeToolRecord(overrides?: Partial<{
 describe('adminRoutes', () => {
   it('revokes the server-side admin session on logout', async () => {
     process.env['ADMIN_TOKEN'] = 'secret-token'
+    process.env['GATEWAY_ADMIN_PASSWORD'] = 'admin-password'
 
     const app = buildServer({ logLevel: 'silent' })
     await app.register(adminRoutes, {})
@@ -128,7 +138,7 @@ describe('adminRoutes', () => {
     const loginRes = await app.inject({
       method: 'POST',
       url: '/admin/auth/login',
-      payload: { token: 'secret-token' },
+      payload: { username: 'mcpgateway', password: 'admin-password' },
     })
 
     expect(loginRes.statusCode).toBe(200)
@@ -194,14 +204,16 @@ describe('adminRoutes', () => {
 
   it('previews imported MCP servers with normalized transport and namespaces to create', async () => {
     const { configRepo, configManager } = createAdminHarness({
-      servers: [{
-        id: 'existing',
-        namespaces: ['gmail'],
-        transport: 'http',
-        url: 'https://existing.example/mcp',
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-      }],
+      servers: [
+        {
+          id: 'existing',
+          namespaces: ['gmail'],
+          transport: 'http',
+          url: 'https://existing.example/mcp',
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+        },
+      ],
     })
     const app = buildServer({ logLevel: 'silent' })
     await app.register(adminRoutes, {
@@ -670,7 +682,7 @@ describe('adminRoutes', () => {
           userId: 'file-user',
           roles: ['user'],
         }),
-      ]),
+      ])
     )
 
     const versionsRes = await app.inject({
@@ -904,7 +916,7 @@ describe('adminRoutes', () => {
             intervalSeconds: 30,
           },
         }),
-      ]),
+      ])
     )
     expect(getCurrent().namespaces['default']).toBeDefined()
     expect(getCurrent().namespaces['ops']).toBeDefined()
@@ -966,7 +978,7 @@ describe('adminRoutes', () => {
             intervalSeconds: 30,
           },
         }),
-      ]),
+      ])
     )
 
     await app.close()
@@ -1005,7 +1017,7 @@ describe('adminRoutes', () => {
             intervalSeconds: 30,
           },
         }),
-      ]),
+      ])
     )
 
     await app.close()
@@ -1085,7 +1097,9 @@ describe('adminRoutes', () => {
           return []
         },
         async refreshTools() {
-          throw new Error('[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp')
+          throw new Error(
+            '[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp'
+          )
         },
         async checkHealth() {
           return {
@@ -1093,7 +1107,8 @@ describe('adminRoutes', () => {
             status: 'unknown',
             lastChecked: '2026-03-22T12:00:00.000Z',
             latencyMs: 18,
-            error: '[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp',
+            error:
+              '[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp',
           }
         },
         getHealthState() {
@@ -1109,13 +1124,16 @@ describe('adminRoutes', () => {
     })
 
     expect(res.statusCode).toBe(400)
-    expect(res.json()).toEqual(expect.objectContaining({
-      error: '[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp',
-      toolCount: 0,
-      health: 'unknown',
-      lastChecked: '2026-03-22T12:00:00.000Z',
-      latencyMs: 18,
-    }))
+    expect(res.json()).toEqual(
+      expect.objectContaining({
+        error:
+          '[registry/http] Server fast-mcp-docs returned non-JSON response from https://gofastmcp.com/mcp',
+        toolCount: 0,
+        health: 'unknown',
+        lastChecked: '2026-03-22T12:00:00.000Z',
+        latencyMs: 18,
+      })
+    )
 
     await app.close()
   })
@@ -1175,31 +1193,37 @@ describe('adminRoutes', () => {
       url: `/admin/stdio-auth/servers/${stdioServer.id}/start`,
     })
     expect(startRes.statusCode).toBe(200)
-    expect(startRes.json()).toEqual(expect.objectContaining({
-      serverId: stdioServer.id,
-      status: 'pending',
-      url: 'http://127.0.0.1:22393/oauth/callback',
-    }))
+    expect(startRes.json()).toEqual(
+      expect.objectContaining({
+        serverId: stdioServer.id,
+        status: 'pending',
+        url: 'http://127.0.0.1:22393/oauth/callback',
+      })
+    )
 
     const statusRes = await app.inject({
       method: 'GET',
       url: `/admin/stdio-auth/servers/${stdioServer.id}/status`,
     })
     expect(statusRes.statusCode).toBe(200)
-    expect(statusRes.json()).toEqual(expect.objectContaining({
-      serverId: stdioServer.id,
-      status: 'pending',
-    }))
+    expect(statusRes.json()).toEqual(
+      expect.objectContaining({
+        serverId: stdioServer.id,
+        status: 'pending',
+      })
+    )
 
     const cancelRes = await app.inject({
       method: 'POST',
       url: `/admin/stdio-auth/servers/${stdioServer.id}/cancel`,
     })
     expect(cancelRes.statusCode).toBe(200)
-    expect(cancelRes.json()).toEqual(expect.objectContaining({
-      serverId: stdioServer.id,
-      status: 'cancelled',
-    }))
+    expect(cancelRes.json()).toEqual(
+      expect.objectContaining({
+        serverId: stdioServer.id,
+        status: 'cancelled',
+      })
+    )
 
     await app.close()
   })
@@ -1275,21 +1299,23 @@ describe('adminRoutes', () => {
       },
     })
     const { configRepo, configManager } = createAdminHarness({
-      servers: [{
-        id: 'example-hosted',
-        namespaces: ['default'],
-        transport: 'streamable-http',
-        url: 'https://mcp.example.com/mcp',
-        auth: {
-          mode: 'bearer',
-          source: { type: 'secret' },
+      servers: [
+        {
+          id: 'example-hosted',
+          namespaces: ['default'],
+          transport: 'streamable-http',
+          url: 'https://mcp.example.com/mcp',
+          auth: {
+            mode: 'bearer',
+            source: { type: 'secret' },
+          },
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+          refreshIntervalSeconds: 300,
+          healthcheck: { enabled: true, intervalSeconds: 30 },
+          discovery: { mode: 'manual' },
         },
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-        refreshIntervalSeconds: 300,
-        healthcheck: { enabled: true, intervalSeconds: 30 },
-        discovery: { mode: 'manual' },
-      }] as any,
+      ] as any,
     })
 
     const registry = {
@@ -1325,10 +1351,12 @@ describe('adminRoutes', () => {
     })
 
     expect(saveRes.statusCode).toBe(200)
-    expect(saveRes.json()).toEqual(expect.objectContaining({
-      serverId: 'example-hosted',
-      managedSecretConfigured: true,
-    }))
+    expect(saveRes.json()).toEqual(
+      expect.objectContaining({
+        serverId: 'example-hosted',
+        managedSecretConfigured: true,
+      })
+    )
 
     const listRes = await app.inject({
       method: 'GET',
@@ -1421,18 +1449,20 @@ describe('adminRoutes', () => {
 
   it('returns 501 when saving a managed bearer secret without encryption support', async () => {
     const { configRepo, configManager } = createAdminHarness({
-      servers: [{
-        id: 'example-hosted',
-        namespaces: ['default'],
-        transport: 'streamable-http',
-        url: 'https://mcp.example.com/mcp',
-        auth: {
-          mode: 'bearer',
-          source: { type: 'secret' },
+      servers: [
+        {
+          id: 'example-hosted',
+          namespaces: ['default'],
+          transport: 'streamable-http',
+          url: 'https://mcp.example.com/mcp',
+          auth: {
+            mode: 'bearer',
+            source: { type: 'secret' },
+          },
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
         },
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-      }] as any,
+      ] as any,
     })
 
     const registry = {
@@ -1469,26 +1499,28 @@ describe('adminRoutes', () => {
   it('returns detailed tool catalog entries with effective overrides and token estimates', async () => {
     const toolRecord = makeToolRecord()
     const { configRepo, configManager } = createAdminHarness({
-      servers: [{
-        id: 'docs',
-        namespaces: ['default'],
-        transport: 'streamable-http',
-        url: 'https://example.com/mcp',
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-        toolOverrides: {
-          docs_search: {
-            description: 'Search curated docs only',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                query: { type: 'string' },
-                limit: { type: 'number' },
+      servers: [
+        {
+          id: 'docs',
+          namespaces: ['default'],
+          transport: 'streamable-http',
+          url: 'https://example.com/mcp',
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+          toolOverrides: {
+            docs_search: {
+              description: 'Search curated docs only',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string' },
+                  limit: { type: 'number' },
+                },
               },
             },
           },
         },
-      }],
+      ],
     })
     const registry = {
       async listServers() {
@@ -1504,7 +1536,12 @@ describe('adminRoutes', () => {
         return undefined
       },
       getToolsByNamespace() {
-        return [{ server: configManager.getAdminConfig().servers[0], records: [{ ...toolRecord, namespace: 'default' }] }]
+        return [
+          {
+            server: configManager.getAdminConfig().servers[0],
+            records: [{ ...toolRecord, namespace: 'default' }],
+          },
+        ]
       },
     } as any
 
@@ -1538,12 +1575,14 @@ describe('adminRoutes', () => {
     })
 
     expect(schemaRes.statusCode).toBe(200)
-    expect(schemaRes.json()).toEqual(expect.objectContaining({
-      summary: expect.objectContaining({
-        toolCount: 1,
-        customizedTools: 1,
-      }),
-    }))
+    expect(schemaRes.json()).toEqual(
+      expect.objectContaining({
+        summary: expect.objectContaining({
+          toolCount: 1,
+          customizedTools: 1,
+        }),
+      })
+    )
 
     await app.close()
   })
@@ -1551,14 +1590,16 @@ describe('adminRoutes', () => {
   it('persists and reverts tool overrides through the admin API', async () => {
     const toolRecord = makeToolRecord()
     const { configRepo, configManager, getCurrent } = createAdminHarness({
-      servers: [{
-        id: 'docs',
-        namespaces: ['default'],
-        transport: 'streamable-http',
-        url: 'https://example.com/mcp',
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-      }],
+      servers: [
+        {
+          id: 'docs',
+          namespaces: ['default'],
+          transport: 'streamable-http',
+          url: 'https://example.com/mcp',
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+        },
+      ],
     })
     const registry = {
       async listServers() {
@@ -1571,7 +1612,12 @@ describe('adminRoutes', () => {
         return [toolRecord]
       },
       getToolsByNamespace() {
-        return [{ server: configManager.getAdminConfig().servers[0], records: [{ ...toolRecord, namespace: 'default' }] }]
+        return [
+          {
+            server: configManager.getAdminConfig().servers[0],
+            records: [{ ...toolRecord, namespace: 'default' }],
+          },
+        ]
       },
     } as any
 
@@ -1618,21 +1664,28 @@ describe('adminRoutes', () => {
   it('returns namespace summaries with effective token metrics', async () => {
     const toolRecord = makeToolRecord({ namespace: 'gmail' })
     const { configRepo, configManager } = createAdminHarness({
-      servers: [{
-        id: 'docs',
-        namespaces: ['gmail'],
-        transport: 'streamable-http',
-        url: 'https://example.com/mcp',
-        enabled: true,
-        trustLevel: SourceTrustLevel.Verified,
-      }],
+      servers: [
+        {
+          id: 'docs',
+          namespaces: ['gmail'],
+          transport: 'streamable-http',
+          url: 'https://example.com/mcp',
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+        },
+      ],
     })
     const registry = {
       async getTools() {
         return [toolRecord]
       },
       getToolsByNamespace() {
-        return [{ server: configManager.getAdminConfig().servers[0], records: [{ ...toolRecord, namespace: 'gmail' }] }]
+        return [
+          {
+            server: configManager.getAdminConfig().servers[0],
+            records: [{ ...toolRecord, namespace: 'gmail' }],
+          },
+        ]
       },
     } as any
 
@@ -1726,7 +1779,7 @@ describe('adminRoutes', () => {
       expect.objectContaining({
         error: expect.stringContaining('Cannot delete namespace'),
         serverIds: ['only-gmail'],
-      }),
+      })
     )
     expect(getCurrent().namespaces['gmail']).toBeDefined()
 
@@ -1808,7 +1861,7 @@ describe('adminRoutes', () => {
           namespaces: ['all', 'context7'],
           transport: 'streamable-http',
         }),
-      ]),
+      ])
     )
     expect(getCurrent().namespaces['all']).toBeDefined()
     expect(getCurrent().namespaces['context7']).toBeDefined()

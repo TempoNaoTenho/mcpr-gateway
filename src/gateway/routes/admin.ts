@@ -298,14 +298,14 @@ export function deleteNamespaceFromAdminConfig(
 }
 
 function buildAuthSummary(effectiveAuth: {
-  mode: 'static_key' | 'mock_dev'
+  mode: 'static_key'
   staticKeys?: Record<string, { userId: string; roles: string[] }>
 }) {
   return {
     clientAuth: 'bearer_tokens' as const,
     clientTokensConfigured: Object.keys(effectiveAuth.staticKeys ?? {}).length,
     adminTokenConfigured: Boolean(process.env['ADMIN_TOKEN']),
-    devModeEnabled: effectiveAuth.mode === 'mock_dev',
+    devModeEnabled: false,
   }
 }
 
@@ -759,9 +759,32 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         return reply.send({ authenticated: true })
       }
 
-      const body = request.body as { token?: string } | undefined
-      if (!body?.token || body.token !== adminToken) {
+      const body = request.body as { token?: string; username?: string; password?: string } | undefined
+      const token = body?.token?.trim()
+      if (token) {
+        if (token === adminToken) {
+          const sessionId = nanoid(32)
+          adminSessions.set(sessionId, { createdAt: Date.now() })
+
+          const isProduction = process.env['NODE_ENV'] === 'production'
+          reply.header(
+            'Set-Cookie',
+            `admin_session=${sessionId}; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=${SESSION_TTL_MS / 1000}`
+          )
+
+          return reply.send({ authenticated: true })
+        }
+
         return reply.status(401).send({ error: 'Invalid token' })
+      }
+
+      const adminPassword = process.env['GATEWAY_ADMIN_PASSWORD'] ?? adminToken
+      const username = body?.username?.trim()
+      const password = body?.password
+
+      // Username must be 'mcpgateway', password must match the configured admin secret.
+      if (username !== 'mcpgateway' || !password || password !== adminPassword) {
+        return reply.status(401).send({ error: 'Invalid credentials' })
       }
 
       const sessionId = nanoid(32)

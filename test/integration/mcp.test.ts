@@ -9,12 +9,13 @@ import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.j
 import { DownstreamRegistry } from '../../src/registry/registry.js'
 import { SelectorEngine } from '../../src/selector/engine.js'
 import { TriggerEngine } from '../../src/trigger/index.js'
-import { initConfig } from '../../src/config/index.js'
+import { initConfig, setConfig } from '../../src/config/index.js'
 import {
   defaultDebug,
   defaultResilience,
   defaultSelector,
   defaultSession,
+  defaultTestStaticKeys,
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import type { FastifyInstance } from 'fastify'
@@ -22,7 +23,6 @@ import type { FastifyInstance } from 'fastify'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_mcp_config__')
 
-// mock_dev auth: Bearer <userId>:<role1,role2>
 const AUTH_USER = { Authorization: 'Bearer alice:user' }
 
 let app: FastifyInstance
@@ -44,7 +44,7 @@ beforeAll(async () => {
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user', 'admin'],
@@ -83,10 +83,17 @@ beforeAll(async () => {
         },
       },
       null,
-      2,
-    ),
+      2
+    )
   )
-  initConfig(TMP)
+  const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: {
+      ...config.auth,
+      staticKeys: defaultTestStaticKeys,
+    },
+  })
 
   const { store, close } = createTempSqliteSessionStore()
   disposeSessionDb = () => {
@@ -207,7 +214,9 @@ describe('OPTIONS /mcp/gmail', () => {
     expect(res.statusCode).toBe(204)
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost:6274')
     expect(res.headers['access-control-allow-methods']).toBe('GET, POST, OPTIONS')
-    expect(res.headers['access-control-allow-headers']).toBe('Authorization, Content-Type, Mcp-Session-Id')
+    expect(res.headers['access-control-allow-headers']).toBe(
+      'Authorization, Content-Type, Mcp-Session-Id'
+    )
     expect(res.headers['access-control-expose-headers']).toBe('Mcp-Session-Id, Mcp-Tools-Changed')
   })
 
@@ -398,7 +407,7 @@ describe('POST /mcp/dev — initialize', () => {
     expect(res.json().error).toBe('UNAUTHORIZED_NAMESPACE')
   })
 
-  it('returns 403 UNAUTHORIZED_NAMESPACE when mock_dev request has no bearer roles', async () => {
+  it('returns 403 UNAUTHORIZED_NAMESPACE when request has no matching bearer token', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/mcp/gmail',

@@ -19,12 +19,13 @@ import type { ISessionStore } from '../../src/types/interfaces.js'
 import { DownstreamRegistry } from '../../src/registry/registry.js'
 import { SelectorEngine } from '../../src/selector/engine.js'
 import { TriggerEngine } from '../../src/trigger/index.js'
-import { initConfig } from '../../src/config/index.js'
+import { initConfig, setConfig } from '../../src/config/index.js'
 import {
   defaultDebug,
   defaultResilience,
   defaultSelector,
   defaultSession,
+  defaultTestStaticKeys,
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import type { FastifyInstance } from 'fastify'
@@ -64,7 +65,7 @@ beforeAll(async () => {
     JSON.stringify(
       {
         servers: [],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user', 'admin'],
@@ -97,10 +98,17 @@ beforeAll(async () => {
         },
       },
       null,
-      2,
-    ),
+      2
+    )
   )
-  initConfig(TMP)
+  const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: {
+      ...config.auth,
+      staticKeys: defaultTestStaticKeys,
+    },
+  })
 })
 
 afterAll(async () => {
@@ -111,7 +119,9 @@ afterAll(async () => {
 describe('Restart — SESSION_NOT_FOUND após reinicialização do store', () => {
   it('returns 404 SESSION_NOT_FOUND when session store is replaced after session creation', async () => {
     // --- Original "instance" before restart ---
-    const { store: originalStore, close: closeOriginal } = openSessionStore(join(TMP, 'restart-original.db'))
+    const { store: originalStore, close: closeOriginal } = openSessionStore(
+      join(TMP, 'restart-original.db')
+    )
     const app = await buildApp(originalStore)
     originalApp = app
 
@@ -129,7 +139,11 @@ describe('Restart — SESSION_NOT_FOUND após reinicialização do store', () =>
     const listBefore = await app.inject({
       method: 'POST',
       url: '/mcp/gmail',
-      headers: { 'Content-Type': 'application/json', ...AUTH_ALICE, 'mcp-session-id': oldSessionId },
+      headers: {
+        'Content-Type': 'application/json',
+        ...AUTH_ALICE,
+        'mcp-session-id': oldSessionId,
+      },
       payload: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
     })
     expect(listBefore.statusCode).toBe(200)

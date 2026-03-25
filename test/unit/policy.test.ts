@@ -9,7 +9,7 @@ import type { UserIdentity } from '../../src/types/identity.js'
 function makeConfig(overrides?: Partial<GatewayConfig>): GatewayConfig {
   return {
     servers: [],
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: {
       gmail: {
         allowedRoles: ['user', 'admin'],

@@ -52,11 +52,12 @@ async function main(): Promise<void> {
     console.log('')
     console.log('Select a configuration profile:')
     console.log(
-      '  [1] production — recommended for hosted/shared use; static_key (optional ${GATEWAY_API_KEY} in example, or use admin UI for tokens)'
+      '  [1] production — recommended for hosted/shared use; static_key with admin-managed client tokens'
     )
     console.log(
-      '  [2] local      — development only; mock_dev auth, debug enabled, generous limits'
+      '  [2] local      — development profile with static_key auth, debug enabled, generous limits'
     )
+    console.log('      (this checkout ships one bootstrap.example.json template for both profiles)')
     console.log('')
     const choice = await ask('Profile [1/2, default=1]: ')
     profile = choice.trim() === '2' ? '2' : '1'
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
   console.log('')
 
   if (shouldWrite) {
-    const src = profile === '2' ? 'gateway.local.example.json' : 'gateway.production.example.json'
+    const src = 'bootstrap.example.json'
     copy(src, 'bootstrap.json')
   }
 
@@ -78,7 +79,7 @@ async function main(): Promise<void> {
   if (profile === '1') {
     console.log('  1. Set required environment variables:')
     console.log(
-      '       Set ADMIN_TOKEN, then add client tokens in the Web UI — or define env vars matching any ${...} placeholders in bootstrap.json'
+      '       Set ADMIN_TOKEN, then add client tokens in the Web UI.'
     )
     console.log('')
     console.log('  2. Start the gateway and open the WebUI to configure servers and policies.')
@@ -91,8 +92,8 @@ async function main(): Promise<void> {
     console.log('  2. Start the gateway:')
     console.log('       npm run dev')
     console.log('')
-    console.log('  Tip: mock_dev is local-only. Use any Bearer token like:')
-    console.log('       Authorization: Bearer alice:user')
+    console.log('  Tip: create a client token in the WebUI and use it as:')
+    console.log('       Authorization: Bearer <issued-token>')
   }
 
   console.log('')

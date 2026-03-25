@@ -10,6 +10,7 @@ import {
   defaultResilience,
   defaultSelector,
   defaultSession,
+  defaultTestStaticKeys,
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.js'
@@ -53,11 +54,7 @@ function makeServer(overrides: Partial<DownstreamServer> = {}): DownstreamServer
   }
 }
 
-function makeToolRecord(
-  name: string,
-  description?: string,
-  serverId = 'gmail-server',
-): ToolRecord {
+function makeToolRecord(name: string, description?: string, serverId = 'gmail-server'): ToolRecord {
   return {
     name,
     description: description ?? `Description for ${name}`,
@@ -98,7 +95,7 @@ beforeAll(() => {
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user', 'admin'],
@@ -131,10 +128,17 @@ beforeAll(() => {
         },
       },
       null,
-      2,
-    ),
+      2
+    )
   )
-  initConfig(TMP)
+  const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: {
+      ...config.auth,
+      staticKeys: defaultTestStaticKeys,
+    },
+  })
 })
 
 afterAll(() => {
@@ -164,13 +168,16 @@ describe('handleInitialize', () => {
       makeRequest(Mode.Write),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Write } },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
     // toolWindow now contains only the two gateway meta-tools
     expect(session?.toolWindow).toHaveLength(2)
-    expect(session?.toolWindow.map((t) => t.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(session?.toolWindow.map((t) => t.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+    ])
     expect(session?.lastSelectorDecision?.selected).toEqual([])
   })
 
@@ -193,13 +200,16 @@ describe('handleInitialize', () => {
       makeRequest(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
     // toolWindow now contains only the two gateway meta-tools regardless of downstream tools
     expect(session?.toolWindow).toHaveLength(2)
-    expect(session?.toolWindow.map((t) => t.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(session?.toolWindow.map((t) => t.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+    ])
     // lastSelectorDecision still reflects the bootstrap window computation
     expect(session?.lastSelectorDecision?.selected).toHaveLength(4)
   })
@@ -228,7 +238,7 @@ describe('handleInitialize', () => {
         },
       },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
@@ -251,7 +261,7 @@ describe('handleInitialize', () => {
               makeToolRecord(
                 'resolve_library_reference',
                 'Read API docs, SDK reference, product manual, and guides',
-                'docs-hub',
+                'docs-hub'
               ),
             ],
           },
@@ -261,7 +271,7 @@ describe('handleInitialize', () => {
               makeToolRecord(
                 'extract_web_page',
                 'Browse a website and extract page contents',
-                'web-tools',
+                'web-tools'
               ),
             ],
           },
@@ -286,16 +296,19 @@ describe('handleInitialize', () => {
         },
       },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
     expect(session?.initialIntentText).toBe(
-      'Read API docs SDK reference for FastMCP Need product documentation',
+      'Read API docs SDK reference for FastMCP Need product documentation'
     )
     // toolWindow now has only gateway meta-tools; intent text is stored for future use
     expect(session?.toolWindow).toHaveLength(2)
-    expect(session?.toolWindow.map((t) => t.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(session?.toolWindow.map((t) => t.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+    ])
   })
 
   it('always includes gateway_search_tools and gateway_call_tool', async () => {
@@ -310,7 +323,7 @@ describe('handleInitialize', () => {
       makeRequest(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
@@ -344,7 +357,7 @@ describe('handleInitialize', () => {
         makeRequest(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
-        registry as never,
+        registry as never
       )
 
       const session = await store.get(response.id)
@@ -386,7 +399,7 @@ describe('handleInitialize', () => {
         makeRequest(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
-        registry as never,
+        registry as never
       )
 
       const session = await store.get(response.id)
@@ -412,7 +425,10 @@ describe('handleInitialize', () => {
       getToolsByNamespace(namespace: string) {
         if (namespace !== 'gmail') return []
         return [
-          { server: offlineServer, records: [makeToolRecord('email_archive', undefined, 'offline-server')] },
+          {
+            server: offlineServer,
+            records: [makeToolRecord('email_archive', undefined, 'offline-server')],
+          },
           { server: onlineServer, records: [makeToolRecord('email_read')] },
         ]
       },
@@ -425,13 +441,16 @@ describe('handleInitialize', () => {
       makeRequest(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
-      registry as never,
+      registry as never
     )
 
     const session = await store.get(response.id)
     // toolWindow now contains only gateway meta-tools
     expect(session?.toolWindow).toHaveLength(2)
-    expect(session?.toolWindow.map((t) => t.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(session?.toolWindow.map((t) => t.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+    ])
     // bootstrap window (via lastSelectorDecision) should have filtered out offline tools
     const selected = session?.lastSelectorDecision?.selected ?? []
     expect(selected).toHaveLength(1)
@@ -478,13 +497,17 @@ describe('handleInitialize', () => {
       const registry = {
         getToolsByNamespace(namespace: string) {
           if (namespace !== 'all') return []
-          return [{
-            server: makeServer({ id: 'context7', namespaces: ['all'] }),
-            records: [{
-              ...makeToolRecord('resolve-library-id', 'Resolve library ids', 'context7'),
-              namespace: 'all',
-            }],
-          }]
+          return [
+            {
+              server: makeServer({ id: 'context7', namespaces: ['all'] }),
+              records: [
+                {
+                  ...makeToolRecord('resolve-library-id', 'Resolve library ids', 'context7'),
+                  namespace: 'all',
+                },
+              ],
+            },
+          ]
         },
         getHealthStates() {
           return {}
@@ -495,14 +518,17 @@ describe('handleInitialize', () => {
         request,
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
-        registry as never,
+        registry as never
       )
 
       const session = await store.get(response.id)
       expect(session?.namespace).toBe('all')
       // toolWindow now contains only gateway meta-tools
       expect(session?.toolWindow).toHaveLength(2)
-      expect(session?.toolWindow.map((t) => t.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+      expect(session?.toolWindow.map((t) => t.name)).toEqual([
+        GATEWAY_SEARCH_TOOL_NAME,
+        GATEWAY_CALL_TOOL_NAME,
+      ])
       // bootstrap window should contain the downstream tool
       const selected = session?.lastSelectorDecision?.selected ?? []
       expect(selected).toHaveLength(1)

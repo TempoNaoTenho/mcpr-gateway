@@ -20,12 +20,13 @@ import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.j
 import { DownstreamRegistry } from '../../src/registry/registry.js'
 import { SelectorEngine } from '../../src/selector/engine.js'
 import { TriggerEngine } from '../../src/trigger/index.js'
-import { initConfig } from '../../src/config/index.js'
+import { initConfig, setConfig } from '../../src/config/index.js'
 import {
   defaultDebug,
   defaultResilience,
   defaultSelector,
   defaultSession,
+  defaultTestStaticKeys,
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import { createFakeMcpServer } from '../fixtures/fake-mcp-server.js'
@@ -35,7 +36,6 @@ import type { FakeMcpServer } from '../fixtures/fake-mcp-server.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_security__')
 
-// mock_dev auth: Bearer <userId>:<role1,role2>
 const AUTH_USER = { Authorization: 'Bearer alice:user' }
 const AUTH_WRITE_DENIED = { Authorization: 'Bearer bob:write-denied-user' }
 
@@ -71,7 +71,7 @@ beforeAll(async () => {
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user', 'admin', 'write-denied-user'],
@@ -115,11 +115,18 @@ beforeAll(async () => {
         },
       },
       null,
-      2,
-    ),
+      2
+    )
   )
 
   const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: {
+      ...config.auth,
+      staticKeys: defaultTestStaticKeys,
+    },
+  })
 
   const { store, close } = createTempSqliteSessionStore()
   disposeSessionDb = () => {

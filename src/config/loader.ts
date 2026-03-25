@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ZodError } from 'zod'
 import { Mode } from '../types/enums.js'
-import { PoliciesFileSchema, GatewayConfigFileSchema } from './schemas.js'
+import {
+  PoliciesFileSchema,
+  GatewayConfigFileSchema,
+  BootstrapAuthConfigSchema,
+} from './schemas.js'
 import type {
   ServersFile,
   PoliciesFile,
   AuthConfig,
+  BootstrapAuthConfig,
   TriggerPolicy,
   ResilienceConfig,
 } from './schemas.js'
@@ -27,7 +32,7 @@ export interface GatewayConfig {
 }
 
 export interface BootstrapConfig {
-  auth: AuthConfig
+  auth: BootstrapAuthConfig
 }
 
 export interface AdminAuthConfig {
@@ -67,7 +72,7 @@ export function mergeWithAdminConfig(base: BootstrapConfig, override: AdminConfi
   return normalizeGatewayConfig({
     auth: {
       ...base.auth,
-      staticKeys: adminAuth.staticKeys ?? base.auth.staticKeys,
+      staticKeys: adminAuth.staticKeys,
     },
     ...rest,
   })
@@ -128,7 +133,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
   const effectiveNamespaces = namespaces.length > 0 ? namespaces : ['default']
 
   return PoliciesFileSchema.parse({
-    auth: { mode: 'mock_dev' },
+    auth: { mode: 'static_key' },
     namespaces: Object.fromEntries(
       effectiveNamespaces.map((namespace) => [
         namespace,
@@ -174,20 +179,34 @@ export function createDefaultAdminConfig(serverNamespaces: string[] = []): Admin
 
 function createBootstrapConfig(raw: unknown): BootstrapConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { auth: { mode: 'mock_dev' } }
+    return { auth: { mode: 'static_key' } }
   }
 
   const authValue = 'auth' in raw ? (raw as { auth?: unknown }).auth : undefined
   if (authValue === undefined) {
-    return { auth: { mode: 'mock_dev' } }
+    return { auth: { mode: 'static_key' } }
+  }
+
+  if (authValue && typeof authValue === 'object' && !Array.isArray(authValue)) {
+    const authRecord = authValue as Record<string, unknown>
+
+    if (authRecord['mode'] === 'mock_dev') {
+      console.error('[config] Invalid bootstrap.json.auth:')
+      console.error('  - auth.mode "mock_dev" has been removed; use "static_key".')
+      process.exit(1)
+    }
+
+    if ('staticKeys' in authRecord) {
+      console.error('[config] Invalid bootstrap.json.auth:')
+      console.error(
+        '  - auth.staticKeys is no longer supported in bootstrap.json; manage client tokens through the admin config/auth endpoints.'
+      )
+      process.exit(1)
+    }
   }
 
   return {
-    auth: validateSchema(
-      { parse: (data: unknown) => PoliciesFileSchema.shape.auth.parse(data) },
-      authValue,
-      'bootstrap.json.auth'
-    ),
+    auth: validateSchema(BootstrapAuthConfigSchema, authValue, 'bootstrap.json.auth'),
   }
 }
 
@@ -271,10 +290,10 @@ export function loadConfig(configPath?: string): GatewayConfig {
   let config: GatewayConfig
 
   if (raw === null) {
-    config = mergeWithAdminConfig({ auth: { mode: 'mock_dev' } }, createDefaultAdminConfig())
+    config = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, createDefaultAdminConfig())
   } else {
-    const parsed = validateSchema(GatewayConfigFileSchema, raw, 'bootstrap.json')
     const bootstrap = createBootstrapConfig(raw)
+    const parsed = validateSchema(GatewayConfigFileSchema, raw, 'bootstrap.json')
     const defaults = createDefaultAdminConfig(parsed.servers.flatMap((server) => server.namespaces))
     config = mergeWithAdminConfig(bootstrap, {
       ...defaults,

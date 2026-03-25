@@ -22,13 +22,14 @@ import type { SqliteSessionRepository } from '../../src/repositories/sessions/sq
 import { DownstreamRegistry } from '../../src/registry/registry.js'
 import { SelectorEngine } from '../../src/selector/engine.js'
 import { TriggerEngine } from '../../src/trigger/index.js'
-import { initConfig } from '../../src/config/index.js'
+import { initConfig, setConfig } from '../../src/config/index.js'
 import { createFakeMcpServer } from '../fixtures/fake-mcp-server.js'
 import {
   defaultDebug,
   defaultResilience,
   defaultSelector,
   defaultSession,
+  defaultTestStaticKeys,
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import type { FastifyInstance } from 'fastify'
@@ -48,9 +49,21 @@ beforeAll(async () => {
   // 1. Start FakeMcpServer with low-risk gmail tools
   fakeServer = await createFakeMcpServer({
     tools: [
-      { name: 'read_email', description: 'Read an email by ID', inputSchema: { type: 'object', properties: { id: { type: 'string' } } } },
-      { name: 'list_emails', description: 'List emails in inbox', inputSchema: { type: 'object', properties: {} } },
-      { name: 'search_emails', description: 'Search emails by query', inputSchema: { type: 'object', properties: { q: { type: 'string' } } } },
+      {
+        name: 'read_email',
+        description: 'Read an email by ID',
+        inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+      },
+      {
+        name: 'list_emails',
+        description: 'List emails in inbox',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'search_emails',
+        description: 'Search emails by query',
+        inputSchema: { type: 'object', properties: { q: { type: 'string' } } },
+      },
     ],
   })
 
@@ -71,7 +84,7 @@ beforeAll(async () => {
             trustLevel: 'internal',
           },
         ],
-        auth: { mode: 'mock_dev' },
+        auth: { mode: 'static_key' },
         namespaces: {
           gmail: {
             allowedRoles: ['user', 'admin'],
@@ -104,12 +117,19 @@ beforeAll(async () => {
         },
       },
       null,
-      2,
-    ),
+      2
+    )
   )
 
   // 3. Load config and populate registry from FakeMcpServer
   const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: {
+      ...config.auth,
+      staticKeys: defaultTestStaticKeys,
+    },
+  })
 
   const created = createTempSqliteSessionStore()
   store = created.store
@@ -261,7 +281,11 @@ describe('Golden path — tools/call routes to FakeMcpServer', () => {
         method: 'tools/call',
         params: {
           name: 'gateway_call_tool',
-          arguments: { name: 'read_email', serverId: 'fake-gmail-server', arguments: { id: 'msg-001' } },
+          arguments: {
+            name: 'read_email',
+            serverId: 'fake-gmail-server',
+            arguments: { id: 'msg-001' },
+          },
         },
       },
     })
@@ -319,7 +343,11 @@ describe('Golden path — tools/call routes to FakeMcpServer', () => {
         method: 'tools/call',
         params: {
           name: 'gateway_call_tool',
-          arguments: { name: 'read_email', serverId: 'fake-gmail-server', arguments: { id: 'msg-001' } },
+          arguments: {
+            name: 'read_email',
+            serverId: 'fake-gmail-server',
+            arguments: { id: 'msg-001' },
+          },
         },
       },
     })
@@ -342,7 +370,11 @@ describe('Golden path — cold start explicit (no registry tools)', () => {
 
     const emptyApp = buildServer({ logLevel: 'silent' })
     emptyApp.register(healthRoutes)
-    emptyApp.register(mcpRoutes, { store: emptyStore, registry: emptyRegistry, triggerEngine: emptyTrigger })
+    emptyApp.register(mcpRoutes, {
+      store: emptyStore,
+      registry: emptyRegistry,
+      triggerEngine: emptyTrigger,
+    })
     await emptyApp.ready()
 
     const initRes = await emptyApp.inject({

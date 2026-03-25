@@ -4,21 +4,24 @@
   import { auth } from '$lib/auth.js';
   import { ApiError } from '$lib/api.js';
 
-  let token = $state('');
+  const username = 'mcpgateway';
+  let password = $state('');
   let error = $state('');
   let loading = $state(false);
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
-    if (!token.trim()) return;
+    if (!password.trim()) return;
     loading = true;
     error = '';
     try {
-      await auth.login(token.trim());
+      await auth.login(username, password.trim());
       goto(`${base}/dashboard`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        error = 'Invalid token. Please try again.';
+        error = 'Invalid credentials. Please try again.';
+      } else if (err instanceof ApiError && err.status === 500) {
+        error = 'Server configuration error. Contact administrator.';
       } else {
         error = 'Connection error. Is the gateway running?';
       }
@@ -49,14 +52,27 @@
     <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
       <form onsubmit={handleSubmit}>
         <div class="mb-4">
-          <label for="token" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Admin panel token
+          <label for="username" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            Username
           </label>
           <input
-            id="token"
+            id="username"
+            type="text"
+            value={username}
+            readonly
+            class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+          />
+        </div>
+
+        <div class="mb-4">
+          <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            Password
+          </label>
+          <input
+            id="password"
             type="password"
-            bind:value={token}
-            placeholder="Enter your admin panel token"
+            bind:value={password}
+            placeholder="Enter admin password"
             autocomplete="current-password"
             class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
           />
@@ -68,7 +84,7 @@
 
         <button
           type="submit"
-          disabled={loading || !token.trim()}
+          disabled={loading || !password.trim()}
           class="w-full py-2 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 dark:disabled:bg-indigo-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
           {#if loading}
@@ -84,7 +100,7 @@
     </div>
 
     <p class="text-center text-xs text-slate-400 dark:text-slate-600 mt-4">
-      Set <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">ADMIN_TOKEN</code> on the gateway to protect the panel
+      Set <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">GATEWAY_ADMIN_PASSWORD</code> on the gateway to protect the admin panel
     </p>
   </div>
 </div>

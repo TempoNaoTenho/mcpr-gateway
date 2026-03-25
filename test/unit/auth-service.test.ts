@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { resolveIdentity } from '../../src/auth/service.js'
 
 describe('resolveIdentity', () => {
-  it('prefers persisted bearer tokens even when bootstrap auth mode is mock_dev', () => {
+  it('resolves persisted bearer tokens from staticKeys', () => {
     const identity = resolveIdentity('Bearer persisted-token', {
-      mode: 'mock_dev',
+      mode: 'static_key',
       staticKeys: {
         'persisted-token': {
           userId: 'service-user',
@@ -19,9 +19,9 @@ describe('resolveIdentity', () => {
     })
   })
 
-  it('falls back to mock_dev parsing when the bearer token is not a persisted client token', () => {
+  it('returns anonymous when bearer token is not persisted', () => {
     const identity = resolveIdentity('Bearer inspector:admin', {
-      mode: 'mock_dev',
+      mode: 'static_key',
       staticKeys: {
         persisted: {
           userId: 'service-user',
@@ -30,9 +30,6 @@ describe('resolveIdentity', () => {
       },
     })
 
-    expect(identity).toEqual({
-      sub: 'inspector',
-      roles: ['admin'],
-    })
+    expect(identity).toEqual({ sub: 'anonymous', roles: [] })
   })
 })

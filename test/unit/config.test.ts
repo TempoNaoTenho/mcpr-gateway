@@ -45,7 +45,7 @@ function validGatewayBase() {
         trustLevel: 'internal' as const,
       },
     ],
-    auth: { mode: 'mock_dev' as const },
+    auth: { mode: 'static_key' as const },
     namespaces: {
       test: {
         allowedRoles: ['user'],
@@ -69,6 +69,14 @@ function validGatewayBase() {
     triggers: TRIGGERS,
     resilience: RESILIENCE,
     debug: { enabled: false },
+    codeMode: {
+      memoryLimitMb: 128,
+      executionTimeoutMs: 10_000,
+      maxToolCallsPerExecution: 20,
+      maxResultSizeBytes: 1_048_576,
+      artifactStoreTtlSeconds: 300,
+      maxConcurrentToolCalls: 5,
+    },
     starterPacks: {
       test: {
         preferredTags: ['search'],
@@ -77,6 +85,7 @@ function validGatewayBase() {
         includeModes: ['read' as const],
       },
     },
+    allowedOAuthProviders: [],
   }
 }
 
@@ -110,11 +119,11 @@ describe('loadConfig — valid config', () => {
       resilience: base.resilience,
       debug: base.debug,
       starterPacks: base.starterPacks,
-    } as AdminConfig
+    } as unknown as AdminConfig
 
-    const merged = mergeWithAdminConfig({ auth: { mode: 'mock_dev' } }, adminConfig)
+    const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
 
-    expect(merged.auth).toEqual({ mode: 'mock_dev', staticKeys: undefined })
+    expect(merged.auth).toEqual({ mode: 'static_key', staticKeys: undefined })
     expect(merged.servers).toEqual([
       {
         ...base.servers[0],
@@ -142,9 +151,9 @@ describe('loadConfig — valid config', () => {
           trustLevel: 'verified' as const,
         },
       ],
-    } as AdminConfig
+    } as unknown as AdminConfig
 
-    const merged = mergeWithAdminConfig({ auth: { mode: 'mock_dev' } }, adminConfig)
+    const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
 
     expect(merged.servers).toEqual([
       expect.objectContaining({
@@ -172,9 +181,9 @@ describe('loadConfig — valid config', () => {
       resilience: base.resilience,
       debug: base.debug,
       starterPacks: base.starterPacks,
-    } as AdminConfig
+    } as unknown as AdminConfig
 
-    const merged = mergeWithAdminConfig({ auth: { mode: 'mock_dev' } }, adminConfig)
+    const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
 
     expect(merged.selector.vector).toEqual({ enabled: false })
     expect(merged.selector.focus).toEqual({
@@ -223,12 +232,12 @@ describe('loadConfig — valid config', () => {
     expect(config.starterPacks['test'].maxTools).toBe(4)
   })
 
-  it('defaults auth to mock_dev when auth is omitted from bootstrap.json', () => {
+  it('defaults auth to static_key when auth is omitted from bootstrap.json', () => {
     const base = validGatewayBase()
     const { auth: _a, ...withoutAuth } = base
     writeGatewayJson(TMP, withoutAuth)
     const config = loadConfig(TMP)
-    expect(config.auth).toEqual({ mode: 'mock_dev' })
+    expect(config.auth).toEqual({ mode: 'static_key' })
   })
 
   it('defaults debug.enabled to false when omitted', () => {
@@ -307,7 +316,7 @@ describe('loadConfig — bootstrap defaults', () => {
     const config = loadConfig(TMP)
 
     expect(config.servers).toEqual([])
-    expect(config.auth).toEqual({ mode: 'mock_dev' })
+    expect(config.auth).toEqual({ mode: 'static_key' })
     expect(config.namespaces['default']).toBeDefined()
     expect(config.roles['user']).toEqual({
       allowNamespaces: ['default'],
@@ -319,7 +328,7 @@ describe('loadConfig — bootstrap defaults', () => {
       unhealthyDownstream: 0.5,
     })
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('starting with built-in defaults and zero downstream servers'),
+      expect.stringContaining('starting with built-in defaults and zero downstream servers')
     )
 
     warnSpy.mockRestore()
@@ -404,13 +413,44 @@ describe('loadConfig — invalid schema', () => {
     expect(config.auth).toEqual({ mode: 'static_key' })
   })
 
-  it('loads when auth.mode is static_key with empty staticKeys', () => {
+  it('rejects legacy bootstrap auth.staticKeys', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit')
+    }) as never)
     writeGatewayJson(TMP, {
       ...validGatewayBase(),
       auth: { mode: 'static_key', staticKeys: {} },
     })
-    const config = loadConfig(TMP)
-    expect(config.auth).toEqual({ mode: 'static_key', staticKeys: {} })
+
+    expect(() => loadConfig(TMP)).toThrow('process.exit')
+    expect(errorSpy).toHaveBeenCalledWith('[config] Invalid bootstrap.json.auth:')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('auth.staticKeys is no longer supported in bootstrap.json')
+    )
+
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('rejects legacy bootstrap auth.mode mock_dev', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit')
+    }) as never)
+    writeGatewayJson(TMP, {
+      ...validGatewayBase(),
+      auth: { mode: 'mock_dev' },
+    })
+
+    expect(() => loadConfig(TMP)).toThrow('process.exit')
+    expect(errorSpy).toHaveBeenCalledWith('[config] Invalid bootstrap.json.auth:')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('auth.mode "mock_dev" has been removed')
+    )
+
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
   })
 })
 
@@ -483,18 +523,15 @@ describe('loadConfig — env var interpolation', () => {
     process.env['TEST_API_KEY'] = 'my-secret-token'
     writeGatewayJson(TMP, {
       ...validGatewayBase(),
-      auth: {
-        mode: 'static_key',
-        staticKeys: {
-          '${TEST_API_KEY}': {
-            userId: 'svc',
-            roles: ['user'],
-          },
+      servers: [
+        {
+          ...validGatewayBase().servers[0],
+          url: 'https://${TEST_API_KEY}.example.com/mcp',
         },
-      },
+      ],
     })
     const config = loadConfig(TMP)
-    expect(config.auth.staticKeys?.['my-secret-token']).toBeDefined()
+    expect(config.servers[0]?.url).toBe('https://my-secret-token.example.com/mcp')
     delete process.env['TEST_API_KEY']
   })
 
@@ -510,7 +547,7 @@ describe('loadConfig — env var interpolation', () => {
             url: '${MISSING_VAR}',
           },
         ],
-      }),
+      })
     )
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit')
