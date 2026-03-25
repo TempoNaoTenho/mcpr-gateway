@@ -487,6 +487,31 @@ describe('handleInitialize', () => {
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
     expect(result.instructions).toContain('gateway_call_tool')
+    expect(result.instructions).toContain('"gmail-server"')
+  })
+
+  it('omits server list from compat instructions when no servers available', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const emptyRegistry = {
+      getToolsByNamespace: () => [],
+      getHealthStates: () => ({}),
+    }
+
+    const response = await handleInitialize(
+      makeHandlerContext(Mode.Read),
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+      store,
+      emptyRegistry as never
+    )
+
+    const result = (response.result as { result: { instructions?: string } }).result
+    expect(result.instructions).toBeDefined()
+    expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).not.toContain('Available servers')
   })
 
   it('includes code mode instructions in initialize response for code mode', async () => {

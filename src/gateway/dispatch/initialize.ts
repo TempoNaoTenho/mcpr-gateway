@@ -21,10 +21,15 @@ import { buildVisibleToolCatalog } from '../../session/catalog.js'
 import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
 
-function buildGatewayInstructions(mode: GatewayMode): string | undefined {
+function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): string | undefined {
   switch (mode) {
-    case GatewayMode.Compat:
-      return 'Gateway in compatibility mode. Discover available tools with gateway_search_tools, then invoke them with gateway_call_tool. Do not attempt to call upstream tools directly.'
+    case GatewayMode.Compat: {
+      const serverList =
+        serverIds.length > 0
+          ? ` Available servers: [${serverIds.map((id) => `"${id}"`).join(', ')}].`
+          : ''
+      return `Gateway in compatibility mode. Discover available tools with gateway_search_tools, then invoke them with gateway_call_tool. Do not attempt to call upstream tools directly.${serverList}`
+    }
     case GatewayMode.Code:
       return 'Gateway in code mode. Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.search(query), catalog.list(), mcp.call(handle, args), mcp.batch([{handle, args}]), result.limit(n), result.pick(fields), artifacts.save(name, content). Call gateway_help for full API reference.'
     default:
@@ -198,7 +203,8 @@ export async function handleInitialize(
     latencyMs,
   }, 'session initialized')
 
-  const instructions = buildGatewayInstructions(gatewayMode)
+  const serverIds = serverGroups.map((g) => g.server.id)
+  const instructions = buildGatewayInstructions(gatewayMode, serverIds)
 
   return {
     id: sessionId,
