@@ -135,43 +135,15 @@
         <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-4">
           <h2 class="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">
             Selector
-            <InfoTooltip text="Controls tool ranking, optional vector stage, focus heuristics, published schema compression, and the legacy gateway_find_tools discovery tool." />
+            <InfoTooltip text="Tune how the selector ranks candidates when it runs (e.g. session refresh in compat mode). Does not change gateway_search_tools, which always uses BM25." />
           </h2>
           <div class="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-300">
             <label class="flex items-center gap-2">
               <input type="checkbox" bind:checked={policies.selector.lexical.enabled} />
               <span class="inline-flex items-center gap-1">
                 BM25 / lexical ranking
-                <InfoTooltip text="Lexical / BM25 stage for candidate scoring when enabled." />
+                <InfoTooltip text="When enabled, adds a BM25/RRF stage to the selector’s hybrid ranker (intent text + tool fields). Off: context/heuristic signals only. gateway_search_tools always ranks with BM25 regardless of this switch." />
               </span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" bind:checked={policies.selector.vector.enabled} />
-              <span class="inline-flex items-center gap-1">
-                Vector ranking
-                <InfoTooltip text="Optional embedding-based ranking stage; requires vector configuration elsewhere in the gateway." />
-              </span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" bind:checked={policies.selector.discoveryTool.enabled} />
-              <span class="inline-flex items-center gap-1">
-                Legacy discovery tool
-                <InfoTooltip text="Exposes gateway_find_tools for promoting hidden tools into the session window." />
-              </span>
-            </label>
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <label class="space-y-1">
-              <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Discovery result limit <InfoTooltip text="Max tools gateway_find_tools may inspect per request." />
-              </span>
-              <input type="number" min="1" bind:value={policies.selector.discoveryTool.resultLimit} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
-            </label>
-            <label class="space-y-1">
-              <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Discovery promote count <InfoTooltip text="How many matches gateway_find_tools promotes into the active window." />
-              </span>
-              <input type="number" min="1" bind:value={policies.selector.discoveryTool.promoteCount} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
           <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 pt-1">Focus</h3>
@@ -214,7 +186,7 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Description compression <InfoTooltip text="Reduces description size sent to MCP clients (token savings)." />
+                Description compression <InfoTooltip text="When conservative, shortens downstream tool descriptions in tools/list (gateway’s own tools are never compressed). Default off — full text." />
               </span>
               <select bind:value={policies.selector.publication.descriptionCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="off">off</option>
@@ -223,7 +195,7 @@
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Schema compression <InfoTooltip text="Simplifies JSON Schema payloads published to clients when enabled." />
+                Schema compression <InfoTooltip text="When conservative, simplifies JSON Schemas for downstream tools in tools/list. Default off — full schema." />
               </span>
               <select bind:value={policies.selector.publication.schemaCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="off">off</option>
@@ -232,7 +204,7 @@
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Description max length <InfoTooltip text="Maximum length for tool descriptions after compression." />
+                Description max length <InfoTooltip text="Cap on description length when description compression is conservative (ignored when off)." />
               </span>
               <input type="number" min="1" bind:value={policies.selector.publication.descriptionMaxLength} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
@@ -240,19 +212,19 @@
           <div class="grid grid-cols-3 gap-3">
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Write penalty <InfoTooltip text="Score penalty applied to write-capable tools during selection." />
+                Write penalty <InfoTooltip text="In the selector ranker only: when the session mode is Read, multiplies a score penalty for tools marked High risk (magnitude = value × 5). 0 disables this bias." />
               </span>
               <input type="number" step="0.05" bind:value={policies.selector.penalties.write} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Admin penalty <InfoTooltip text="Score penalty applied to admin-scope tools." />
+                Admin penalty <InfoTooltip text="In the selector ranker only: when the session mode is Admin, score penalty for High-risk tools (magnitude = value × 5). 0 disables." />
               </span>
               <input type="number" step="0.05" bind:value={policies.selector.penalties.admin} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Unhealthy penalty <InfoTooltip text="Score penalty for tools from degraded or offline downstream servers." />
+                Unhealthy penalty <InfoTooltip text="Scales fixed health-based score adjustments in the selector (degraded/offline/unknown). 0.5 matches historical strength; 0 removes that scaling (no extra penalty from this setting)." />
               </span>
               <input type="number" step="0.05" bind:value={policies.selector.penalties.unhealthyDownstream} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>

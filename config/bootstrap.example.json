@@ -8,6 +8,9 @@
  *
  * This file uses static_key auth mode. Client access tokens are managed
  * through the Admin UI and stored separately from the bootstrap config.
+ *
+ * selector (see Admin UI → Configuration): only lexical, penalties, focus,
+ * and publication. gateway_search_tools always uses BM25; it is not toggled here.
  */
 
 {
@@ -19,32 +22,24 @@
   "roles": {},
   "selector": {
     "lexical": {
-      "enabled": true
-    },
-    "vector": {
       "enabled": false
     },
     "penalties": {
-      "write": 0.15,
-      "admin": 0.35,
-      "unhealthyDownstream": 0.5
+      "write": 0,
+      "admin": 0,
+      "unhealthyDownstream": 0
     },
     "focus": {
-      "enabled": true,
+      "enabled": false,
       "lookback": 5,
       "minDominantSuccesses": 2,
-      "reserveSlots": 1,
-      "crossDomainPenalty": 1
+      "reserveSlots": 0,
+      "crossDomainPenalty": 0
     },
     "publication": {
       "descriptionCompression": "off",
       "schemaCompression": "off",
-      "descriptionMaxLength": 500
-    },
-    "discoveryTool": {
-      "enabled": false,
-      "resultLimit": 8,
-      "promoteCount": 3
+      "descriptionMaxLength": 160
     }
   },
   "session": {
@@ -89,7 +84,9 @@
     "executionTimeoutMs": 10000,
     "maxToolCallsPerExecution": 20,
     "maxResultSizeBytes": 1048576,
-    "artifactStoreTtlSeconds": 300
+    "artifactStoreTtlSeconds": 300,
+    "maxConcurrentToolCalls": 5
   },
-  "starterPacks": {}
+  "starterPacks": {},
+  "allowedOAuthProviders": []
 }

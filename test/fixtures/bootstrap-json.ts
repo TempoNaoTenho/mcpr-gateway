@@ -2,24 +2,18 @@
 
 export const defaultSelector = {
   lexical: { enabled: true },
-  vector: { enabled: false },
   penalties: { write: 0.2, admin: 0.5, unhealthyDownstream: 0.7 },
   focus: {
-    enabled: true,
+    enabled: false,
     lookback: 5,
     minDominantSuccesses: 2,
     reserveSlots: 1,
     crossDomainPenalty: 1,
   },
   publication: {
-    descriptionCompression: 'conservative',
-    schemaCompression: 'conservative',
+    descriptionCompression: 'off' as const,
+    schemaCompression: 'off' as const,
     descriptionMaxLength: 160,
-  },
-  discoveryTool: {
-    enabled: false,
-    resultLimit: 8,
-    promoteCount: 3,
   },
 } as const
 

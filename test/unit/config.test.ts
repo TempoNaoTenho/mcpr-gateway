@@ -62,7 +62,6 @@ function validGatewayBase() {
     },
     selector: {
       lexical: { enabled: true },
-      vector: { enabled: false },
       penalties: { write: 0.2, admin: 0.5, unhealthyDownstream: 0.7 },
     },
     session: SESSION,
@@ -185,23 +184,17 @@ describe('loadConfig — valid config', () => {
 
     const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
 
-    expect(merged.selector.vector).toEqual({ enabled: false })
     expect(merged.selector.focus).toEqual({
-      enabled: true,
+      enabled: false,
       lookback: 5,
       minDominantSuccesses: 2,
       reserveSlots: 1,
       crossDomainPenalty: 1,
     })
     expect(merged.selector.publication).toEqual({
-      descriptionCompression: 'conservative',
-      schemaCompression: 'conservative',
+      descriptionCompression: 'off',
+      schemaCompression: 'off',
       descriptionMaxLength: 160,
-    })
-    expect(merged.selector.discoveryTool).toEqual({
-      enabled: false,
-      resultLimit: 8,
-      promoteCount: 3,
     })
   })
 
@@ -257,9 +250,8 @@ describe('loadConfig — valid config', () => {
     })
     const config = loadConfig(TMP)
     expect(config.selector.lexical.enabled).toBe(false)
-    expect(config.selector.vector.enabled).toBe(false)
     expect(config.selector.penalties).toEqual({
-      write: 0.15,
+      write: 0,
       admin: 0.35,
       unhealthyDownstream: 0.5,
     })
@@ -323,7 +315,7 @@ describe('loadConfig — bootstrap defaults', () => {
       denyModes: ['admin'],
     })
     expect(config.selector.penalties).toEqual({
-      write: 0.15,
+      write: 0,
       admin: 0.35,
       unhealthyDownstream: 0.5,
     })

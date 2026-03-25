@@ -40,8 +40,19 @@ function makeConfig(overrides?: Partial<GatewayConfig>): GatewayConfig {
     },
     selector: {
       lexical: { enabled: true },
-      vector: { enabled: false },
       penalties: { write: 0.2, admin: 0.5, unhealthyDownstream: 0.7 },
+      focus: {
+        enabled: false,
+        lookback: 5,
+        minDominantSuccesses: 2,
+        reserveSlots: 1,
+        crossDomainPenalty: 1,
+      },
+      publication: {
+        descriptionCompression: 'off',
+        schemaCompression: 'off',
+        descriptionMaxLength: 160,
+      },
     },
     session: { ttlSeconds: 1800, cleanupIntervalSeconds: 60 },
     triggers: {

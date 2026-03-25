@@ -653,7 +653,6 @@ export interface PoliciesConfig {
   >
   selector: {
     lexical: { enabled: boolean }
-    vector: { enabled: boolean }
     penalties: {
       write: number
       admin: number
@@ -670,11 +669,6 @@ export interface PoliciesConfig {
       descriptionCompression: 'off' | 'conservative'
       schemaCompression: 'off' | 'conservative'
       descriptionMaxLength: number
-    }
-    discoveryTool: {
-      enabled: boolean
-      resultLimit: number
-      promoteCount: number
     }
   }
   session: {

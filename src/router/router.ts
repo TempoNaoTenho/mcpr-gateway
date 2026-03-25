@@ -17,12 +17,10 @@ import { getConfig } from '../config/index.js'
 import { isToolDisabledForNamespace } from '../config/disabled-tool-keys.js'
 import { executeCodeModeHelp, executeCodeMode } from '../runtime/index.js'
 import {
-  executeGatewayDiscovery,
   executeGatewaySearch,
   parseGatewayCallArgs,
   parseGatewayRunCodeArgs,
   GATEWAY_SERVER_ID,
-  GATEWAY_DISCOVERY_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
@@ -177,29 +175,6 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result: executeCodeModeHelp(topic, gatewayMode),
-        durationMs: 0,
-        timestamp: new Date().toISOString(),
-      }
-    }
-
-    // gateway_find_tools — legacy BM25 discovery
-    if (
-      toolName === GATEWAY_DISCOVERY_TOOL_NAME &&
-      isToolVisible(session.toolWindow, GATEWAY_DISCOVERY_TOOL_NAME, GATEWAY_SERVER_ID)
-    ) {
-      const { updatedSession, result } = await executeGatewayDiscovery(
-        session,
-        args,
-        this.registry,
-        getConfig().selector
-      )
-      await this.store.set(sessionId, updatedSession)
-      return {
-        toolName,
-        serverId: GATEWAY_SERVER_ID,
-        sessionId,
-        outcome: OutcomeClass.Success,
-        result,
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }

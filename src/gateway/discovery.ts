@@ -1,12 +1,9 @@
-import type { SelectorConfig } from '../config/schemas.js'
 import type { VisibleTool } from '../types/tools.js'
 import type { SessionState } from '../types/session.js'
-import { GatewayMode, RefreshTriggerType, ToolRiskLevel } from '../types/enums.js'
+import { GatewayMode, ToolRiskLevel } from '../types/enums.js'
 import { generateToolcards } from '../toolcard/index.js'
 import type { IRegistryAdapter } from '../types/interfaces.js'
 import { toolCandidateKey } from '../candidate/lexical.js'
-import { projectToPublic } from './publish/project.js'
-import { inferCapabilityFromTool } from '../selector/focus.js'
 import { getConfig } from '../config/index.js'
 import { disabledToolKeysForNamespace } from '../config/disabled-tool-keys.js'
 import { rankToolsWithBm25 } from '../selector/bm25.js'
@@ -16,7 +13,6 @@ import { GATEWAY_SERVER_ID } from './gateway-constants.js'
 // Constants
 // ---------------------------------------------------------------------------
 
-export const GATEWAY_DISCOVERY_TOOL_NAME = 'gateway_find_tools'
 export const GATEWAY_SEARCH_TOOL_NAME = 'gateway_search_tools'
 export const GATEWAY_CALL_TOOL_NAME = 'gateway_call_tool'
 export const GATEWAY_RUN_CODE_TOOL_NAME = 'gateway_run_code'
@@ -31,7 +27,6 @@ export const GATEWAY_DISCOVERY_SERVER_ID = GATEWAY_SERVER_ID
 // ---------------------------------------------------------------------------
 
 const GATEWAY_TOOL_NAMES = new Set([
-  GATEWAY_DISCOVERY_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
@@ -281,192 +276,3 @@ export function parseGatewayRunCodeArgs(args: unknown): GatewayRunCodeArgs | { e
   return { code: obj.code }
 }
 
-// ---------------------------------------------------------------------------
-// Legacy: gateway_find_tools (BM25-based, kept for backward compat)
-// ---------------------------------------------------------------------------
-
-type DiscoveryArgs = {
-  query?: string
-  limit?: number
-  promoteCount?: number
-  includeVisible?: boolean
-}
-
-function getDiscoveryConfig(
-  selectorConfig: SelectorConfig
-): Required<SelectorConfig>['discoveryTool'] {
-  return (
-    selectorConfig.discoveryTool ?? {
-      enabled: false,
-      resultLimit: 8,
-      promoteCount: 3,
-    }
-  )
-}
-
-function buildGatewayDiscoveryTool(namespace: string): VisibleTool {
-  return {
-    name: GATEWAY_DISCOVERY_TOOL_NAME,
-    description:
-      'Search hidden tools in this namespace and promote the best matches into the session window.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'BM25/lexical search query for hidden tools.' },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 20,
-          description: 'Maximum results to inspect.',
-        },
-        promoteCount: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 10,
-          description: 'How many matching tools should be promoted into the active session window.',
-        },
-        includeVisible: {
-          type: 'boolean',
-          description: 'Include tools already visible in the current session window.',
-        },
-      },
-      required: ['query'],
-      additionalProperties: false,
-    },
-    serverId: GATEWAY_SERVER_ID,
-    namespace,
-    riskLevel: ToolRiskLevel.Low,
-    tags: ['search', 'discovery', namespace],
-  }
-}
-
-export function appendDiscoveryTool(
-  tools: VisibleTool[],
-  namespace: string,
-  selectorConfig: SelectorConfig
-): VisibleTool[] {
-  const discoveryConfig = getDiscoveryConfig(selectorConfig)
-  if (!discoveryConfig.enabled) return tools
-  if (
-    tools.some(
-      (tool) => tool.serverId === GATEWAY_SERVER_ID && tool.name === GATEWAY_DISCOVERY_TOOL_NAME
-    )
-  ) {
-    return tools
-  }
-  return [...tools, buildGatewayDiscoveryTool(namespace)]
-}
-
-function parseDiscoveryArgs(
-  args: unknown,
-  selectorConfig: SelectorConfig
-): Required<DiscoveryArgs> {
-  const discoveryConfig = getDiscoveryConfig(selectorConfig)
-  const parsed =
-    args && typeof args === 'object' && !Array.isArray(args) ? (args as DiscoveryArgs) : {}
-  return {
-    query: typeof parsed.query === 'string' ? parsed.query.trim() : '',
-    limit: Math.max(1, Math.min(20, parsed.limit ?? discoveryConfig.resultLimit)),
-    promoteCount: Math.max(1, Math.min(10, parsed.promoteCount ?? discoveryConfig.promoteCount)),
-    includeVisible: parsed.includeVisible === true,
-  }
-}
-
-function promoteHiddenTools(session: SessionState, promoted: VisibleTool[]): VisibleTool[] {
-  const discoveryTool = session.toolWindow.find((tool) =>
-    isGatewayInternalTool(tool.name, tool.serverId)
-  )
-  const visible = session.toolWindow.filter(
-    (tool) => !isGatewayInternalTool(tool.name, tool.serverId)
-  )
-  const deduped = [...visible]
-
-  for (const tool of promoted) {
-    if (!deduped.some((entry) => entry.serverId === tool.serverId && entry.name === tool.name)) {
-      deduped.push(tool)
-    }
-  }
-
-  return discoveryTool ? [...deduped, discoveryTool] : deduped
-}
-
-export async function executeGatewayDiscovery(
-  session: SessionState,
-  args: unknown,
-  registry: IRegistryAdapter,
-  selectorConfig: SelectorConfig
-): Promise<{ updatedSession: SessionState; result: unknown }> {
-  const parsed = parseDiscoveryArgs(args, selectorConfig)
-  const serverGroups = registry.getToolsByNamespace?.(session.namespace) ?? []
-  const toolcards = serverGroups.flatMap(({ server, records }) =>
-    generateToolcards(records, server, server.toolOverrides)
-  )
-  const disabledKeys = disabledToolKeysForNamespace(getConfig(), session.namespace)
-  const visibleKeys = new Set(session.toolWindow.map((tool) => `${tool.serverId}::${tool.name}`))
-
-  const searchableToolcards = toolcards
-    .filter((toolcard) => !disabledKeys.has(toolCandidateKey(toolcard.serverId, toolcard.name)))
-    .filter(
-      (toolcard) =>
-        parsed.includeVisible || !visibleKeys.has(`${toolcard.serverId}::${toolcard.name}`)
-    )
-
-  const ranked = rankToolsWithBm25(searchableToolcards, parsed.query)
-    .filter((entry) => entry.score > 0)
-    .sort((left, right) => {
-      const diff = right.score - left.score
-      if (diff !== 0) return diff
-      return left.toolcard.name.localeCompare(right.toolcard.name)
-    })
-
-  const matches = ranked.slice(0, parsed.limit)
-  const promoted = matches
-    .slice(0, Math.min(parsed.promoteCount, matches.length))
-    .map(({ toolcard }) => ({
-      name: toolcard.name,
-      description: toolcard.description,
-      inputSchema: toolcard.inputSchema,
-      serverId: toolcard.serverId,
-      namespace: toolcard.namespace,
-      riskLevel: toolcard.riskLevel,
-      tags: toolcard.tags,
-    }))
-
-  const nextToolWindow = promoteHiddenTools(session, promoted)
-  const updatedSession: SessionState = {
-    ...session,
-    toolWindow: nextToolWindow,
-    refreshCount: session.refreshCount + (promoted.length > 0 ? 1 : 0),
-    pendingToolListChange: promoted.length > 0,
-    refreshHistory:
-      promoted.length > 0
-        ? [
-            ...(session.refreshHistory ?? []),
-            {
-              triggeredBy: RefreshTriggerType.ExplicitRequest,
-              timestamp: new Date().toISOString(),
-              toolCount: nextToolWindow.length,
-            },
-          ]
-        : (session.refreshHistory ?? []),
-  }
-
-  return {
-    updatedSession,
-    result: {
-      query: parsed.query,
-      promoted: promoted.map((tool) => ({ name: tool.name, serverId: tool.serverId })),
-      matches: matches.map(({ toolcard, score }) => ({
-        name: toolcard.name,
-        serverId: toolcard.serverId,
-        namespace: toolcard.namespace,
-        capability: inferCapabilityFromTool(toolcard),
-        score,
-        search: {
-          strategy: 'bm25',
-        },
-        tool: projectToPublic(toolcard, selectorConfig),
-      })),
-    },
-  }
-}

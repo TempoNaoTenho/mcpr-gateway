@@ -3,7 +3,6 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
-  import { get } from 'svelte/store';
   import { page } from '$app/stores';
   import { auth } from '$lib/auth.js';
   import Sidebar from '../components/layout/Sidebar.svelte';
@@ -20,15 +19,22 @@
   let authChecked = $state(false);
 
   onMount(async () => {
-    const ok = await auth.check();
+    await auth.check();
     authChecked = true;
-    const pathname = get(page).url.pathname;
+  });
+
+  // Layout `onMount` only runs once; pathname-driven redirects must react to client navigations
+  // (e.g. browser back from `/dashboard` to `/`) so we do not leave an empty root `+page.svelte`.
+  $effect(() => {
+    if (!authChecked) return;
+    const pathname = $page.url.pathname;
+    const ok = $auth.authenticated;
     const onLogin = pathname === `${base}/login`;
     const onRoot = pathname === `${base}/`;
     if (!ok && !onLogin) {
-      goto(`${base}/login`);
+      void goto(`${base}/login`, { replaceState: true });
     } else if (ok && (onLogin || onRoot)) {
-      goto(`${base}/dashboard`);
+      void goto(`${base}/dashboard`, { replaceState: true });
     }
   });
 </script>

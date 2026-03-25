@@ -40,8 +40,8 @@ export class SelectorEngine implements ISelectorEngine {
     const ranked = rerankCandidates(input.candidates, {
       mode: input.mode,
       penalties: {
-        write: policy.selector?.penalties?.write ?? 0.5,
-        admin: policy.selector?.penalties?.admin ?? 0.5,
+        write: policy.selector?.penalties?.write ?? 0,
+        admin: policy.selector?.penalties?.admin ?? 0.35,
         unhealthyDownstream: policy.selector?.penalties?.unhealthyDownstream ?? 0.5,
       },
       healthStates,
@@ -70,8 +70,8 @@ export class SelectorEngine implements ISelectorEngine {
       candidatePoolSize: input.candidates.length,
       filtersApplied: ['namespace', 'mode', 'health'],
       penaltiesApplied: {
-        write: policy.selector?.penalties?.write ?? 0.5,
-        admin: policy.selector?.penalties?.admin ?? 0.5,
+        write: policy.selector?.penalties?.write ?? 0,
+        admin: policy.selector?.penalties?.admin ?? 0.35,
         unhealthyDownstream: policy.selector?.penalties?.unhealthyDownstream ?? 0.5,
       },
       exclusionReasons: exclusions,

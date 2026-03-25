@@ -37,21 +37,15 @@ const SelectorLexicalSchema = z
   })
   .strict()
 
-const SelectorVectorSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-  })
-  .strict()
-
 const SelectorPenaltySchema = z.object({
-  write: z.number().min(0).max(1).default(0.15),
+  write: z.number().min(0).max(1).default(0),
   admin: z.number().min(0).max(1).default(0.35),
   unhealthyDownstream: z.number().min(0).max(1).default(0.5),
 })
 
 const SelectorFocusSchema = z
   .object({
-    enabled: z.boolean().default(true),
+    enabled: z.boolean().default(false),
     lookback: z.number().int().positive().default(5),
     minDominantSuccesses: z.number().int().positive().default(2),
     reserveSlots: z.number().int().nonnegative().default(1),
@@ -61,28 +55,18 @@ const SelectorFocusSchema = z
 
 const SelectorPublicationSchema = z
   .object({
-    descriptionCompression: z.enum(['off', 'conservative']).default('conservative'),
-    schemaCompression: z.enum(['off', 'conservative']).default('conservative'),
+    descriptionCompression: z.enum(['off', 'conservative']).default('off'),
+    schemaCompression: z.enum(['off', 'conservative']).default('off'),
     descriptionMaxLength: z.number().int().positive().default(160),
   })
   .strict()
 
-const SelectorDiscoveryToolSchema = z.object({
-  enabled: z.boolean().default(false),
-  resultLimit: z.number().int().positive().default(8),
-  promoteCount: z.number().int().positive().default(3),
+const SelectorConfigSchema = z.object({
+  lexical: SelectorLexicalSchema.default({}),
+  penalties: SelectorPenaltySchema.default({}),
+  focus: SelectorFocusSchema.default({}),
+  publication: SelectorPublicationSchema.default({}),
 })
-
-const SelectorConfigSchema = z
-  .object({
-    lexical: SelectorLexicalSchema.default({}),
-    vector: SelectorVectorSchema.default({}),
-    penalties: SelectorPenaltySchema.default({}),
-    focus: SelectorFocusSchema.default({}),
-    publication: SelectorPublicationSchema.default({}),
-    discoveryTool: SelectorDiscoveryToolSchema.default({}),
-  })
-  .strict()
 
 export type SelectorConfig = z.infer<typeof SelectorConfigSchema>
 

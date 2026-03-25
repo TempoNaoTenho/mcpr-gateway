@@ -65,9 +65,10 @@ export function rerankCandidates(
       score += trustBonus
     }
 
-    // Health penalty
+    // Health penalty — scale by unhealthyDownstream; 0.5 preserves legacy magnitude
+    const unhealthyScale = signals.penalties.unhealthyDownstream / 0.5
     const health = signals.healthStates[tc.serverId]
-    const healthPenalty =
+    const baseHealthPenalty =
       health === DownstreamHealth.Degraded
         ? -2
         : health === DownstreamHealth.Offline
@@ -75,6 +76,8 @@ export function rerankCandidates(
           : health === DownstreamHealth.Unknown
             ? -0.5
             : 0
+    const healthPenalty =
+      baseHealthPenalty !== 0 ? baseHealthPenalty * unhealthyScale : 0
     if (healthPenalty !== 0) {
       breakdown.healthPenalty = healthPenalty
       score += healthPenalty
@@ -99,12 +102,19 @@ export function rerankCandidates(
       score += failurePenalty
     }
 
-    // Mode penalty: Read mode + High risk
+    // Mode penalty: Read mode + High risk (write); Admin mode + High risk (admin)
     if (signals.mode === Mode.Read && tc.riskLevel === ToolRiskLevel.High) {
       const modePenalty = -(signals.penalties.write * 5)
       if (modePenalty !== 0) {
         breakdown.modePenalty = modePenalty
         score += modePenalty
+      }
+    }
+    if (signals.mode === Mode.Admin && tc.riskLevel === ToolRiskLevel.High) {
+      const adminModePenalty = -(signals.penalties.admin * 5)
+      if (adminModePenalty !== 0) {
+        breakdown.adminModePenalty = adminModePenalty
+        score += adminModePenalty
       }
     }
 

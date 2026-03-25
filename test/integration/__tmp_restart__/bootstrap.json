@@ -1,0 +1,109 @@
+{
+  "servers": [],
+  "auth": {
+    "mode": "static_key"
+  },
+  "namespaces": {
+    "gmail": {
+      "allowedRoles": [
+        "user",
+        "admin"
+      ],
+      "bootstrapWindowSize": 4,
+      "candidatePoolSize": 16,
+      "allowedModes": [
+        "read",
+        "write"
+      ]
+    }
+  },
+  "roles": {
+    "user": {
+      "allowNamespaces": [
+        "gmail"
+      ],
+      "denyModes": [
+        "admin"
+      ]
+    },
+    "admin": {
+      "allowNamespaces": [
+        "gmail"
+      ]
+    }
+  },
+  "selector": {
+    "lexical": {
+      "enabled": true
+    },
+    "penalties": {
+      "write": 0.2,
+      "admin": 0.5,
+      "unhealthyDownstream": 0.7
+    },
+    "focus": {
+      "enabled": false,
+      "lookback": 5,
+      "minDominantSuccesses": 2,
+      "reserveSlots": 1,
+      "crossDomainPenalty": 1
+    },
+    "publication": {
+      "descriptionCompression": "off",
+      "schemaCompression": "off",
+      "descriptionMaxLength": 160
+    }
+  },
+  "session": {
+    "ttlSeconds": 1800,
+    "cleanupIntervalSeconds": 60,
+    "handleTtlSeconds": 300
+  },
+  "triggers": {
+    "refreshOnSuccess": false,
+    "refreshOnTimeout": true,
+    "refreshOnError": true,
+    "replaceOrAppend": "replace",
+    "cooldownSeconds": 30
+  },
+  "resilience": {
+    "timeouts": {
+      "connectMs": 5000,
+      "responseMs": 10000,
+      "totalMs": 30000
+    },
+    "rateLimit": {
+      "perSession": {
+        "maxRequests": 100,
+        "windowSeconds": 60
+      },
+      "perUser": {
+        "maxRequests": 500,
+        "windowSeconds": 60
+      },
+      "perDownstreamConcurrency": 10
+    },
+    "circuitBreaker": {
+      "degradedAfterFailures": 3,
+      "offlineAfterFailures": 5,
+      "resetAfterSeconds": 60
+    }
+  },
+  "debug": {
+    "enabled": false
+  },
+  "starterPacks": {
+    "gmail": {
+      "preferredTags": [
+        "email"
+      ],
+      "maxTools": 4,
+      "includeRiskLevels": [
+        "low"
+      ],
+      "includeModes": [
+        "read"
+      ]
+    }
+  }
+}

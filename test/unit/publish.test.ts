@@ -7,7 +7,6 @@ import type { VisibleTool } from '../../src/types/tools.js'
 
 const selectorConfig = {
   lexical: { enabled: true },
-  vector: { enabled: false },
   penalties: { write: 0.2, admin: 0.5, unhealthyDownstream: 0.7 },
   focus: { enabled: true, lookback: 5, minDominantSuccesses: 2, reserveSlots: 1, crossDomainPenalty: 1 },
   publication: {
@@ -15,7 +14,6 @@ const selectorConfig = {
     schemaCompression: 'conservative' as const,
     descriptionMaxLength: 160,
   },
-  discoveryTool: { enabled: false, resultLimit: 8, promoteCount: 3 },
 }
 
 function makeVisibleTool(): VisibleTool {

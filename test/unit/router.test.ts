@@ -1,22 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ExecutionRouter } from '../../src/router/router.js'
 import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.js'
-import { GatewayMode, Mode, OutcomeClass, SessionStatus, ToolRiskLevel } from '../../src/types/enums.js'
+import { Mode, OutcomeClass, SessionStatus, ToolRiskLevel } from '../../src/types/enums.js'
 import { SessionIdSchema } from '../../src/types/identity.js'
 import { SourceTrustLevel } from '../../src/types/enums.js'
 import type { SessionState } from '../../src/types/session.js'
 import type { DownstreamServer } from '../../src/types/server.js'
 import type { VisibleTool } from '../../src/types/tools.js'
-import { setConfig } from '../../src/config/index.js'
 import {
-  GATEWAY_DISCOVERY_SERVER_ID,
-  GATEWAY_DISCOVERY_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
-import { defaultDebug, defaultResilience, defaultSelector, defaultSession, defaultTriggers } from '../fixtures/bootstrap-json.js'
 
 function makeTool(name: string, serverId: string): VisibleTool {
   return {
@@ -57,33 +53,6 @@ function makeServer(id: string): DownstreamServer {
     enabled: true,
     trustLevel: SourceTrustLevel.Verified,
   }
-}
-
-function enableDiscoveryTool(): void {
-  setConfig({
-    servers: [],
-    auth: { mode: 'static_key' },
-    namespaces: {
-      gmail: {
-        allowedRoles: ['user'],
-        bootstrapWindowSize: 4,
-        candidatePoolSize: 8,
-        allowedModes: ['read', 'write'],
-        gatewayMode: GatewayMode.Compat,
-        disabledTools: [],
-      },
-    },
-    roles: { user: { allowNamespaces: ['gmail'] } },
-    selector: {
-      ...defaultSelector,
-      discoveryTool: { enabled: true, resultLimit: 5, promoteCount: 2 },
-    },
-    session: defaultSession,
-    triggers: defaultTriggers,
-    resilience: defaultResilience,
-    debug: defaultDebug,
-    starterPacks: {},
-  })
 }
 
 describe('ExecutionRouter', () => {
@@ -141,57 +110,25 @@ describe('ExecutionRouter', () => {
     expect(registry.getServer).not.toHaveBeenCalled()
   })
 
-  it('executes the gateway discovery tool locally and promotes hidden tools into the session window', async () => {
-    enableDiscoveryTool()
-
+  it('does not route removed gateway_find_tools builtin', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {
       store.stop()
       close()
     }
-    const session = makeSession([
-      makeTool(GATEWAY_DISCOVERY_TOOL_NAME, GATEWAY_DISCOVERY_SERVER_ID),
-    ])
+    const session = makeSession([makeTool('read_email', 'gmail-primary')])
     await store.set(session.id, session)
 
     const registry = {
       getServer: vi.fn(),
-      getToolsByNamespace: vi.fn().mockReturnValue([
-        {
-          server: makeServer('docs'),
-          records: [
-            {
-              name: 'search_docs',
-              description: 'Search docs and product documentation',
-              inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
-              serverId: 'docs',
-              namespace: 'gmail',
-              retrievedAt: new Date().toISOString(),
-              sanitized: true,
-            },
-            {
-              name: 'read_file',
-              description: 'Read a file',
-              inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
-              serverId: 'docs',
-              namespace: 'gmail',
-              retrievedAt: new Date().toISOString(),
-              sanitized: true,
-            },
-          ],
-        },
-      ]),
+      getToolsByNamespace: vi.fn(),
     }
 
     const router = new ExecutionRouter(registry as never, store)
-    const outcome = await router.route(GATEWAY_DISCOVERY_TOOL_NAME, { query: 'product documentation search' }, session.id)
-    const updated = await store.get(session.id)
+    const outcome = await router.route('gateway_find_tools', { query: 'docs' }, session.id)
 
-    expect(outcome.outcome).toBe(OutcomeClass.Success)
-    expect(outcome.serverId).toBe(GATEWAY_DISCOVERY_SERVER_ID)
-    expect(updated?.toolWindow.map((tool) => tool.name)).toContain('search_docs')
-    expect(updated?.pendingToolListChange).toBe(true)
-    expect((outcome.result as { matches: Array<{ search: { strategy: string } }> }).matches[0]?.search.strategy).toBe('bm25')
+    expect(outcome.outcome).toBe(OutcomeClass.ToolError)
+    expect(outcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(registry.getServer).not.toHaveBeenCalled()
   })
 
