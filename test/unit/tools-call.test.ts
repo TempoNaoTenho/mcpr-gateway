@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FastifyRequest } from 'fastify'
 import { handleToolsCall } from '../../src/gateway/dispatch/tools-call.js'
+import type { McpHandlerContext } from '../../src/gateway/mcp-handler-context.js'
 import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.js'
 import { Mode, OutcomeClass, SessionStatus } from '../../src/types/enums.js'
 import { GatewayError } from '../../src/types/errors.js'
@@ -29,11 +29,13 @@ function makeSession(): SessionState {
   }
 }
 
-function makeRequest(sessionId: string): FastifyRequest {
+function makeCtx(sessionId: string): McpHandlerContext {
   return {
-    params: { namespace: 'gmail' },
-    headers: { 'mcp-session-id': sessionId },
-  } as unknown as FastifyRequest
+    namespace: 'gmail',
+    sessionId,
+    requestId: 'test-req',
+    log: undefined,
+  }
 }
 
 describe('handleToolsCall', () => {
@@ -58,7 +60,7 @@ describe('handleToolsCall', () => {
 
     await expect(
       handleToolsCall(
-        makeRequest(session.id),
+        makeCtx(session.id),
         {
           jsonrpc: '2.0',
           id: 1,
@@ -100,7 +102,7 @@ describe('handleToolsCall', () => {
 
     await expect(
       handleToolsCall(
-        makeRequest(session.id),
+        makeCtx(session.id),
         {
           jsonrpc: '2.0',
           id: 1,

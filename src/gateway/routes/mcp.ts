@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { NamespaceSchema } from '../../types/identity.js'
 import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
@@ -8,33 +7,18 @@ import type { DownstreamRegistry } from '../../registry/registry.js'
 import { ExecutionRouter } from '../../router/router.js'
 import type { TriggerEngine } from '../../trigger/index.js'
 import type { RateLimiter } from '../../resilience/rateLimiter.js'
-
-const JsonRpcEnvelopeSchema = z.object({
-  jsonrpc: z.string(),
-  id: z.union([z.number(), z.string(), z.null()]).optional(),
-  method: z.string(),
-  params: z.record(z.unknown()).optional(),
-})
+import {
+  parseJsonRpcEnvelope,
+  isNotificationMethod,
+  isJsonRpcRequest,
+  type JsonRpcEnvelope,
+} from '../jsonrpc.js'
+import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
 
 const LOOPBACK_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i
 const MCP_ALLOWED_HEADERS = 'Authorization, Content-Type, Mcp-Session-Id'
 const MCP_EXPOSED_HEADERS = 'Mcp-Session-Id, Mcp-Tools-Changed'
 const SSE_PING_INTERVAL_MS = 15_000
-
-type JsonRpcBody = {
-  jsonrpc: string
-  id: number | string | null
-  method: string
-  params?: Record<string, unknown>
-}
-
-type JsonRpcEnvelope =
-  | JsonRpcBody
-  | {
-      jsonrpc: string
-      method: string
-      params?: Record<string, unknown>
-    }
 
 interface McpRouteOptions {
   store: ISessionStore
@@ -54,40 +38,6 @@ function setMcpCorsHeaders(reply: FastifyReply, origin: string | undefined): voi
   reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   reply.header('Access-Control-Allow-Headers', MCP_ALLOWED_HEADERS)
   reply.header('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
-}
-
-function isNotificationMethod(method: string): boolean {
-  return method.startsWith('notifications/')
-}
-
-function isJsonRpcRequest(body: JsonRpcEnvelope): body is JsonRpcBody {
-  return 'id' in body
-}
-
-function parseJsonRpcEnvelope(body: unknown): JsonRpcEnvelope {
-  const bodyResult = JsonRpcEnvelopeSchema.safeParse(body)
-  if (!bodyResult.success) {
-    throw new GatewayError(
-      GatewayErrorCode.INTERNAL_GATEWAY_ERROR,
-      'Invalid JSON-RPC body',
-      bodyResult.error.issues
-    )
-  }
-
-  const envelope = bodyResult.data
-  if (!isNotificationMethod(envelope.method) && envelope.id === undefined) {
-    throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR, 'Invalid JSON-RPC body', [
-      {
-        code: 'invalid_type',
-        expected: 'number | string | null',
-        received: 'undefined',
-        path: ['id'],
-        message: 'Required',
-      },
-    ])
-  }
-
-  return envelope as JsonRpcEnvelope
 }
 
 function openSseStream(reply: FastifyReply, origin: string | undefined): void {
@@ -216,19 +166,22 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
 
     switch (body.method) {
       case 'initialize': {
-        const { id, result } = await handleInitialize(request, body, store, registry, auditLogger)
+        const ctx = mcpContextFromFastifyRequest(request)
+        const { id, result } = await handleInitialize(ctx, body, store, registry, auditLogger)
         reply.header('Mcp-Session-Id', id)
         return reply.send(result)
       }
 
       case 'tools/list': {
-        const result = await handleToolsList(request, body, store, reply)
+        const ctx = mcpContextFromFastifyRequest(request, { reply })
+        const result = await handleToolsList(ctx, body, store)
         return reply.send(result)
       }
 
       case 'tools/call': {
+        const ctx = mcpContextFromFastifyRequest(request)
         const result = await handleToolsCall(
-          request,
+          ctx,
           body,
           store,
           router,

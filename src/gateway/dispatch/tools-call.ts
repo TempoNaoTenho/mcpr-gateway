@@ -1,4 +1,3 @@
-import type { FastifyRequest } from 'fastify'
 import { SessionStatus, OutcomeClass, AuditEventType } from '../../types/enums.js'
 import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
 import { SessionIdSchema } from '../../types/identity.js'
@@ -10,28 +9,23 @@ import {
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
 } from '../discovery.js'
-
-interface JsonRpcBody {
-  jsonrpc: string
-  id: number | string | null
-  method: string
-  params?: Record<string, unknown>
-}
+import type { McpHandlerContext } from '../mcp-handler-context.js'
+import type { JsonRpcBody } from '../jsonrpc.js'
 
 function isToolArguments(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 export async function handleToolsCall(
-  request: FastifyRequest,
+  ctx: McpHandlerContext,
   body: JsonRpcBody,
   store: ISessionStore,
   router: IExecutionRouter,
   triggerEngine: TriggerEngine,
   auditLogger?: IAuditLogger
 ): Promise<unknown> {
-  const namespace = (request.params as { namespace: string }).namespace
-  const rawSessionId = request.headers['mcp-session-id']
+  const namespace = ctx.namespace
+  const rawSessionId = ctx.sessionId
   if (!rawSessionId || typeof rawSessionId !== 'string') {
     throw new GatewayError(GatewayErrorCode.SESSION_NOT_FOUND)
   }
@@ -84,9 +78,9 @@ export async function handleToolsCall(
         timestamp: now,
       })
       logRequest(
-        request.log,
+        ctx.log,
         {
-          requestId: request.id,
+          requestId: ctx.requestId,
           sessionId,
           namespace,
           method: 'tools/call',
@@ -115,9 +109,9 @@ export async function handleToolsCall(
           timestamp: now,
         })
         logRequest(
-          request.log,
+          ctx.log,
           {
-            requestId: request.id,
+            requestId: ctx.requestId,
             sessionId,
             namespace,
             method: 'tools/call',
@@ -161,9 +155,9 @@ export async function handleToolsCall(
         timestamp: now,
       })
       logRequest(
-        request.log,
+        ctx.log,
         {
-          requestId: request.id,
+          requestId: ctx.requestId,
           sessionId,
           namespace,
           method: 'tools/call',

@@ -32,6 +32,13 @@ import { downstreamAuthManager } from './registry/auth/index.js'
 
 const memoryBackend = process.env['SESSION_BACKEND'] === 'memory'
 
+/**
+ * MCP **client** transport over stdio (stdin/stdout) is DISABLED for now — the gateway runs as HTTP only.
+ * Implementation is kept in `./gateway/stdio-mcp.ts` (and unit tests) for a future re-enable: import `runStdioMcp`,
+ * set this flag from `process.env['GATEWAY_TRANSPORT'] === 'stdio'`, and restore stderr-only logging for that branch.
+ */
+const isStdioTransport = false
+
 type SessionBackend = ISessionStore & {
   start(ttlSeconds: number, cleanupIntervalSeconds: number): void
   stop(): void
@@ -79,16 +86,18 @@ const triggerEngine = new TriggerEngine(activeStore, registry, selector, auditLo
 let rateLimiter: RateLimiter | undefined
 let runtimeConfigManager: RuntimeConfigManager | undefined
 
-app.register(healthRoutes, { registry })
-app.register(mcpRoutes, {
-  store: activeStore,
-  registry,
-  triggerEngine,
-  healthMonitor,
-  getRateLimiter: () => rateLimiter,
-  getResponseTimeoutMs: () => runtimeConfigManager?.getEffective().resilience.timeouts.responseMs,
-  auditLogger,
-})
+if (!isStdioTransport) {
+  app.register(healthRoutes, { registry })
+  app.register(mcpRoutes, {
+    store: activeStore,
+    registry,
+    triggerEngine,
+    healthMonitor,
+    getRateLimiter: () => rateLimiter,
+    getResponseTimeoutMs: () => runtimeConfigManager?.getEffective().resilience.timeouts.responseMs,
+    auditLogger,
+  })
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const configPath = process.env['CONFIG_PATH'] ?? './config'
@@ -106,6 +115,35 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   })
   await runtimeConfigManager.initialize()
   config = runtimeConfigManager.getEffective()
+
+  activeStore.start(config.session.ttlSeconds, config.session.cleanupIntervalSeconds)
+
+  async function shutdownHttp(): Promise<void> {
+    registry.stop()
+    activeStore.stop()
+    if (!memoryBackend) sqliteAdapter.disconnect()
+    if (!isStdioTransport) {
+      await app.close()
+    }
+  }
+
+  process.on('SIGTERM', async () => {
+    await shutdownHttp()
+    process.exit(0)
+  })
+  process.on('SIGINT', async () => {
+    await shutdownHttp()
+    process.exit(0)
+  })
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err)
+    process.exit(1)
+  })
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection:', reason)
+    process.exit(1)
+  })
 
   if (config.debug.enabled) {
     app.register(debugRoutes, { store: activeStore, registry })
@@ -126,32 +164,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   app.register(uiRoutes)
-
-  activeStore.start(config.session.ttlSeconds, config.session.cleanupIntervalSeconds)
-
-  process.on('SIGTERM', async () => {
-    registry.stop()
-    activeStore.stop()
-    if (!memoryBackend) sqliteAdapter.disconnect()
-    await app.close()
-    process.exit(0)
-  })
-  process.on('SIGINT', async () => {
-    registry.stop()
-    activeStore.stop()
-    if (!memoryBackend) sqliteAdapter.disconnect()
-    await app.close()
-    process.exit(0)
-  })
-
-  process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err)
-    process.exit(1)
-  })
-  process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled rejection:', reason)
-    process.exit(1)
-  })
 
   const port = Number(process.env['PORT'] ?? 3000)
   const host = process.env['HOST'] ?? '127.0.0.1'

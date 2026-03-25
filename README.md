@@ -136,7 +136,19 @@ npm ci
 npm run setup    # interactive: creates config/bootstrap.json (does not start the server)
 ```
 
-The MCP HTTP surface is `GET`/`POST` `/mcp/<namespace>` where `<namespace>` matches your configuration (many setups use `default`).
+### Connecting your AI client (HTTP)
+
+The gateway serves MCP over **HTTP**. Downstream MCP servers you configure may still use **stdio** or **HTTP/streamable-HTTP** in `bootstrap.json` / runtime config.
+
+| Step         | What to do                                                                                                                                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run          | Start the gateway; it listens on `HOST` / `PORT` (defaults `127.0.0.1` / `3000`).                                                                                                                                           |
+| MCP endpoint | `POST /mcp/<namespace>` for JSON-RPC. Streamable HTTP clients can also use `GET /mcp/<namespace>` for SSE. The path segment must match a configured namespace (many setups use `default`).                                  |
+| Auth         | Send `Authorization: Bearer <token>` on MCP requests. Tokens are issued via the admin UI / admin API and map through `static_key` auth (same as [docs/http-api.md](docs/http-api.md)).                                      |
+| Session      | After `initialize`, read `Mcp-Session-Id` from the **response** headers and send it on later `tools/list` and `tools/call` requests. Optional `Mcp-Tools-Changed` on responses indicates the tool catalog may have changed. |
+| Admin        | WebUI (`/ui/` after `npm run build:ui`), `/admin/*`, and `/health` run in the **same** process.                                                                                                                             |
+
+Full route list, CORS, and notification behavior: [docs/http-api.md](docs/http-api.md).
 
 ### `npm run setup` vs `npm run dev:all`
 

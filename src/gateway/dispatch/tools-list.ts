@@ -1,4 +1,3 @@
-import type { FastifyRequest, FastifyReply } from 'fastify'
 import { getConfig } from '../../config/index.js'
 import { SessionStatus } from '../../types/enums.js'
 import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
@@ -6,22 +5,16 @@ import { SessionIdSchema } from '../../types/identity.js'
 import type { ISessionStore } from '../../types/interfaces.js'
 import { projectWindow } from '../publish/project.js'
 import { logRequest } from '../../observability/structured-log.js'
-
-interface JsonRpcBody {
-  jsonrpc: string
-  id: number | string | null
-  method: string
-  params?: Record<string, unknown>
-}
+import type { McpHandlerContext } from '../mcp-handler-context.js'
+import type { JsonRpcBody } from '../jsonrpc.js'
 
 export async function handleToolsList(
-  request: FastifyRequest,
+  ctx: McpHandlerContext,
   body: JsonRpcBody,
   store: ISessionStore,
-  reply?: FastifyReply,
 ): Promise<unknown> {
-  const namespace = (request.params as { namespace: string }).namespace
-  const rawSessionId = request.headers['mcp-session-id']
+  const namespace = ctx.namespace
+  const rawSessionId = ctx.sessionId
   if (!rawSessionId || typeof rawSessionId !== 'string') {
     throw new GatewayError(GatewayErrorCode.SESSION_NOT_FOUND)
   }
@@ -44,16 +37,16 @@ export async function handleToolsList(
     pendingToolListChange: false,
   })
 
-  if (reply && session.clientCapabilities?.supportsToolListChanged) {
-    reply.header('Mcp-Tools-Changed', pendingToolListChange ? 'true' : 'false')
+  if (session.clientCapabilities?.supportsToolListChanged) {
+    ctx.setToolsListChangedHeader?.(pendingToolListChange)
   }
 
   const tools = session.toolWindow.length > 0
     ? projectWindow(session.toolWindow, getConfig().selector)
     : []
 
-  logRequest(request.log, {
-    requestId: request.id,
+  logRequest(ctx.log, {
+    requestId: ctx.requestId,
     sessionId,
     namespace,
     method: 'tools/list',

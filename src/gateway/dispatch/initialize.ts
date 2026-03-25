@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
-import type { FastifyRequest } from 'fastify'
 import { SessionIdSchema } from '../../types/identity.js'
+import type { SelectorDecision } from '../../types/selector.js'
 import { SessionStatus, Mode, RefreshTriggerType, ToolRiskLevel, GatewayMode } from '../../types/enums.js'
 import { GatewayError } from '../../types/errors.js'
 import { getConfig } from '../../config/index.js'
@@ -18,6 +18,8 @@ import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { resolveFocusFromOutcomes } from '../../selector/focus.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
+import type { McpHandlerContext } from '../mcp-handler-context.js'
+import type { JsonRpcBody } from '../jsonrpc.js'
 
 function buildGatewayInstructions(mode: GatewayMode): string | undefined {
   switch (mode) {
@@ -28,14 +30,6 @@ function buildGatewayInstructions(mode: GatewayMode): string | undefined {
     default:
       return undefined
   }
-}
-import type { SelectorDecision } from '../../types/selector.js'
-
-interface JsonRpcBody {
-  jsonrpc: string
-  id: number | string | null
-  method: string
-  params?: Record<string, unknown>
 }
 
 function normalizeInitializeIntent(params: Record<string, unknown> | undefined): string | undefined {
@@ -52,7 +46,7 @@ function normalizeInitializeIntent(params: Record<string, unknown> | undefined):
 }
 
 export async function handleInitialize(
-  request: FastifyRequest,
+  ctx: McpHandlerContext,
   body: JsonRpcBody,
   store: ISessionStore,
   registry: DownstreamRegistry,
@@ -60,8 +54,8 @@ export async function handleInitialize(
 ): Promise<{ id: string; result: unknown }> {
   const startMs = Date.now()
   const config = getConfig()
-  const identity = resolveIdentity(request.headers.authorization, config.auth)
-  const namespace = (request.params as { namespace: string }).namespace
+  const identity = resolveIdentity(ctx.authorization, config.auth)
+  const namespace = ctx.namespace
   const requestedMode = (body.params?.mode as Mode | undefined) ?? Mode.Read
   const initialIntentText = normalizeInitializeIntent(body.params)
 
@@ -195,8 +189,8 @@ export async function handleInitialize(
     timestamp: now,
   })
 
-  logRequest(request.log, {
-    requestId: request.id,
+  logRequest(ctx.log, {
+    requestId: ctx.requestId,
     sessionId,
     namespace,
     method: 'initialize',

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FastifyRequest } from 'fastify'
 import { handleInitialize } from '../../src/gateway/dispatch/initialize.js'
+import type { McpHandlerContext } from '../../src/gateway/mcp-handler-context.js'
 import { getConfig, initConfig, setConfig } from '../../src/config/index.js'
 import {
   defaultDebug,
@@ -40,6 +41,16 @@ function makeRequest(mode?: Mode): FastifyRequest {
       params: mode ? { mode } : {},
     },
   } as unknown as FastifyRequest
+}
+
+function makeHandlerContext(mode?: Mode): McpHandlerContext {
+  const request = makeRequest(mode)
+  return {
+    namespace: (request.params as { namespace: string }).namespace,
+    authorization: request.headers.authorization as string | undefined,
+    requestId: 'test-req',
+    log: undefined,
+  }
 }
 
 function makeServer(overrides: Partial<DownstreamServer> = {}): DownstreamServer {
@@ -165,7 +176,7 @@ describe('handleInitialize', () => {
     ])
 
     const response = await handleInitialize(
-      makeRequest(Mode.Write),
+      makeHandlerContext(Mode.Write),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Write } },
       store,
       registry as never
@@ -197,7 +208,7 @@ describe('handleInitialize', () => {
     ])
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
       registry as never
@@ -223,7 +234,7 @@ describe('handleInitialize', () => {
     const registry = makeRegistry([])
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       {
         jsonrpc: '2.0',
         id: 1,
@@ -283,7 +294,7 @@ describe('handleInitialize', () => {
     }
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       {
         jsonrpc: '2.0',
         id: 1,
@@ -320,7 +331,7 @@ describe('handleInitialize', () => {
     const registry = makeRegistry([makeToolRecord('read_message')])
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
       registry as never
@@ -354,7 +365,7 @@ describe('handleInitialize', () => {
       const registry = makeRegistry([makeToolRecord('read_message')])
 
       const response = await handleInitialize(
-        makeRequest(Mode.Read),
+        makeHandlerContext(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
         registry as never
@@ -396,7 +407,7 @@ describe('handleInitialize', () => {
       ])
 
       const response = await handleInitialize(
-        makeRequest(Mode.Read),
+        makeHandlerContext(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
         registry as never
@@ -438,7 +449,7 @@ describe('handleInitialize', () => {
     }
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
       registry as never
@@ -466,7 +477,7 @@ describe('handleInitialize', () => {
     const registry = makeRegistry([makeToolRecord('read_message')])
 
     const response = await handleInitialize(
-      makeRequest(Mode.Read),
+      makeHandlerContext(Mode.Read),
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
       store,
       registry as never
@@ -499,7 +510,7 @@ describe('handleInitialize', () => {
       const registry = makeRegistry([makeToolRecord('read_message')])
 
       const response = await handleInitialize(
-        makeRequest(Mode.Read),
+        makeHandlerContext(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
         registry as never
@@ -536,7 +547,7 @@ describe('handleInitialize', () => {
       const registry = makeRegistry([makeToolRecord('read_message')])
 
       const response = await handleInitialize(
-        makeRequest(Mode.Read),
+        makeHandlerContext(Mode.Read),
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
         registry as never
@@ -607,7 +618,12 @@ describe('handleInitialize', () => {
       }
 
       const response = await handleInitialize(
-        request,
+        {
+          namespace: (request.params as { namespace: string }).namespace,
+          authorization: request.headers.authorization as string | undefined,
+          requestId: 'test-req',
+          log: undefined,
+        },
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
         store,
         registry as never
