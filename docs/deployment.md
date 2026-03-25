@@ -5,7 +5,7 @@
 The [Dockerfile](../docker/Dockerfile) is multi-stage:
 
 1. Builds the Svelte UI into `ui/build` (published in the image as `ui/dist` beside the server).
-2. Builds the TypeScript gateway to `dist/`.
+2. Builds the TypeScript gateway to `dist/` via `npm run build:gateway` (UI is built in the previous stage only).
 3. Runtime image: `node:20-alpine`, `npm ci --omit=dev`, `CONFIG_PATH=/config`, exposes **3000**.
 
 Build from repository root:
@@ -34,7 +34,7 @@ Typical environment:
 | `UI_STATIC_DIR`   | `/app/ui/dist`         | Ensures the UI is found in the image layout                       |
 | `ADMIN_TOKEN`     | _(any non-empty value)_ | Enables admin protection for `/admin/*` when set (not the login password; use `GATEWAY_ADMIN_*`) |
 
-Run from repo root (after `npm run setup` so `config/bootstrap.json` exists):
+Run from repo root (`npm run setup` is optional; compose can mount an empty config dir if you rely on defaults only):
 
 ```bash
 npm run docker:up

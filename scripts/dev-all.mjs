@@ -4,33 +4,14 @@
  * Sets GATEWAY_PROXY_TARGET so the UI proxies /admin and /health to the API.
  */
 import { spawn } from 'node:child_process'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { applyDotEnvFromRoot } from './load-dotenv.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-function loadDotEnv() {
-  const p = join(root, '.env')
-  if (!existsSync(p)) return
-  for (const line of readFileSync(p, 'utf8').split('\n')) {
-    const t = line.trim()
-    if (!t || t.startsWith('#')) continue
-    const i = t.indexOf('=')
-    if (i === -1) continue
-    const k = t.slice(0, i).trim()
-    let v = t.slice(i + 1).trim()
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'"))
-    ) {
-      v = v.slice(1, -1)
-    }
-    if (process.env[k] === undefined) process.env[k] = v
-  }
-}
-
-loadDotEnv()
+applyDotEnvFromRoot(root)
 
 const port = Number(process.env['PORT'] ?? 3000)
 const host = process.env['HOST'] ?? '127.0.0.1'
@@ -51,7 +32,7 @@ const uiEnv = {
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
-const gw = spawn(npmCmd, ['run', 'dev'], {
+const gw = spawn(npmCmd, ['run', 'dev:gateway'], {
   cwd: root,
   env: gwEnv,
   stdio: 'inherit',

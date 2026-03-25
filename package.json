@@ -11,11 +11,19 @@
   },
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "dev": "tsx watch src/index.ts",
-    "build": "tsup --config tsup.config.ts",
+    "dev": "node scripts/dev-all.mjs",
+    "dev:gateway": "tsx watch src/index.ts",
+    "build": "npm run build:ui && npm run build:gateway",
+    "build:gateway": "tsup --config tsup.config.ts",
     "typecheck": "tsc --noEmit",
+    "check:gate": "npm run typecheck && npm run lint",
+    "pretest": "npm run check:gate",
     "test": "vitest run",
+    "test:coverage": "npm run check:gate && vitest run --coverage",
     "test:watch": "vitest",
+    "verify": "npm ci && npm run test:coverage && npm --prefix ui ci && npm --prefix ui run check && npm run build",
+    "ci": "npm run verify",
+    "prepush": "npm run verify",
     "benchmark:smoke": "node --import tsx bench/main.ts smoke",
     "benchmark:all": "node --import tsx bench/main.ts all",
     "lint": "eslint src",
@@ -23,13 +31,13 @@
     "docker:build": "docker build -f docker/Dockerfile .",
     "docker:up": "docker compose -f docker/docker-compose.yml up --build",
     "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
-    "build:all": "npm run build:ui && npm run build",
-    "dev:all": "node scripts/dev-all.mjs"
+    "build:all": "npm run build",
+    "dev:all": "npm run dev"
   },
   "dependencies": {
-    "@fastify/rate-limit": "^10.2.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.2.0",
     "@fastify/sensible": "^6.0.3",
     "@fastify/static": "^9.0.0",
     "better-sqlite3": "^11.8.1",
@@ -45,12 +53,12 @@
     "@types/node": "^22.13.10",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
-    "@vitest/coverage-v8": "^3.0.8",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
     "tsup": "^8.4.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "vitest": "^3.0.8"
+    "vitest": "^3.2.4"
   }
 }

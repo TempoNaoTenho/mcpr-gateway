@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
 		gatewayProxy ??
 		`http://${proxyHost}:${Number.isFinite(gatewayPort) ? gatewayPort : 3000}`;
 
-	/** With dev:all, GATEWAY_PROXY_TARGET is set and Vite uses PORT from .env. */
+	/** With repo `npm run dev`, GATEWAY_PROXY_TARGET is set and Vite uses PORT from .env. */
 	const serverPort = gatewayProxy
 		? Number(process.env['PORT'] ?? rootEnv['PORT'] ?? 3000)
 		: Number(
@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
 					5173,
 			);
 
-	/** Same-origin dev: browser hits PORT; Vite forwards API paths to the gateway (PORT+1 in dev:all). */
+	/** Same-origin dev: browser hits PORT; Vite forwards API paths to the gateway (PORT+1 with root `npm run dev`). */
 	const proxy: Record<string, string> = {};
 	for (const prefix of [
 		'/admin',

@@ -13,7 +13,7 @@
   <section
     class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
   >
-    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev:all</h2>
+    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev</h2>
     <p>
       The admin UI is served by Vite using the same
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">HOST</code>
@@ -27,13 +27,14 @@
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/mcp</code>,
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/health</code>, and related API paths to that
       backend, so the browser uses a single origin.
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run dev:all</code> is the same script.
     </p>
   </section>
 
   <section
     class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
   >
-    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev</h2>
+    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev:gateway</h2>
     <p>
       Only the gateway runs. It serves HTTP on
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">HOST</code> /

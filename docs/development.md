@@ -4,17 +4,24 @@
 
 | Script                       | Command                         | Purpose                             |
 | ---------------------------- | ------------------------------- | ----------------------------------- |
-| `dev`                        | `tsx watch src/index.ts`        | Hot-reload gateway                  |
-| `build`                      | `tsup`                          | Production bundle to `dist/`        |
+| `dev`                        | `node scripts/dev-all.mjs`      | Full-stack: Vite on `PORT`, gateway on `PORT+1` |
+| `dev:gateway`                | `tsx watch src/index.ts`        | Hot-reload gateway only             |
+| `build`                      | `build:ui` then `build:gateway` | UI + production bundle to `dist/`   |
+| `build:gateway`              | `tsup`                          | Gateway bundle to `dist/` only      |
 | `typecheck`                  | `tsc --noEmit`                  | Type-check                          |
-| `test`                       | `vitest run`                    | Unit/integration tests              |
-| `test:watch`                 | `vitest`                        | Watch mode                          |
+| `check:gate`                 | typecheck + lint                | Fast gate before tests              |
+| `test`                       | `check:gate` then `vitest run` | Tests (`pretest` runs first)       |
+| `test:coverage`              | `check:gate` + Vitest coverage  | Same as CI test step               |
+| `test:watch`                 | `vitest`                        | Watch (no pretest; run `check:gate` yourself if needed) |
+| `verify`                     | `npm ci`, coverage, UI check, `build` | Full local / pre-push suite |
+| `ci`                         | same as `verify`                | Common name for pipelines / hooks |
+| `prepush`                    | same as `verify`                | Hook-friendly name                 |
 | `lint`                       | `eslint src`                    | Lint                                |
 | `format`                     | `prettier --write .`            | Format                              |
-| `setup`                      | `tsx scripts/setup.ts`          | Interactive `config/bootstrap.json` |
+| `setup`                      | `tsx scripts/setup.ts`          | Checks, `.env` help, optional bootstrap (advanced) |
 | `build:ui`                   | npm in `ui/`                    | Production UI build                 |
-| `build:all`                  | UI then gateway build           | Release artifact                    |
-| `dev:all`                    | `node scripts/dev-all.mjs`      | Vite on `PORT`, gateway on `PORT+1`, proxies admin |
+| `build:all`                  | same as `build`                 | Alias                               |
+| `dev:all`                    | same as `dev`                   | Alias                               |
 | `docker:build` / `docker:up` | Docker                          | See [Deployment](deployment.md)     |
 
 Defined in [`package.json`](../package.json).
@@ -23,8 +30,8 @@ Defined in [`package.json`](../package.json).
 
 The admin UI lives under [`ui/`](../ui/) (Svelte).
 
-- **Development:** `npm run dev:all` or `npm --prefix ui run dev` alongside `npm run dev`.
-- **Production assets:** `npm run build:ui` produces `ui/build` (Dockerfile uses this path; the gateway also accepts `ui/dist` or `UI_STATIC_DIR`).
+- **Development:** `npm run dev` (full stack) or `npm run dev:gateway` with `npm --prefix ui run dev` if you prefer separate terminals.
+- **Production assets:** `npm run build` runs `build:ui` then `build:gateway`; `npm run build:ui` alone produces `ui/build` (Dockerfile builds UI in its own stage; runtime uses `ui/dist` layout in the image).
 
 The gateway serves the SPA under **`/ui/`** and redirects `/` → `/ui/` when files exist ([`src/gateway/routes/ui.ts`](../src/gateway/routes/ui.ts)).
 

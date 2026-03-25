@@ -1,4 +1,4 @@
-# Run `npm run setup` first (creates config/bootstrap.json at repo root), then either:
+# Optional: `npm run setup` for .env + optional bootstrap.json (advanced). Then either:
 #   From repo root:  docker compose -f docker/docker-compose.yml up --build
 #   From docker/:     docker compose up --build
 #

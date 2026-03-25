@@ -20,13 +20,13 @@ All of this is managed through a built-in **WebUI** and a full **Admin REST API*
 
 ### Operating Modes
 
-| Mode        | Tool Window                                                | Best For                                              |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------------------- |
-| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets                    |
-| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage                |
-| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Programmatic multi-tool orchestration in a JS sandbox |
+| Mode        | Tool Window                                                | Best For                                                                                                                                   |
+| ----------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Programmatic multi-tool orchestration in a JS sandbox - my tests shows better performance than compat mode, especially for large tool sets |
+| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage                                                                                                     |
+| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets                                                                                                         |
 
-Modes are configured per namespace and can be mixed across different access paths.
+Modes are configured per namespace and can be mixed across different access paths. You can create a `mcp/dev` with complex tools to be used in code mode or `/mcp/personal` with a small set of tools to be used in compat mode for example.
 
 ### Session Management
 
@@ -133,7 +133,7 @@ The sandbox is memory- and time-limited (configurable). The model writes a scrip
 git clone <repository-url>
 cd mcp-session-gateway
 npm ci
-npm run setup    # interactive: creates config/bootstrap.json (does not start the server)
+npm run setup    # optional: .env checks, env prompts, optional bootstrap.json (advanced)
 ```
 
 ### Connecting your AI client (HTTP)
@@ -146,36 +146,38 @@ The gateway serves MCP over **HTTP**. Downstream MCP servers you configure may s
 | MCP endpoint | `POST /mcp/<namespace>` for JSON-RPC. Streamable HTTP clients can also use `GET /mcp/<namespace>` for SSE. The path segment must match a configured namespace (many setups use `default`).                                  |
 | Auth         | Send `Authorization: Bearer <token>` on MCP requests. Tokens are issued via the admin UI / admin API and map through `static_key` auth (same as [docs/http-api.md](docs/http-api.md)).                                      |
 | Session      | After `initialize`, read `Mcp-Session-Id` from the **response** headers and send it on later `tools/list` and `tools/call` requests. Optional `Mcp-Tools-Changed` on responses indicates the tool catalog may have changed. |
-| Admin        | WebUI (`/ui/` after `npm run build:ui`), `/admin/*`, and `/health` run in the **same** process.                                                                                                                             |
+| Admin        | WebUI (`/ui/` after `npm run build` or `npm run build:ui`), `/admin/*`, and `/health` run in the **same** process.                                                                                                          |
 
 Full route list, CORS, and notification behavior: [docs/http-api.md](docs/http-api.md).
 
-### `npm run setup` vs `npm run dev:all`
+### `npm run setup` vs `npm run dev`
 
-| Script                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`npm run setup`**   | One-time (or occasional) **configuration** step. Prompts for a profile label, then copies [`config/bootstrap.example.json`](config/bootstrap.example.json) to `config/bootstrap.json`. The choice only changes the **printed “next steps”**; the file content is the same. Does **not** install npm dependencies and does **not** start any process. For hand-edited bootstrap files, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md).  |
-| **`npm run dev:all`** | **Runs the stack** for local development: spawns the gateway (`npm run dev`) and the SvelteKit **Vite** dev server (`npm run dev` in `ui/`). Default ports: **UI on `PORT`** (from the environment or `.env`, usually `3000`), **gateway on `PORT + 1`** (usually `3001`). [`scripts/dev-all.mjs`](scripts/dev-all.mjs) sets `GATEWAY_PROXY_TARGET` so the UI proxies admin/health traffic to the API. Optional: copy [`.env.example`](.env.example) to `.env` for `HOST` / `PORT`. |
+| Script              | What it does                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`npm run setup`** | Optional **first-time helper**: Node `engines` check, `.env` from [`.env.example`](.env.example) if missing, port checks for full-stack dev, SQLite path info, interactive `.env` prompts, and **optional** `config/bootstrap.json` (advanced / GitOps). Does not install dependencies or start servers. Full bootstrap reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md). |
+| **`npm run dev`**   | **Default local stack**: gateway (`npm run dev:gateway` on `HOST` / **`PORT + 1`**) plus SvelteKit **Vite** on **`PORT`** ([`scripts/dev-all.mjs`](scripts/dev-all.mjs)). Sets `GATEWAY_PROXY_TARGET` so the browser uses one origin for `/ui`, `/admin`, `/mcp`, `/health`.                                                                                                                                                |
+
+`npm run dev:all` is the same as `npm run dev`. `bootstrap.json` is **not** required: without it the gateway starts with built-in defaults and an empty server list (Web UI + SQLite hold runtime config after first start).
 
 ### Run commands
+
+**Full-stack local dev (default)**
+
+```bash
+npm run dev
+```
+
+Open the URL Vite prints (typically `http://127.0.0.1:3000`); the gateway listens on **the next port** (typically `3001`).
 
 **API only (hot-reload gateway)**
 
 ```bash
-npm run dev   # http://127.0.0.1:3000 by default (MCP, health, etc.)
+npm run dev:gateway   # single process on HOST/PORT (default http://127.0.0.1:3000)
 ```
 
-The admin WebUI at `/ui/` is served only if static files exist: run **`npm run build:ui`** first (output under `ui/build`; the server also accepts `ui/dist` or `UI_STATIC_DIR`).
+The admin WebUI at `/ui/` is served only if static files exist: run **`npm run build`** (UI + gateway) or **`npm run build:ui`** alone (output under `ui/build`; the server also accepts `ui/dist` or `UI_STATIC_DIR`).
 
-**Full-stack local dev (Vite + gateway)**
-
-```bash
-npm run dev:all
-```
-
-Open the URL Vite logs (typically `http://127.0.0.1:3000`); the gateway listens on the next port (typically `3001`).
-
-**Docker** (after `npm run setup`):
+**Docker** (optional `npm run setup` for `.env` / bootstrap):
 
 ```bash
 npm run docker:up  # http://localhost:3000
@@ -229,6 +231,10 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full schema reference
 - **CORS** — restricted to loopback origins for MCP endpoints
 
 See [docs/deployment.md](docs/deployment.md) for production hardening checklist.
+
+### Local verification (pre-push / CI parity)
+
+From the repo root, **`npm run verify`** (alias **`npm run ci`**, **`npm run prepush`**) runs: fresh `npm ci`, typecheck, lint, Vitest with coverage, `npm --prefix ui ci` + **`svelte-check`**, then **`npm run build`**. For day-to-day runs without reinstalling deps or building the UI, use **`npm test`** (typecheck + lint + tests via npm `pretest`) or **`npm run test:coverage`**.
 
 ---
 

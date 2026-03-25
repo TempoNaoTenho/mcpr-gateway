@@ -12,7 +12,7 @@ Run from this directory (`ui/`) or via npm prefix:
 
 ```bash
 npm ci
-npm run dev          # Vite dev server (use with gateway `npm run dev` from repo root)
+npm run dev          # Vite alone (default port 5173; or use repo root `npm run dev` for integrated PORT)
 npm run build        # Output: ui/build (used by root `npm run build:ui` and Docker)
 npm run preview      # Preview production build
 ```
@@ -20,13 +20,13 @@ npm run preview      # Preview production build
 Full-stack local development from the **repository root**:
 
 ```bash
-npm run dev:all      # gateway + UI dev servers (see root package.json)
+npm run dev          # Vite on PORT + gateway on PORT+1 (see root package.json; `dev:all` is an alias)
 ```
 
 ## Integration with the gateway
 
 - The gateway looks for a built UI in `UI_STATIC_DIR`, then `ui/dist`, then **`ui/build`** relative to the process working directory.
-- Root script `npm run build:ui` runs `npm run build` here and is required before `npm run build:all` or a Docker image that serves the UI.
+- Root script `npm run build:ui` runs `npm run build` here; `npm run build` at the repo root runs UI then the gateway bundle (`build:all` is an alias).
 - HTTP: [`GET /`](../docs/http-api.md) redirects to `/ui/`; static files are mounted under `/ui/`.
 
 ## API usage

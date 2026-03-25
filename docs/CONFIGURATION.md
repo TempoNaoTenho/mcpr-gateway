@@ -246,7 +246,7 @@ In `config/`:
 
 - `bootstrap.example.json` — template `bootstrap.json` with `static_key` (no placeholder keys; add tokens via the Web UI or `auth.staticKeys`).
 
-Run `npm run setup` to copy it to `config/bootstrap.json` (interactive profile choice), then use the WebUI for downstream servers and policies.
+Optional: run `npm run setup` and choose to create `config/bootstrap.json` (advanced), or copy `bootstrap.example.json` manually. The default workflow needs no bootstrap file—use the WebUI for downstream servers and policies with SQLite-backed config.
 
 For Docker Compose, set `HOST=0.0.0.0` and, if needed, `UI_STATIC_DIR=/app/ui/dist` so the bundled server can always locate the built WebUI inside the container.
 

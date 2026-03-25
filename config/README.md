@@ -11,11 +11,11 @@ The gateway uses a **bootstrap file**: `bootstrap.json` in this directory (or un
 ## Quick start
 
 ```bash
-npm run setup   # interactive: choose profile → writes config/bootstrap.json
-npm run dev
+npm run setup   # optional: .env helper, checks, optional bootstrap.json (advanced)
+npm run dev     # full-stack dev: Vite + gateway (see root package.json)
 ```
 
-Recommendation: use `npm run setup` and choose the profile that matches your environment. Auth is always **`static_key`**; use the Access Control panel (or `auth.staticKeys` in `bootstrap.json`) for client bearer tokens.
+**Default:** you can skip `setup` entirely. Without `bootstrap.json`, the gateway uses built-in defaults and SQLite; use the Access Control panel for client bearer tokens. **`static_key`** is the only auth mode; add `config/bootstrap.json` only for advanced / file-first workflows (`npm run setup` can create it, or copy `bootstrap.example.json` manually).
 
 By default the HTTP server binds to `127.0.0.1`, which keeps development local to the host machine. Set `HOST=0.0.0.0` only when you intentionally need Docker or remote network exposure.
 
@@ -23,7 +23,7 @@ By default the HTTP server binds to `127.0.0.1`, which keeps development local t
 
 | File                     | Use case                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------- |
-| `bootstrap.example.json` | Template copied to `bootstrap.json` by `npm run setup`; `static_key` auth, minimal policies    |
+| `bootstrap.example.json` | Template for optional `bootstrap.json` (advanced); `static_key` auth, full default-shaped config    |
 
 ### Docker
 

@@ -14,29 +14,37 @@ npm ci
 npm run setup
 ```
 
-[`npm run setup`](../scripts/setup.ts) interactively copies a profile into `config/bootstrap.json`. Example sources live in [`config/`](../config/) (`bootstrap.example.json`). The current example is pretty minimal. It is recommended for testing and reproducible instances only.
+[`npm run setup`](../scripts/setup.ts) is **optional**: creates `.env` from [`.env.example`](../.env.example) when missing, runs basic checks (Node, ports for full-stack dev, SQLite path), lets you edit common env vars, and **optionally** creates `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
-For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`, or define entries under `auth.staticKeys` in `bootstrap.json` (optionally using `${VAR}` placeholders — missing env vars cause startup failure).
+For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
-If you skip `setup`, you can copy an example manually:
+**Advanced:** copy a bootstrap template manually:
 
 ```bash
 cp config/bootstrap.example.json config/bootstrap.json
-# Then: add tokens via the Web UI, or edit auth.staticKeys in bootstrap.json
+# Then tune file-backed config or use ${VAR} placeholders (missing vars → startup failure)
 ```
 
 When `bootstrap.json` is missing, the process still starts with built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)).
 
 ## Run the gateway
 
+**Full-stack local dev (default)** — Vite on `PORT`, API on `PORT + 1`:
+
 ```bash
 npm run dev
+```
+
+**API process only** (single `HOST` / `PORT`, e.g. for MCP clients hitting `http://127.0.0.1:3000` directly):
+
+```bash
+npm run dev:gateway
 ```
 
 Defaults:
 
 - **Host:** `127.0.0.1` — loopback only; set `HOST=0.0.0.0` for Docker or LAN exposure
-- **Port:** `3000` (`PORT`)
+- **Port:** `3000` (`PORT`) — with `npm run dev`, the **UI** uses this port and the **gateway** uses `PORT + 1`
 
 Full list of process environment variables: [Configuration — Process environment](CONFIGURATION.md#process-environment).
 
@@ -147,7 +155,7 @@ If static files exist under `ui/dist` or `ui/build` (or `UI_STATIC_DIR`), the se
 npm run build:ui
 ```
 
-See [Development](development.md#web-ui) for day-to-day UI work.
+See [Development](development.md#web-ui) for day-to-day UI work (`npm run dev` runs Vite + gateway together).
 
 ## Next steps
 

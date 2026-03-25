@@ -1,20 +1,21 @@
 #!/usr/bin/env tsx
 /**
- * Interactive setup script for MCP Session Gateway.
+ * Interactive setup: checks, optional .env merge, optional bootstrap.json (advanced).
+ * Default workflow: SQLite + no bootstrap file (Web UI manages config in the DB).
  * Usage: npm run setup
- *
- * Creates config/bootstrap.json from the appropriate example profile.
- * No external dependencies — only Node.js built-ins.
  */
 
-import { existsSync, copyFileSync } from 'node:fs'
+import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
-import { join, dirname } from 'node:path'
+import { join, dirname, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:net'
+import { randomBytes } from 'node:crypto'
+import { readDotEnvFile } from './load-dotenv.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-const CONFIG = join(ROOT, 'config')
+const CONFIG_DIR = join(ROOT, 'config')
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
@@ -22,18 +23,123 @@ function ask(question: string): Promise<string> {
   return new Promise((resolve) => rl.question(question, resolve))
 }
 
-function checkExists(file: string): boolean {
-  return existsSync(join(CONFIG, file))
+type EnvField = {
+  key: string
+  hint: string
+  secret?: boolean
+  generate?: 'adminToken' | 'encryptionKey'
 }
 
-async function confirmOverwrite(file: string): Promise<boolean> {
-  const answer = await ask(`  ${file} already exists. Overwrite? [y/N] `)
-  return answer.toLowerCase() === 'y'
+/** Order matches README / .env.example; interactive prompts only these keys. */
+const ENV_FIELDS: EnvField[] = [
+  { key: 'HOST', hint: 'HTTP bind (127.0.0.1 local; 0.0.0.0 for Docker/LAN)' },
+  { key: 'PORT', hint: 'Port for full-stack dev UI (Vite); gateway uses PORT+1' },
+  { key: 'CONFIG_PATH', hint: 'Directory containing bootstrap.json (optional file)' },
+  { key: 'LOG_LEVEL', hint: 'Pino log level (e.g. info, debug)' },
+  {
+    key: 'ADMIN_TOKEN',
+    hint: 'Non-empty enables protected /admin; not the login password',
+    secret: true,
+    generate: 'adminToken',
+  },
+  { key: 'GATEWAY_ADMIN_USER', hint: 'Admin UI username when ADMIN_TOKEN is set' },
+  {
+    key: 'GATEWAY_ADMIN_PASSWORD',
+    hint: 'Optional password with username; omit for username-only login',
+    secret: true,
+  },
+  {
+    key: 'DOWNSTREAM_AUTH_ENCRYPTION_KEY',
+    hint: 'Base64 32-byte key for downstream secrets at rest (SQLite)',
+    secret: true,
+    generate: 'encryptionKey',
+  },
+  { key: 'SESSION_BACKEND', hint: 'Unset or anything but memory = SQLite; memory = no DB file' },
+  { key: 'DATABASE_PATH', hint: 'SQLite file when not memory (default ./data/gateway.db)' },
+  { key: 'NODE_ENV', hint: 'Set production to lock down admin unless debug / ADMIN_TOKEN' },
+  { key: 'AUDIT_RETENTION_DAYS', hint: 'Default retention for audit prune' },
+  { key: 'UI_STATIC_DIR', hint: 'Override built UI path (else ui/dist, ui/build)' },
+]
+
+function applyEnvPatches(
+  content: string,
+  patches: Record<string, string | null | undefined>,
+): string {
+  const toApply = new Map<string, string | null>()
+  for (const [k, v] of Object.entries(patches)) {
+    if (v === undefined) continue
+    toApply.set(k, v)
+  }
+  if (toApply.size === 0) return content
+
+  const lines = content.split('\n')
+  const out: string[] = []
+  const seen = new Set<string>()
+
+  for (const line of lines) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) {
+      out.push(line)
+      continue
+    }
+    const eq = t.indexOf('=')
+    if (eq === -1) {
+      out.push(line)
+      continue
+    }
+    const key = t.slice(0, eq).trim()
+    if (!toApply.has(key)) {
+      out.push(line)
+      continue
+    }
+    seen.add(key)
+    const val = toApply.get(key)
+    if (val !== null && val !== '') {
+      out.push(`${key}=${val}`)
+    }
+  }
+
+  for (const [key, val] of toApply) {
+    if (!seen.has(key) && val !== null && val !== '') {
+      out.push(`${key}=${val}`)
+    }
+  }
+
+  return out.join('\n')
 }
 
-function copy(src: string, dest: string): void {
-  copyFileSync(join(CONFIG, src), join(CONFIG, dest))
-  console.log(`  ✓ Created config/${dest}`)
+async function checkPort(host: string, port: number, label: string): Promise<void> {
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const s = createServer()
+      s.once('error', reject)
+      s.listen(port, host, () => {
+        s.close((err) => (err ? reject(err) : resolve()))
+      })
+    })
+  } catch (e: unknown) {
+    const err = e as NodeJS.ErrnoException
+    if (err.code === 'EADDRINUSE') {
+      console.warn(
+        `  Port ${port} on ${host} is in use — ${label}. Stop the other process or change PORT.`,
+      )
+    } else {
+      console.warn(`  Could not verify port ${port}: ${err.message}`)
+    }
+  }
+}
+
+function resolveDbPath(vars: Record<string, string>): string | null {
+  if ((vars['SESSION_BACKEND'] ?? '').trim() === 'memory') return null
+  const rel = (vars['DATABASE_PATH'] ?? '').trim() || './data/gateway.db'
+  if (isAbsolute(rel)) return rel
+  return join(ROOT, rel)
+}
+
+function mask(value: string, secret: boolean | undefined): string {
+  if (!value) return '(unset)'
+  if (secret) return '********'
+  return value
 }
 
 async function main(): Promise<void> {
@@ -42,64 +148,159 @@ async function main(): Promise<void> {
   console.log('═══════════════════════════')
   console.log('')
 
-  let shouldWrite = true
-  if (checkExists('bootstrap.json')) {
-    shouldWrite = await confirmOverwrite('bootstrap.json')
+  const nodeMajor = Number(process.versions.node.split('.')[0])
+  if (!Number.isFinite(nodeMajor) || nodeMajor < 20) {
+    console.error('Node.js 20 or newer is required (see package.json engines).')
+    process.exit(1)
   }
 
-  let profile: '1' | '2' = '1'
-  if (shouldWrite) {
+  if (!existsSync(join(ROOT, 'node_modules'))) {
+    console.warn('No node_modules found. Run: npm ci')
     console.log('')
-    console.log('Select a configuration profile:')
-    console.log(
-      '  [1] production — recommended for hosted/shared use; static_key with admin-managed client tokens'
-    )
-    console.log(
-      '  [2] local      — development profile with static_key auth, debug enabled, generous limits'
-    )
-    console.log('      (this checkout ships one bootstrap.example.json template for both profiles)')
-    console.log('')
-    const choice = await ask('Profile [1/2, default=1]: ')
-    profile = choice.trim() === '2' ? '2' : '1'
   }
 
-  rl.close()
+  const envPath = join(ROOT, '.env')
+  const examplePath = join(ROOT, '.env.example')
 
+  if (!existsSync(envPath)) {
+    if (!existsSync(examplePath)) {
+      console.error('Missing .env.example at repo root.')
+      process.exit(1)
+    }
+    copyFileSync(examplePath, envPath)
+    console.log('Created .env from .env.example')
+    console.log('')
+  }
+
+  let envContent = readFileSync(envPath, 'utf8')
+  let vars = readDotEnvFile(envPath)
+
+  const port = Number(vars['PORT'] ?? process.env['PORT'] ?? 3000)
+  const host = (vars['HOST'] ?? process.env['HOST'] ?? '127.0.0.1').trim() || '127.0.0.1'
+
+  console.log('Checking ports used by full-stack dev (npm run dev)…')
+  if (Number.isFinite(port) && port >= 1 && port <= 65534) {
+    await checkPort(host, port, 'Vite / UI')
+    await checkPort(host, port + 1, 'API gateway (PORT+1)')
+  } else {
+    console.warn('  PORT in .env is not valid; skipped port checks.')
+  }
   console.log('')
 
-  if (shouldWrite) {
-    const src = 'bootstrap.example.json'
-    copy(src, 'bootstrap.json')
+  const sessionBackend = (vars['SESSION_BACKEND'] ?? '').trim()
+  if (sessionBackend === 'memory') {
+    console.log('SESSION_BACKEND=memory: no SQLite file; admin saves go to bootstrap.json;')
+    console.log('no config versions, no SQLite audit table, no persisted downstream secrets.')
+  } else {
+    const db = resolveDbPath(vars)
+    if (db) {
+      if (existsSync(db)) {
+        console.log('SQLite database file already exists:')
+        console.log(`  ${db}`)
+        console.log(
+          '  (sessions, config versions, audit, downstream auth metadata — do not delete while the gateway runs.)',
+        )
+      } else {
+        console.log('SQLite will be created on first gateway start:')
+        console.log(`  ${db}`)
+      }
+    }
+  }
+  console.log('')
+
+  const edit = (await ask('Edit .env values interactively now? [Y/n] ')).trim().toLowerCase()
+  if (edit !== 'n') {
+    console.log('Enter new value, or Enter to keep. Secrets: "g" = generate. "-" = remove key line.')
+    console.log('')
+    const patches: Record<string, string | null | undefined> = {}
+
+    for (const field of ENV_FIELDS) {
+      const cur = vars[field.key] ?? ''
+      const gen =
+        field.generate === 'adminToken'
+          ? ' / g=generate token'
+          : field.generate === 'encryptionKey'
+            ? ' / g=generate base64-32-byte'
+            : ''
+      const line = await ask(
+        `${field.key} — ${field.hint}\n  Current: ${mask(cur, field.secret)}${gen}\n  > `,
+      )
+      const ans = line.trim()
+      if (ans === '') continue
+      if (ans === '-') {
+        patches[field.key] = null
+        continue
+      }
+      if (ans.toLowerCase() === 'g' && field.generate === 'adminToken') {
+        patches[field.key] = randomBytes(24).toString('base64url')
+        continue
+      }
+      if (ans.toLowerCase() === 'g' && field.generate === 'encryptionKey') {
+        patches[field.key] = randomBytes(32).toString('base64')
+        continue
+      }
+      if (field.key === 'PORT') {
+        const n = Number(ans)
+        if (!Number.isFinite(n) || n < 1 || n > 65534) {
+          console.log('  (skipped invalid PORT)')
+          continue
+        }
+      }
+      patches[field.key] = ans
+    }
+
+    if (Object.keys(patches).length > 0) {
+      envContent = applyEnvPatches(envContent, patches)
+      writeFileSync(envPath, envContent, 'utf8')
+      vars = readDotEnvFile(envPath)
+      console.log('')
+      console.log('Updated .env')
+    } else {
+      console.log('')
+      console.log('No changes to .env')
+    }
+    console.log('')
+  }
+
+  console.log('Bootstrap file (advanced / GitOps):')
+  console.log('  Without config/bootstrap.json the gateway uses defaults + empty server list;')
+  console.log('  SQLite stores runtime config after first start. Auth secrets still merge from')
+  console.log('  bootstrap.json if that file exists.')
+  console.log('')
+  const wantBootstrap = (await ask('Create config/bootstrap.json from bootstrap.example.json? [y/N] '))
+    .trim()
+    .toLowerCase()
+
+  if (wantBootstrap === 'y') {
+    const dest = join(CONFIG_DIR, 'bootstrap.json')
+    const src = join(CONFIG_DIR, 'bootstrap.example.json')
+    if (!existsSync(src)) {
+      console.error(`Missing ${src}`)
+    } else {
+      let ok = true
+      if (existsSync(dest)) {
+        ok = (await ask('  bootstrap.json exists. Overwrite? [y/N] ')).trim().toLowerCase() === 'y'
+      }
+      if (ok) {
+        copyFileSync(src, dest)
+        console.log('  Created config/bootstrap.json')
+      }
+    }
   }
 
   console.log('')
   console.log('Next steps:')
-  console.log('')
-
-  if (profile === '1') {
-    console.log('  1. Set required environment variables:')
-    console.log(
-      '       Set ADMIN_TOKEN (enables admin login) and GATEWAY_ADMIN_*, then add client tokens in the Web UI.'
-    )
-    console.log('')
-    console.log('  2. Start the gateway and open the WebUI to configure servers and policies.')
-    console.log('')
-    console.log('  3. Start the gateway:')
-    console.log('       npm run dev')
-  } else {
-    console.log('  1. Start the gateway and open the WebUI to configure servers and policies.')
-    console.log('')
-    console.log('  2. Start the gateway:')
-    console.log('       npm run dev')
-    console.log('')
-    console.log('  Tip: create a client token in the WebUI and use it as:')
-    console.log('       Authorization: Bearer <issued-token>')
-  }
-
+  console.log('  npm run dev          # full-stack: Vite (PORT) + gateway (PORT+1)')
+  console.log('  npm run dev:gateway  # API only (single PORT)')
+  console.log('  npm run build        # UI + gateway bundle for production')
   console.log('')
 }
 
-main().catch((err: unknown) => {
-  console.error('Setup failed:', err)
-  process.exit(1)
-})
+main()
+  .catch((err: unknown) => {
+    console.error('Setup failed:', err)
+    process.exit(1)
+  })
+  .finally(() => {
+    rl.close()
+  })
