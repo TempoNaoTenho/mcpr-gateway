@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { get } from 'svelte/store';
   import { page } from '$app/stores';
   import { auth } from '$lib/auth.js';
   import Sidebar from '../components/layout/Sidebar.svelte';
@@ -21,9 +22,12 @@
   onMount(async () => {
     const ok = await auth.check();
     authChecked = true;
-    if (!ok && !isLoginPage) {
+    const pathname = get(page).url.pathname;
+    const onLogin = pathname === `${base}/login`;
+    const onRoot = pathname === `${base}/`;
+    if (!ok && !onLogin) {
       goto(`${base}/login`);
-    } else if (ok && isLoginPage) {
+    } else if (ok && (onLogin || onRoot)) {
       goto(`${base}/dashboard`);
     }
   });

@@ -16,6 +16,8 @@ const TMP = join(__dirname, '__tmp_admin_file_mode__')
 
 afterEach(() => {
   delete process.env['ADMIN_TOKEN']
+  delete process.env['GATEWAY_ADMIN_USER']
+  delete process.env['GATEWAY_ADMIN_PASSWORD']
   delete process.env['NODE_ENV']
   delete process.env['DOWNSTREAM_AUTH_ENCRYPTION_KEY']
   downstreamAuthManager.setRepository(undefined)
@@ -127,6 +129,60 @@ function makeToolRecord(
 }
 
 describe('adminRoutes', () => {
+  it('GET /admin/auth/config returns username and passwordRequired', async () => {
+    process.env['GATEWAY_ADMIN_USER'] = 'custom-admin'
+    process.env['GATEWAY_ADMIN_PASSWORD'] = 'secret'
+
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {})
+    await app.ready()
+
+    const res = await app.inject({ method: 'GET', url: '/admin/auth/config' })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({
+      username: 'custom-admin',
+      passwordRequired: true,
+    })
+
+    delete process.env['GATEWAY_ADMIN_PASSWORD']
+    const resNoPw = await app.inject({ method: 'GET', url: '/admin/auth/config' })
+    expect(resNoPw.statusCode).toBe(200)
+    expect(JSON.parse(resNoPw.payload)).toEqual({
+      username: 'custom-admin',
+      passwordRequired: false,
+    })
+
+    await app.close()
+  })
+
+  it('allows cookie session with username only when GATEWAY_ADMIN_PASSWORD is unset', async () => {
+    process.env['ADMIN_TOKEN'] = 'secret-token'
+    delete process.env['GATEWAY_ADMIN_PASSWORD']
+
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {})
+    await app.ready()
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/admin/auth/login',
+      payload: { username: 'mcpgateway', password: '' },
+    })
+
+    expect(loginRes.statusCode).toBe(200)
+    const sessionCookie = loginRes.cookies.find((cookie) => cookie.name === 'admin_session')
+    expect(sessionCookie?.value).toBeTruthy()
+
+    const dashboardRes = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard',
+      cookies: { admin_session: sessionCookie!.value },
+    })
+    expect(dashboardRes.statusCode).toBe(200)
+
+    await app.close()
+  })
+
   it('revokes the server-side admin session on logout', async () => {
     process.env['ADMIN_TOKEN'] = 'secret-token'
     process.env['GATEWAY_ADMIN_PASSWORD'] = 'admin-password'

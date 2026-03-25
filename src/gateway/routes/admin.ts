@@ -644,6 +644,13 @@ function revokeAdminSession(sessionId: string | undefined): void {
   adminSessions.delete(sessionId)
 }
 
+const DEFAULT_GATEWAY_ADMIN_USER = 'mcpgateway'
+
+function getGatewayAdminUser(): string {
+  const trimmed = process.env['GATEWAY_ADMIN_USER']?.trim()
+  return trimmed || DEFAULT_GATEWAY_ADMIN_USER
+}
+
 // ── Auth middleware ────────────────────────────────────────────────────────────
 
 /**
@@ -732,6 +739,13 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
 
   // ── Auth endpoints ────────────────────────────────────────────────────────
 
+  app.get('/admin/auth/config', async (_request, reply) => {
+    return reply.send({
+      username: getGatewayAdminUser(),
+      passwordRequired: Boolean(process.env['GATEWAY_ADMIN_PASSWORD']),
+    })
+  })
+
   app.post(
     '/admin/auth/login',
     {
@@ -778,12 +792,16 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         return reply.status(401).send({ error: 'Invalid token' })
       }
 
-      const adminPassword = process.env['GATEWAY_ADMIN_PASSWORD'] ?? adminToken
+      const expectedUser = getGatewayAdminUser()
+      const adminPasswordEnv = process.env['GATEWAY_ADMIN_PASSWORD']
       const username = body?.username?.trim()
-      const password = body?.password
+      const password = body?.password ?? ''
 
-      // Username must be 'mcpgateway', password must match the configured admin secret.
-      if (username !== 'mcpgateway' || !password || password !== adminPassword) {
+      if (username !== expectedUser) {
+        return reply.status(401).send({ error: 'Invalid credentials' })
+      }
+
+      if (adminPasswordEnv && password !== adminPasswordEnv) {
         return reply.status(401).send({ error: 'Invalid credentials' })
       }
 

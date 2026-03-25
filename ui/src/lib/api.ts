@@ -56,6 +56,10 @@ export async function authMe(): Promise<{ authenticated: boolean }> {
   return request('/admin/auth/me')
 }
 
+export async function authConfig(): Promise<{ username: string; passwordRequired: boolean }> {
+  return request('/admin/auth/config')
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export interface DashboardData {

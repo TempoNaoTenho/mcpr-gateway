@@ -1,4 +1,4 @@
-# Codeunctor MCP Gateway - MCP Managment and Sandboxed
+# Codeunctor MCP Gateway — MCP management and sandboxing
 
 **A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them.**
 
@@ -31,7 +31,7 @@ Modes are configured per namespace and can be mixed across different access path
 ### Session Management
 
 - Persistent sessions backed by **SQLite** (default) or in-memory store
-- Configurable TTL (default 5 min) with automatic cleanup
+- Configurable TTL (default 30 minutes via `session.ttlSeconds` = 1800) with automatic cleanup
 - Session-scoped tool window tracks recent execution outcomes
 - Admin can query, inspect, and revoke sessions via API or WebUI
 
@@ -46,8 +46,7 @@ Modes are configured per namespace and can be mixed across different access path
 
 - **Namespaces** define isolated access paths (e.g. `/mcp/dev`, `/mcp/prod`)
 - **Roles** map to namespaces with configurable allowed modes (`read`/`write`/`admin`)
-- **Bearer tokens** issued per user/service, mapped to roles in config
-- Two auth modes: `mock_dev` for local dev, `static_key` for production
+- **Bearer tokens** issued per user/service via the admin API or WebUI, mapped to roles in config (`static_key` auth)
 
 ### WebUI Admin Panel
 
@@ -134,18 +133,35 @@ The sandbox is memory- and time-limited (configurable). The model writes a scrip
 git clone <repository-url>
 cd mcp-session-gateway
 npm ci
-npm run setup    # interactive: writes config/bootstrap.json
-npm run dev      # starts at http://127.0.0.1:3000
+npm run setup    # interactive: creates config/bootstrap.json (does not start the server)
 ```
 
-The MCP endpoint is `POST /mcp/<namespace>` (default namespace: `default`).
+The MCP HTTP surface is `GET`/`POST` `/mcp/<namespace>` where `<namespace>` matches your configuration (many setups use `default`).
 
-To run the full stack with the admin UI:
+### `npm run setup` vs `npm run dev:all`
+
+| Script | What it does |
+|--------|----------------|
+| **`npm run setup`** | One-time (or occasional) **configuration** step. Prompts for a profile label, then copies [`config/bootstrap.example.json`](config/bootstrap.example.json) to `config/bootstrap.json`. The choice only changes the **printed “next steps”**; the file content is the same. Does **not** install npm dependencies and does **not** start any process. For hand-edited bootstrap files, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md). |
+| **`npm run dev:all`** | **Runs the stack** for local development: spawns the gateway (`npm run dev`) and the SvelteKit **Vite** dev server (`npm run dev` in `ui/`). Default ports: **UI on `PORT`** (from the environment or `.env`, usually `3000`), **gateway on `PORT + 1`** (usually `3001`). [`scripts/dev-all.mjs`](scripts/dev-all.mjs) sets `GATEWAY_PROXY_TARGET` so the UI proxies admin/health traffic to the API. Optional: copy [`.env.example`](.env.example) to `.env` for `HOST` / `PORT`. |
+
+### Run commands
+
+**API only (hot-reload gateway)**
 
 ```bash
-npm run build:ui   # build SvelteKit UI
-npm run dev        # UI available at http://127.0.0.1:3000/ui/
+npm run dev   # http://127.0.0.1:3000 by default (MCP, health, etc.)
 ```
+
+The admin WebUI at `/ui/` is served only if static files exist: run **`npm run build:ui`** first (output under `ui/build`; the server also accepts `ui/dist` or `UI_STATIC_DIR`).
+
+**Full-stack local dev (Vite + gateway)**
+
+```bash
+npm run dev:all
+```
+
+Open the URL Vite logs (typically `http://127.0.0.1:3000`); the gateway listens on the next port (typically `3001`).
 
 **Docker** (after `npm run setup`):
 
@@ -182,18 +198,7 @@ Changes made via the admin panel are written to SQLite and persist across restar
 | `LOG_LEVEL`                      | `info`              | Pino log level                                      |
 | `AUDIT_RETENTION_DAYS`           | `90`                | Default audit log retention                         |
 
-Secrets in `bootstrap.json` can be injected via environment interpolation:
-
-```json
-{
-  "auth": {
-    "mode": "static_key",
-    "staticKeys": {
-      "${GATEWAY_API_KEY}": { "userId": "my-client", "roles": ["user"] }
-    }
-  }
-}
-```
+Bootstrap `auth` is only `{"mode": "static_key"}` (see [`config/bootstrap.example.json`](config/bootstrap.example.json)); **client Bearer tokens are created in the admin WebUI / API**, not listed in `bootstrap.json`. Other bootstrap strings may still use `${VAR_NAME}` environment interpolation where the schema allows it.
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full schema reference.
 
@@ -202,7 +207,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full schema reference
 ## Security
 
 - **Local bind by default** — `HOST=127.0.0.1` prevents accidental network exposure
-- **Two auth modes** — `mock_dev` (dev-only, no secrets required) and `static_key` (production, bearer tokens)
+- **Client auth** — `static_key`: MCP clients use Bearer tokens created in the admin UI / admin API (bootstrap only carries `auth.mode`; tokens are not embedded in `bootstrap.json`)
 - **Admin API protection** — set `ADMIN_TOKEN`; in `NODE_ENV=production` with debug off and no token, admin routes are not mounted at all
 - **Downstream credentials** — stored AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set
 - **Rate limiting** — per-session and per-user request limits via `@fastify/rate-limit`

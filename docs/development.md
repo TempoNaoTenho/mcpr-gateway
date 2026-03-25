@@ -14,7 +14,7 @@
 | `setup`                      | `tsx scripts/setup.ts`          | Interactive `config/bootstrap.json` |
 | `build:ui`                   | npm in `ui/`                    | Production UI build                 |
 | `build:all`                  | UI then gateway build           | Release artifact                    |
-| `dev:all`                    | `concurrently` gateway + UI dev | Full stack local                    |
+| `dev:all`                    | `node scripts/dev-all.mjs`      | Vite on `PORT`, gateway on `PORT+1`, proxies admin |
 | `docker:build` / `docker:up` | Docker                          | See [Deployment](deployment.md)     |
 
 Defined in [`package.json`](../package.json).
