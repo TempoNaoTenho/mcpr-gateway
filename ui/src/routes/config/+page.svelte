@@ -152,7 +152,7 @@
               <input type="checkbox" bind:checked={policies.selector.focus.enabled} />
               <span class="inline-flex items-center gap-1">
                 Enabled
-                <InfoTooltip text="Capability-focused selection using recent successful tool usage." />
+                <InfoTooltip text="Capability-focused selection using recent successful tool usage. Only active in compat/code modes. Basically keeps tools more aligned to recent use. Can make things more difficult in complex scenarios such as different upstream mcp servers usage on same request." />
               </span>
             </label>
           </div>

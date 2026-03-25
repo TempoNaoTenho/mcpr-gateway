@@ -650,6 +650,10 @@ function getGatewayAdminUser(): string {
   return trimmed || DEFAULT_GATEWAY_ADMIN_USER
 }
 
+function getGatewayAdminPassword(): string | undefined {
+  return trimToUndefined(process.env['GATEWAY_ADMIN_PASSWORD'])
+}
+
 // ── Auth middleware ────────────────────────────────────────────────────────────
 
 /**
@@ -736,7 +740,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
   app.get('/admin/auth/config', async (_request, reply) => {
     return reply.send({
       username: getGatewayAdminUser(),
-      passwordRequired: Boolean(process.env['GATEWAY_ADMIN_PASSWORD']),
+      passwordRequired: Boolean(getGatewayAdminPassword()),
     })
   })
 
@@ -770,9 +774,9 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       const body = request.body as { username?: string; password?: string } | undefined
 
       const expectedUser = getGatewayAdminUser()
-      const adminPasswordEnv = process.env['GATEWAY_ADMIN_PASSWORD']
+      const adminPasswordEnv = getGatewayAdminPassword()
       const username = body?.username?.trim()
-      const password = body?.password ?? ''
+      const password = (body?.password ?? '').trim()
 
       if (username !== expectedUser) {
         return reply.status(401).send({ error: 'Invalid credentials' })

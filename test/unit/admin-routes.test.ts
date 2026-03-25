@@ -155,6 +155,50 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
+  it('matches GATEWAY_ADMIN_PASSWORD after trimming env and login body (UI sends trimmed password)', async () => {
+    process.env['ADMIN_TOKEN'] = 'secret-token'
+    process.env['GATEWAY_ADMIN_PASSWORD'] = '  secret  '
+
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {})
+    await app.ready()
+
+    const cfgRes = await app.inject({ method: 'GET', url: '/admin/auth/config' })
+    expect(cfgRes.statusCode).toBe(200)
+    expect(JSON.parse(cfgRes.payload)).toMatchObject({ passwordRequired: true })
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/admin/auth/login',
+      payload: { username: 'mcpgateway', password: 'secret' },
+    })
+    expect(loginRes.statusCode).toBe(200)
+
+    await app.close()
+  })
+
+  it('treats whitespace-only GATEWAY_ADMIN_PASSWORD as unset', async () => {
+    process.env['ADMIN_TOKEN'] = 'secret-token'
+    process.env['GATEWAY_ADMIN_PASSWORD'] = '  \t  '
+
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {})
+    await app.ready()
+
+    const cfgRes = await app.inject({ method: 'GET', url: '/admin/auth/config' })
+    expect(cfgRes.statusCode).toBe(200)
+    expect(JSON.parse(cfgRes.payload)).toMatchObject({ passwordRequired: false })
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/admin/auth/login',
+      payload: { username: 'mcpgateway', password: '' },
+    })
+    expect(loginRes.statusCode).toBe(200)
+
+    await app.close()
+  })
+
   it('allows cookie session with username only when GATEWAY_ADMIN_PASSWORD is unset', async () => {
     process.env['ADMIN_TOKEN'] = 'secret-token'
     delete process.env['GATEWAY_ADMIN_PASSWORD']
