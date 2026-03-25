@@ -8,6 +8,7 @@
     cancelStdioInteractiveAuth,
     getConfigServers,
     getPolicies,
+    savePolicies,
     getServerSchema,
     createConfigServer,
     updateConfigServer,
@@ -24,6 +25,7 @@
     type ConfigServerImportPreview,
     type ConfigServerImportPayload,
     type ServerSchemaDetail,
+    type PoliciesConfig,
   } from '$lib/api.js';
   import { notifications } from '$lib/stores/notifications.js';
   import ServerHealthCard from '../../components/domain/ServerHealthCard.svelte';
@@ -65,8 +67,10 @@
 
   let servers = $state<ServerInfo[]>([]);
   let configServers = $state<ConfigServer[]>([]);
+  let policies = $state<PoliciesConfig | null>(null);
   let loading = $state(true);
   let saving = $state(false);
+  let trustingOAuthProvider = $state(false);
   let refreshing = $state<Record<string, boolean>>({});
   let interactiveBusy = $state<Record<string, boolean>>({});
   let togglingEnabled = $state<Record<string, boolean>>({});
@@ -101,6 +105,11 @@
     managedSecretsEnabled: false,
     oauthStorageEnabled: false,
   });
+  let pendingOAuthTrust = $state<{
+    serverId: string;
+    authorizationServer: string;
+    refreshError?: string;
+  } | null>(null);
   const interactiveStatusVariant: Record<string, 'warning' | 'success' | 'danger' | 'muted'> = {
     starting: 'warning',
     pending: 'warning',
@@ -173,6 +182,35 @@
     ));
   }
 
+  function normalizeOAuthProvider(provider: string): string | null {
+    try {
+      return new URL(provider).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  function matchesOAuthAllowlist(provider: string, allowlist: string[]): boolean {
+    let origin: string
+    try {
+      origin = new URL(provider).origin
+    } catch {
+      return false
+    }
+
+    return allowlist.some((pattern) => {
+      if (pattern.startsWith('*.')) {
+        const domain = pattern.slice(2)
+        return origin === `https://${domain}` || origin.endsWith(`.${domain}`)
+      }
+      try {
+        return origin === new URL(pattern).origin
+      } catch {
+        return false
+      }
+    })
+  }
+
   async function toggleServerEnabled(id: string, enabled: boolean) {
     togglingEnabled = { ...togglingEnabled, [id]: true };
     const prevCfg = configServers.find((s) => s.id === id);
@@ -197,7 +235,7 @@
   async function load() {
     loading = true;
     try {
-      const [runtime, persisted, policies, authCapabilities] = await Promise.all([
+      const [runtime, persisted, policyRes, authCapabilities] = await Promise.all([
         getServers(),
         getConfigServers(),
         getPolicies(),
@@ -206,7 +244,8 @@
       downstreamAuthCapabilities = authCapabilities;
       servers = runtime.servers;
       configServers = persisted.servers;
-      knownNamespaces = Object.keys(policies.namespaces).sort();
+      policies = policyRes;
+      knownNamespaces = Object.keys(policyRes.namespaces).sort();
     } catch {
       notifications.error('Failed to load servers');
     } finally {
@@ -691,6 +730,10 @@
         if (event.data?.type === 'downstream-auth:success') {
           window.removeEventListener('message', onMessage);
           const refreshErr = typeof event.data?.refreshError === 'string' ? event.data.refreshError : '';
+          const authorizationServer =
+            typeof event.data?.authorizationServer === 'string'
+              ? event.data.authorizationServer
+              : servers.find((server) => server.id === id)?.authAuthorizationServer;
           if (refreshErr) {
             notifications.warning(`OAuth connected for ${id}, but catalog refresh failed: ${refreshErr}`);
           } else {
@@ -699,6 +742,17 @@
           await load();
           resetAutoRefreshAttempt(id);
           await runAutoRefresh();
+          pendingOAuthTrust = null;
+          if (authorizationServer) {
+            const currentPolicies = policies ?? (await getPolicies());
+            if (!matchesOAuthAllowlist(authorizationServer, currentPolicies.allowedOAuthProviders ?? [])) {
+              pendingOAuthTrust = {
+                serverId: id,
+                authorizationServer,
+                refreshError: refreshErr || undefined,
+              };
+            }
+          }
         }
         if (event.data?.type === 'downstream-auth:error') {
           window.removeEventListener('message', onMessage);
@@ -719,6 +773,40 @@
       await load();
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : `Failed to clear auth for ${id}`);
+    }
+  }
+
+  async function trustPendingOAuthProvider() {
+    if (!pendingOAuthTrust) return;
+    trustingOAuthProvider = true;
+    try {
+      const providerOrigin = normalizeOAuthProvider(pendingOAuthTrust.authorizationServer);
+      if (!providerOrigin) {
+        notifications.error('Could not normalize the OAuth provider URL');
+        return;
+      }
+
+      const currentPolicies = await getPolicies();
+      const nextAllowlist = new Set(currentPolicies.allowedOAuthProviders ?? []);
+      if (!matchesOAuthAllowlist(providerOrigin, [...nextAllowlist])) {
+        nextAllowlist.add(providerOrigin);
+        await savePolicies(
+          {
+            ...currentPolicies,
+            allowedOAuthProviders: [...nextAllowlist],
+          },
+          `Trusted OAuth provider for ${pendingOAuthTrust.serverId}`
+        );
+        notifications.success(`Trusted ${providerOrigin}`);
+      } else {
+        notifications.success(`${providerOrigin} is already trusted`);
+      }
+      pendingOAuthTrust = null;
+      await load();
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : 'Failed to save OAuth trust');
+    } finally {
+      trustingOAuthProvider = false;
     }
   }
 
@@ -892,7 +980,7 @@
                   disabled={!downstreamAuthCapabilities.oauthStorageEnabled}
                   class="px-3 py-1.5 text-xs rounded-lg border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 disabled:opacity-50"
                 >
-                  Connect OAuth
+                  {runtimeServer?.authStatus === 'authorized' ? 'Reauthorize OAuth' : 'Connect OAuth'}
                 </button>
               {/if}
               {#if manualAuthKind === 'managed_bearer'}
@@ -1321,6 +1409,46 @@
         {saving ? 'Importing…' : 'Import Servers'}
       </button>
     {/if}
+  {/snippet}
+</Modal>
+
+<Modal
+  open={pendingOAuthTrust !== null}
+  title="Trust OAuth Provider"
+  onclose={() => (pendingOAuthTrust = null)}
+>
+  {#snippet children()}
+    <div class="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+      <p>
+        OAuth completed successfully for <strong>{pendingOAuthTrust?.serverId}</strong>.
+      </p>
+      <p>
+        Trusting this provider will keep future reconnects and refreshes stable.
+      </p>
+      <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 px-3 py-2 font-mono text-xs break-all text-slate-700 dark:text-slate-300">
+        {pendingOAuthTrust?.authorizationServer}
+      </div>
+      {#if pendingOAuthTrust?.refreshError}
+        <p class="text-amber-700 dark:text-amber-300">
+          The server connected, but catalog refresh reported: {pendingOAuthTrust.refreshError}
+        </p>
+      {/if}
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        This adds the resolved provider origin to the OAuth allowlist. You can remove it later in Configuration.
+      </p>
+    </div>
+  {/snippet}
+  {#snippet footer()}
+    <button onclick={() => (pendingOAuthTrust = null)} class="px-4 py-2 text-sm text-slate-700 dark:text-slate-300">
+      Not now
+    </button>
+    <button
+      onclick={trustPendingOAuthProvider}
+      disabled={trustingOAuthProvider || pendingOAuthTrust === null}
+      class="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50"
+    >
+      {trustingOAuthProvider ? 'Saving…' : 'Trust provider'}
+    </button>
   {/snippet}
 </Modal>
 

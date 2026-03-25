@@ -23,10 +23,12 @@ coverage/
 # Build artifacts
 *.tsbuildinfo
 .gitnexus
+
 # SQLite persistence (WAL sidecars are local/ephemeral)
 *.db-shm
 *.db-wal
 data/
+
 # Ephemeral SQLite + bootstrap from restart integration tests (created in beforeAll, removed in afterAll)
 test/integration/__tmp_restart__/
 bench/datasets/local/

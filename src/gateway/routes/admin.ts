@@ -70,6 +70,7 @@ type ServerRefreshPayload = {
   error?: string
   authStatus?: string
   authMessage?: string
+  authAuthorizationServer?: string
   interactiveAuthStatus?: string
   interactiveAuthMessage?: string
   interactiveAuthUrl?: string
@@ -531,6 +532,11 @@ function buildRefreshPayload(
   registry: DownstreamRegistry,
   server: DownstreamServer,
   toolCount: number,
+  authState?: {
+    status?: string
+    message?: string
+    authorizationServer?: string
+  },
   healthState?: {
     status: string
     lastChecked?: string
@@ -544,6 +550,9 @@ function buildRefreshPayload(
     lastChecked: healthState?.lastChecked,
     latencyMs: healthState?.latencyMs,
     error: healthState?.error,
+    authStatus: authState?.status,
+    authMessage: authState?.message,
+    authAuthorizationServer: authState?.authorizationServer,
     ...buildInteractiveAuthPayload(registry, server),
   }
 }
@@ -671,6 +680,7 @@ function requireAdminAuth(app: FastifyInstance): void {
   app.addHook('preHandler', async (request, reply) => {
     // Skip the auth endpoints themselves
     if (request.url.startsWith('/admin/auth/')) return
+    if (request.url.startsWith('/admin/downstream-auth/callback')) return
 
     // Check HttpOnly cookie session
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -964,6 +974,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
             error: healthState?.error,
             authStatus: authState?.status,
             authMessage: authState?.message,
+            authAuthorizationServer: authState?.authorizationServer,
             managedSecretConfigured: authState?.managedSecretConfigured,
             ...buildInteractiveAuthPayload(registry, server),
           }
@@ -985,9 +996,10 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         const authState =
           server.transport === 'stdio' ? undefined : await downstreamAuthManager.getState(serverId)
         return reply.send({
-          ...buildRefreshPayload(registry, server, tools.length, healthState),
+          ...buildRefreshPayload(registry, server, tools.length, authState, healthState),
           authStatus: authState?.status,
           authMessage: authState?.message,
+          authAuthorizationServer: authState?.authorizationServer,
         })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -1002,6 +1014,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
             : await downstreamAuthManager.getState(serverId).catch(() => ({
                 status: DownstreamAuthStatus.None,
                 message: undefined,
+                authorizationServer: undefined,
               }))
         return reply.status(400).send({
           error: msg,
@@ -1009,10 +1022,12 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
             registry,
             server,
             await registry.getTools(serverId).then((tools) => tools.length),
+            authState,
             healthState
           ),
           authStatus: authState?.status,
           authMessage: authState?.message,
+          authAuthorizationServer: authState?.authorizationServer,
         })
       }
     })
@@ -1156,6 +1171,8 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         }
         const payload = JSON.stringify({
           type: 'downstream-auth:success',
+          serverId: result.serverId,
+          authorizationServer: result.authorizationServer,
           ...(refreshError ? { refreshError } : {}),
         })
         return reply
@@ -1753,6 +1770,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         debug,
         codeMode,
         starterPacks,
+        allowedOAuthProviders,
       } = configManager.getAdminConfig()
       return reply.send({
         auth,
@@ -1765,6 +1783,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         debug,
         codeMode,
         starterPacks,
+        allowedOAuthProviders,
       })
     })
 

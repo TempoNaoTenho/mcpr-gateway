@@ -10,6 +10,17 @@ function isInteractiveStdioServer(configServer: ConfigServer | undefined): boole
   return configServer?.transport === 'stdio' && configServer.stdioInteractiveAuth?.enabled === true;
 }
 
+function isOAuthServer(
+  configServer: ConfigServer | undefined,
+  runtimeServer?: ServerInfo | null,
+): boolean {
+  if (configServer?.auth?.mode === 'oauth') {
+    return true;
+  }
+
+  return typeof runtimeServer?.authAuthorizationServer === 'string' && runtimeServer.authAuthorizationServer.length > 0;
+}
+
 export function getManualAuthKind(
   configServer: ConfigServer | undefined,
   runtimeServer?: ServerInfo | null,
@@ -20,8 +31,8 @@ export function getManualAuthKind(
     return runtimeServer?.interactiveAuthStatus === 'ready' ? null : 'stdio';
   }
 
-  if (configServer.auth?.mode === 'oauth') {
-    return runtimeServer?.authStatus === 'authorized' ? null : 'oauth';
+  if (isOAuthServer(configServer, runtimeServer)) {
+    return 'oauth';
   }
 
   if (isManagedBearerServer(configServer)) {

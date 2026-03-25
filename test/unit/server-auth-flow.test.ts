@@ -71,7 +71,7 @@ describe('serverAuthFlow', () => {
     }))).toBe('stdio-ready');
   });
 
-  it('requires manual auth for OAuth until the downstream is authorized', () => {
+  it('keeps OAuth auth actions visible before and after authorization', () => {
     const configServer = makeConfigServer({
       auth: { mode: 'oauth' },
     });
@@ -82,7 +82,7 @@ describe('serverAuthFlow', () => {
 
     expect(getManualAuthKind(configServer, makeRuntimeServer({
       authStatus: 'authorized',
-    }))).toBeNull();
+    }))).toBe('oauth');
 
     expect(getAutoRefreshReason(configServer, makeRuntimeServer({
       authStatus: 'configured',
@@ -91,6 +91,17 @@ describe('serverAuthFlow', () => {
     expect(getAutoRefreshReason(configServer, makeRuntimeServer({
       authStatus: 'authorized',
     }))).toBe('http-empty-catalog:oauth');
+  });
+
+  it('detects OAuth servers from the runtime authorization server even when config auth is generic', () => {
+    const configServer = makeConfigServer({
+      auth: { mode: 'none' },
+    });
+
+    expect(getManualAuthKind(configServer, makeRuntimeServer({
+      authStatus: 'auth_required',
+      authAuthorizationServer: 'https://issuer.example.com',
+    }))).toBe('oauth');
   });
 
   it('treats managed bearer servers as manual until a secret exists', () => {

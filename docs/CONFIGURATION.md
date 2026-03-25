@@ -16,11 +16,11 @@ The gateway uses a **two-tier configuration model**:
 │                     bootstrap.json                              │
 │           (BOOTSTRAP ONLY - used once on first start)           │
 │                                                                 │
-│  • auth: ALWAYS merged from file (secrets management)          │
-│  • servers, namespaces, policies: used to seed SQLite          │
+│  • auth: ALWAYS merged from file (secrets management)           │
+│  • servers, namespaces, policies: used to seed SQLite           │
 │                                                                 │
-│  After first start, changes to this file are IGNORED           │
-│  (except for auth which is always merged from the file)        │
+│  After first start, changes to this file are IGNORED            │
+│  (except for auth which is always merged from the file)         │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ First startup only (if SQLite is empty)
                       ▼
@@ -82,7 +82,7 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 | `auth`         | Bootstrap auth section. **ALWAYS sourced from file** (merged at runtime). In normal use, client Bearer tokens are managed from the WebUI and stored in `staticKeys`. See [`AuthConfigSchema`](../src/config/schemas.ts). |
 | `namespaces`   | Per-namespace tool window sizes and allowed modes/roles.                                                                                                                                                                 |
 | `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                                             |
-| `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication).                    |
+| `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication).                  |
 | `session`      | Session TTL, cleanup interval, and handle TTL (`handleTtlSeconds`).                                                                                                                                                      |
 | `code`         | Code mode execution config, including `maxConcurrentToolCalls` to limit parallel batch execution.                                                                                                                        |
 | `triggers`     | When to refresh the tool window after tool calls.                                                                                                                                                                        |
@@ -107,11 +107,11 @@ Both values can be overridden per-namespace via the admin API.
 
 The gateway builds **toolcards** from downstream tools (sanitized descriptions and stable names; see [`src/toolcard/sanitizer.ts`](../src/toolcard/sanitizer.ts)). What MCP clients receive in `tools/list` and related responses is the **public projection** of each tool: descriptions and input schemas can optionally be compressed under `selector.publication` ([`src/gateway/publish/project.ts`](../src/gateway/publish/project.ts), [`src/gateway/publish/compress.ts`](../src/gateway/publish/compress.ts)).
 
-| Field                      | Type                     | Default | Purpose                                                                                                                                                                                                                                                                 |
-| -------------------------- | ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `descriptionCompression` | `off` or `conservative`  | `off`   | **`off`:** publication leaves descriptions unchanged. **`conservative`:** shortens text using heuristics (first sentence, trim before phrases like “for example” / “e.g.”, strips common “use this tool…” boilerplate, normalizes whitespace) before any length cap. |
-| `schemaCompression`      | `off` or `conservative`  | `off`   | **`off`:** input schemas are passed through unchanged. **`conservative`:** drops doc-only JSON Schema keys and runs the same description compression on nested `description` strings (depth-limited).                                                                  |
-| `descriptionMaxLength`   | integer ≥ 0              | `0`     | Applies only when `descriptionCompression` is **`conservative`**. **`0`** means **no character cap** after the conservative heuristics. A **positive** value applies a word-aware truncation with an ellipsis. Ignored when description compression is **`off`**.     |
+| Field                    | Type                    | Default | Purpose                                                                                                                                                                                                                                                              |
+| ------------------------ | ----------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `descriptionCompression` | `off` or `conservative` | `off`   | **`off`:** publication leaves descriptions unchanged. **`conservative`:** shortens text using heuristics (first sentence, trim before phrases like “for example” / “e.g.”, strips common “use this tool…” boilerplate, normalizes whitespace) before any length cap. |
+| `schemaCompression`      | `off` or `conservative` | `off`   | **`off`:** input schemas are passed through unchanged. **`conservative`:** drops doc-only JSON Schema keys and runs the same description compression on nested `description` strings (depth-limited).                                                                |
+| `descriptionMaxLength`   | integer ≥ 0             | `0`     | Applies only when `descriptionCompression` is **`conservative`**. **`0`** means **no character cap** after the conservative heuristics. A **positive** value applies a word-aware truncation with an ellipsis. Ignored when description compression is **`off`**.    |
 
 Sanitization (strip HTML, noisy markdown emphasis markers, strip unsafe control characters, normalize CRLF to `\n`, collapse horizontal spaces/tabs within each line, cap runs of 3+ blank lines to a single paragraph break) happens when toolcards are generated and is **independent** of publication: turning publication **`off`** does not skip the sanitizer. **Newlines between lines are preserved**, so paragraph breaks and list line breaks from the downstream tool stay visible in toolcards and in **Tools → Customize** unless **conservative** description compression flattens text for clients. The effective description and schema in the admin view match the **published** shape (`projectToPublic`), aligning with what typical MCP clients see after projection.
 
@@ -154,6 +154,20 @@ UI-managed bearer secrets and downstream OAuth tokens require:
 - `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set to a base64-encoded 32-byte key
 
 Managed downstream credentials are stored in SQLite separately from `configJson` and encrypted at rest. Downstream auth via `auth.source: env` / `literal` or legacy static `headers` does not use that store. **`SESSION_BACKEND=memory` disables SQLite** — managed downstream secrets cannot be persisted in that mode.
+
+### OAuth provider allowlist
+
+The gateway also supports an optional allowlist for upstream OAuth providers:
+
+- config key: `allowedOAuthProviders`
+- UI location: **Configuration** page
+- storage: admin-managed config (SQLite when available, file mode otherwise)
+
+Behavior:
+
+- empty list: OAuth is allowed only for HTTPS endpoints that pass the built-in SSRF checks
+- non-empty list: OAuth start/registration is restricted to matching origins or wildcard patterns such as `*.example.com`
+- the list is operator-managed and is not auto-populated from successful logins
 
 ## Environment interpolation
 

@@ -41,10 +41,16 @@
     onConfigureManagedBearer,
   }: Props = $props();
 
-  const manualAuthForEmptyCatalog = $derived(
-    configServer && server.enabled && server.toolCount === 0
-      ? getManualAuthKind(configServer, server)
-      : null,
+  const manualAuthAction = $derived.by(() => {
+    if (!configServer || !server.enabled) return null;
+
+    const kind = getManualAuthKind(configServer, server);
+    if (kind === 'oauth') return kind;
+    if (server.toolCount === 0) return kind;
+    return null;
+  });
+  const oauthAuthButtonLabel = $derived(
+    server.authStatus === 'authorized' ? 'Reauthorize OAuth' : 'Connect OAuth',
   );
 
   const healthVariant = {
@@ -112,13 +118,13 @@
           </span>
         {/if}
       </div>
-      {#if manualAuthForEmptyCatalog}
+      {#if manualAuthAction}
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <span class="text-xs font-medium text-slate-600 dark:text-slate-400 inline-flex items-center gap-1">
             Auth
             <InfoTooltip text="Downstream servers may return an empty tool list until authentication completes or the catalog is refreshed." />
           </span>
-          {#if manualAuthForEmptyCatalog === 'stdio' && onAuthenticateStdio}
+          {#if manualAuthAction === 'stdio' && onAuthenticateStdio}
             <button
               type="button"
               onclick={() => onAuthenticateStdio!(server.id)}
@@ -138,17 +144,17 @@
               </button>
             {/if}
           {/if}
-          {#if manualAuthForEmptyCatalog === 'oauth' && onConnectOAuth}
+          {#if manualAuthAction === 'oauth' && onConnectOAuth}
             <button
               type="button"
               onclick={() => onConnectOAuth!(server.id)}
               disabled={!oauthStorageEnabled}
               class="px-2 py-1 text-xs rounded-lg border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 disabled:opacity-50"
             >
-              Connect OAuth
+              {oauthAuthButtonLabel}
             </button>
           {/if}
-          {#if manualAuthForEmptyCatalog === 'managed_bearer' && onConfigureManagedBearer}
+          {#if manualAuthAction === 'managed_bearer' && onConfigureManagedBearer}
             <button
               type="button"
               onclick={() => onConfigureManagedBearer!(server.id)}

@@ -15,6 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_admin_file_mode__')
 
 afterEach(() => {
+  vi.restoreAllMocks()
   delete process.env['ADMIN_TOKEN']
   delete process.env['GATEWAY_ADMIN_USER']
   delete process.env['GATEWAY_ADMIN_PASSWORD']
@@ -268,6 +269,41 @@ describe('adminRoutes', () => {
     })
 
     expect(dashboardAfterLogout.statusCode).toBe(401)
+
+    await app.close()
+  })
+
+  it('allows the downstream OAuth callback without an admin session while keeping other admin routes protected', async () => {
+    process.env['ADMIN_TOKEN'] = 'secret-token'
+
+    const app = buildServer({ logLevel: 'silent' })
+    const completeSpy = vi.spyOn(downstreamAuthManager, 'completeOAuth').mockResolvedValue({
+      serverId: 'fast-mcp-docs',
+      authorizationServer: 'https://issuer.example.com',
+    })
+
+    await app.register(adminRoutes, {
+      registry: {
+        async refreshTools() {
+          return [{ name: 'docs_search' }]
+        },
+      } as any,
+    })
+    await app.ready()
+
+    const dashboardRes = await app.inject({
+      method: 'GET',
+      url: '/admin/dashboard',
+    })
+    expect(dashboardRes.statusCode).toBe(401)
+
+    const callbackRes = await app.inject({
+      method: 'GET',
+      url: '/admin/downstream-auth/callback?state=abc&code=xyz',
+    })
+    expect(callbackRes.statusCode).toBe(200)
+    expect(callbackRes.payload).toContain('downstream-auth:success')
+    expect(completeSpy).toHaveBeenCalledWith('abc', 'xyz')
 
     await app.close()
   })
@@ -828,8 +864,10 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
-  it('includes codeMode in GET /admin/config/policies', async () => {
-    const { configRepo, configManager, getCurrent } = createAdminHarness()
+  it('includes codeMode and allowedOAuthProviders in GET /admin/config/policies', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness({
+      allowedOAuthProviders: ['https://issuer.example.com'],
+    })
     const app = buildServer({ logLevel: 'silent' })
     await app.register(adminRoutes, {
       configRepo,
@@ -844,6 +882,22 @@ describe('adminRoutes', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.json().codeMode).toEqual(getCurrent().codeMode)
+    expect(res.json().allowedOAuthProviders).toEqual(['https://issuer.example.com'])
+
+    const updateRes = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        ...res.json(),
+        allowedOAuthProviders: ['https://issuer.example.com', '*.example.org'],
+      },
+    })
+
+    expect(updateRes.statusCode).toBe(200)
+    expect(getCurrent().allowedOAuthProviders).toEqual([
+      'https://issuer.example.com',
+      '*.example.org',
+    ])
 
     await app.close()
   })
@@ -1204,6 +1258,98 @@ describe('adminRoutes', () => {
       latencyMs: 42,
       authStatus: 'none',
     })
+
+    await app.close()
+  })
+
+  it('returns runtime oauth metadata when the auth manager has captured an authorization server', async () => {
+    const app = buildServer({ logLevel: 'silent' })
+    const getStateSpy = vi.spyOn(downstreamAuthManager, 'getState').mockResolvedValue({
+      serverId: 'fast-mcp-docs',
+      status: 'authorized' as any,
+      message: 'OAuth authorization is required',
+      managedSecretConfigured: false,
+      authorizationServer: 'https://issuer.example.com',
+    } as any)
+
+    await app.register(adminRoutes, {
+      registry: {
+        async listServers() {
+          return [
+            {
+              id: 'fast-mcp-docs',
+              namespaces: ['docs'],
+              transport: 'http',
+              url: 'https://example.com/mcp',
+              enabled: true,
+              trustLevel: SourceTrustLevel.Verified,
+            },
+          ]
+        },
+        async getServer(id: string) {
+          return {
+            id,
+            namespaces: ['docs'],
+            transport: 'http',
+            url: 'https://example.com/mcp',
+            enabled: true,
+            trustLevel: SourceTrustLevel.Verified,
+          }
+        },
+        async getTools() {
+          return []
+        },
+        getHealthState() {
+          return undefined
+        },
+      } as any,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/servers',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().servers).toEqual([
+      expect.objectContaining({
+        id: 'fast-mcp-docs',
+        authStatus: 'authorized',
+        authAuthorizationServer: 'https://issuer.example.com',
+      }),
+    ])
+
+    expect(getStateSpy).toHaveBeenCalledWith('fast-mcp-docs')
+
+    await app.close()
+  })
+
+  it('includes the resolved authorization server in the downstream OAuth callback payload', async () => {
+    const app = buildServer({ logLevel: 'silent' })
+    const completeSpy = vi.spyOn(downstreamAuthManager, 'completeOAuth').mockResolvedValue({
+      serverId: 'fast-mcp-docs',
+      authorizationServer: 'https://issuer.example.com',
+    })
+
+    await app.register(adminRoutes, {
+      registry: {
+        async refreshTools() {
+          return [{ name: 'docs_search' }]
+        },
+      } as any,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/downstream-auth/callback?state=abc&code=xyz',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.payload).toContain('downstream-auth:success')
+    expect(res.payload).toContain('https://issuer.example.com')
+    expect(completeSpy).toHaveBeenCalledWith('abc', 'xyz')
 
     await app.close()
   })

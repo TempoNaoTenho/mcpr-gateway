@@ -22,6 +22,16 @@
   let rollbackTarget = $state<number | null>(null);
   let rolling = $state(false);
   let starterPackJson = $state('{}');
+  let allowedOAuthProvidersText = $state('');
+
+  function parseAllowedOAuthProviders(text: string): string[] {
+    return [...new Set(
+      text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+    )];
+  }
 
   async function load() {
     loading = true;
@@ -40,6 +50,7 @@
       configSource = configRes.source === 'db' ? 'db' : 'file';
       versions = configSource === 'db' ? (await getConfigVersions()).versions : [];
       starterPackJson = JSON.stringify(policyRes.starterPacks, null, 2);
+      allowedOAuthProvidersText = (policyRes.allowedOAuthProviders ?? []).join('\n');
     } catch {
       notifications.error('Failed to load configuration');
     } finally {
@@ -54,6 +65,7 @@
       await savePolicies({
         ...policies,
         starterPacks: JSON.parse(starterPackJson),
+        allowedOAuthProviders: parseAllowedOAuthProviders(allowedOAuthProvidersText),
       }, 'Updated tuning');
       notifications.success('Gateway tuning updated');
       await load();
@@ -394,6 +406,23 @@
         <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-3">
           <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Starter Packs</h2>
           <textarea autocomplete="off" bind:value={starterPackJson} rows="12" class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+          <h2 class="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">
+            OAuth provider allowlist
+            <InfoTooltip text="If empty, OAuth authorization still requires HTTPS and SSRF-safe endpoints. If populated, only matching origins or wildcard patterns are accepted when starting downstream OAuth." />
+          </h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            One entry per line. Examples: <code class="font-mono">https://issuer.example.com</code> or <code class="font-mono">*.example.com</code>.
+          </p>
+          <textarea
+            bind:value={allowedOAuthProvidersText}
+            rows="5"
+            autocomplete="off"
+            placeholder="https://issuer.example.com&#10;*.example.com"
+            class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+          ></textarea>
         </div>
       </div>
 

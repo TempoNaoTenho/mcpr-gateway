@@ -152,6 +152,7 @@ export interface ServerInfo {
   error?: string
   authStatus?: string
   authMessage?: string
+  authAuthorizationServer?: string
   managedSecretConfigured?: boolean
   interactiveAuthStatus?: string
   interactiveAuthMessage?: string
@@ -170,6 +171,7 @@ export async function refreshServer(id: string): Promise<{
   error?: string
   authStatus?: string
   authMessage?: string
+  authAuthorizationServer?: string
   interactiveAuthStatus?: string
   interactiveAuthMessage?: string
   interactiveAuthUrl?: string
@@ -702,6 +704,7 @@ export interface PoliciesConfig {
     maxResultSizeBytes: number
     artifactStoreTtlSeconds: number
   }
+  allowedOAuthProviders: string[]
   starterPacks: Record<
     string,
     {
