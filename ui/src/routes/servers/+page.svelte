@@ -987,7 +987,7 @@
       <div class="grid grid-cols-2 gap-3">
         <label class="space-y-1 text-sm">
           <span class="text-slate-600 dark:text-slate-300">ID</span>
-          <input bind:value={form.id} disabled={Boolean(editingId)} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input bind:value={form.id} autocomplete="off" disabled={Boolean(editingId)} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <div class="space-y-1 text-sm col-span-2">
           <span class="text-slate-600 dark:text-slate-300">Namespaces</span>
@@ -995,7 +995,7 @@
         </div>
         <label class="space-y-1 text-sm">
           <span class="text-slate-600 dark:text-slate-300">Transport</span>
-          <select bind:value={form.transport} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <select autocomplete="off" bind:value={form.transport} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
             <option value="streamable-http">streamable-http</option>
             <option value="http">http</option>
             <option value="stdio">stdio</option>
@@ -1003,7 +1003,7 @@
         </label>
         <label class="space-y-1 text-sm">
           <span class="text-slate-600 dark:text-slate-300">Trust Level</span>
-          <select bind:value={form.trustLevel} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <select autocomplete="off" bind:value={form.trustLevel} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
             <option value="untrusted">untrusted</option>
             <option value="verified">verified</option>
             <option value="internal">internal</option>
@@ -1014,22 +1014,22 @@
       {#if form.transport === 'stdio'}
         <label class="space-y-1 text-sm block">
           <span class="text-slate-600 dark:text-slate-300">Command</span>
-          <input bind:value={form.command} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input bind:value={form.command} autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <label class="space-y-1 text-sm block">
           <span class="text-slate-600 dark:text-slate-300">Args</span>
-          <input bind:value={argsText} placeholder="arg1, arg2" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input bind:value={argsText} placeholder="arg1, arg2" autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <label class="space-y-1 text-sm block">
           <span class="text-slate-600 dark:text-slate-300">Env</span>
-          <textarea bind:value={envText} rows="4" placeholder="KEY=value" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
+          <textarea bind:value={envText} rows="4" placeholder="KEY=value" autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
         </label>
         <label class="space-y-1 text-sm block">
           <span class="text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
             Stdio timeout (s)
             <InfoTooltip text="Increase this when the child process needs more time to finish startup or complete browser/device authentication before tools become available." />
           </span>
-          <input type="number" min="1" bind:value={form.stdioTimeoutSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input type="number" autocomplete="off" min="1" bind:value={form.stdioTimeoutSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input
@@ -1049,7 +1049,7 @@
       {:else}
         <label class="space-y-1 text-sm block">
           <span class="text-slate-600 dark:text-slate-300">URL</span>
-          <input bind:value={form.url} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input bind:value={form.url} autocomplete="url" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label class="space-y-1 text-sm block">
@@ -1057,7 +1057,7 @@
               Auth mode
               <InfoTooltip text="Use env for process-provided bearer tokens. Managed secret and OAuth storage are only available when downstream auth encryption is enabled." />
             </span>
-            <select bind:value={form.auth!.mode} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <select autocomplete="off" bind:value={form.auth!.mode} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
               <option value="none">none</option>
               <option value="bearer">bearer</option>
               <option value="oauth">oauth</option>
@@ -1091,27 +1091,27 @@
                 Managed bearer token
                 <InfoTooltip text="Stored separately from server config. Leave blank when editing to keep the current secret unchanged." />
               </span>
-              <input type="password" bind:value={managedBearerSecret} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="password" bind:value={managedBearerSecret} autocomplete="new-password" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           {:else}
             <label class="space-y-1 text-sm block">
               <span class="text-slate-600 dark:text-slate-300">Env var</span>
-              <input bind:value={bearerEnvVar} placeholder="MCP_SERVER_TOKEN" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs" />
+              <input bind:value={bearerEnvVar} placeholder="MCP_SERVER_TOKEN" autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs" />
             </label>
           {/if}
         {:else if form.auth?.mode === 'oauth'}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label class="space-y-1 text-sm block">
               <span class="text-slate-600 dark:text-slate-300">Authorization server</span>
-              <input bind:value={oauthAuthorizationServer} placeholder="https://issuer.example.com" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input bind:value={oauthAuthorizationServer} placeholder="https://issuer.example.com" autocomplete="url" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1 text-sm block">
               <span class="text-slate-600 dark:text-slate-300">Scopes</span>
-              <input bind:value={oauthScopesText} placeholder="openid, profile" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input bind:value={oauthScopesText} placeholder="openid, profile" autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1 text-sm block">
               <span class="text-slate-600 dark:text-slate-300">Registration</span>
-              <select bind:value={oauthRegistrationMode} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <select autocomplete="off" bind:value={oauthRegistrationMode} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="dynamic">dynamic</option>
                 <option value="static">static</option>
               </select>
@@ -1119,7 +1119,7 @@
             {#if oauthRegistrationMode === 'static'}
               <label class="space-y-1 text-sm block">
                 <span class="text-slate-600 dark:text-slate-300">Client ID</span>
-                <input bind:value={oauthClientId} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                <input bind:value={oauthClientId} autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
               </label>
             {/if}
           </div>
@@ -1130,6 +1130,7 @@
             bind:value={headersText}
             rows="4"
             placeholder="HEADER=value"
+            autocomplete="off"
             class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs"
           ></textarea>
         </label>
@@ -1138,11 +1139,11 @@
       <div class="grid grid-cols-2 gap-3">
         <label class="space-y-1 text-sm">
           <span class="text-slate-600 dark:text-slate-300">Refresh interval (s)</span>
-          <input type="number" bind:value={form.refreshIntervalSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input type="number" autocomplete="off" bind:value={form.refreshIntervalSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
         <label class="space-y-1 text-sm">
           <span class="text-slate-600 dark:text-slate-300">Healthcheck interval (s)</span>
-          <input type="number" bind:value={form.healthcheck!.intervalSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+          <input type="number" autocomplete="off" bind:value={form.healthcheck!.intervalSeconds} class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
         </label>
       </div>
 
@@ -1170,6 +1171,7 @@
                 oninput={resetImportPreview}
                 list="server-namespaces"
                 placeholder="default"
+                autocomplete="off"
                 class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
               />
             </label>

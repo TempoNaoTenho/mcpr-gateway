@@ -373,6 +373,7 @@
                 </div>
                 <input
                   type="number"
+                  autocomplete="off"
                   bind:value={draft.bootstrapWindowSize}
                   min="1"
                   disabled={budgetControlsDisabled}
@@ -386,6 +387,7 @@
                 </div>
                 <input
                   type="number"
+                  autocomplete="off"
                   bind:value={draft.candidatePoolSize}
                   min="1"
                   disabled={budgetControlsDisabled}

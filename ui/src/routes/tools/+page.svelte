@@ -286,12 +286,14 @@
   <div class="flex flex-wrap gap-3">
     <input
       type="search"
+      autocomplete="off"
       bind:value={searchQuery}
       placeholder="Search tools…"
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-56"
     />
 
     <select
+      autocomplete="off"
       bind:value={serverFilter}
       onchange={() => load()}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -303,6 +305,7 @@
     </select>
 
     <select
+      autocomplete="off"
       bind:value={namespaceFilter}
       onchange={() => load()}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -314,6 +317,7 @@
     </select>
 
     <select
+      autocomplete="off"
       bind:value={riskFilter}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
     >

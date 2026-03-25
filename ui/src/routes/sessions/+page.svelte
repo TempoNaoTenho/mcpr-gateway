@@ -88,6 +88,7 @@
   <!-- Filters -->
   <div class="flex flex-wrap gap-3">
     <select
+      autocomplete="off"
       bind:value={statusFilter}
       onchange={() => { page = 0; loadSessions(); }}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -101,6 +102,7 @@
 
     <input
       type="text"
+      autocomplete="off"
       bind:value={namespaceFilter}
       placeholder="Filter by namespace…"
       oninput={() => { page = 0; loadSessions(); }}

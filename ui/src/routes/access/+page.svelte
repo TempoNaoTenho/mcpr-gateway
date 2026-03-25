@@ -770,6 +770,7 @@
                   <label class="flex-1 space-y-1">
                     <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Profile name</span>
                     <input
+                      autocomplete="off"
                       value={selectedRole.key}
                       onchange={(e) => renameRole(selectedRoleIndex, e.currentTarget.value)}
                       class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
@@ -918,6 +919,7 @@
                         <label class="space-y-1">
                           <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Namespace name</span>
                           <input
+                            autocomplete="off"
                             value={ns.key}
                             onchange={(e) => renameNamespace(index, e.currentTarget.value)}
                             class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
@@ -987,14 +989,14 @@
                               Bootstrap window
                               <InfoTooltip text="Number of tools available when first opening the namespace." />
                             </div>
-                            <input type="number" bind:value={ns.bootstrapWindowSize} min="1" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                            <input type="number" autocomplete="off" bind:value={ns.bootstrapWindowSize} min="1" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
                           </label>
                           <label class="space-y-1">
                             <div class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                               Candidate pool
                               <InfoTooltip text="Size of the candidate tool pool for selection." />
                             </div>
-                            <input type="number" bind:value={ns.candidatePoolSize} min="1" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                            <input type="number" autocomplete="off" bind:value={ns.candidatePoolSize} min="1" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
                           </label>
                         </div>
                       </details>
@@ -1028,7 +1030,7 @@
             <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
               <label class="block space-y-1">
                 <span class="text-xs font-medium text-slate-500 dark:text-slate-400">User ID</span>
-                <input bind:value={newTokenUserId} placeholder="alice" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 max-w-sm" />
+                <input bind:value={newTokenUserId} placeholder="alice" autocomplete="off" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 max-w-sm" />
               </label>
 
               <div class="space-y-2">
@@ -1242,7 +1244,7 @@
     <div class="space-y-4">
       <label class="block space-y-1">
         <span class="text-xs font-medium text-slate-500 dark:text-slate-400">User ID</span>
-        <input bind:value={editingToken.userId} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+        <input bind:value={editingToken.userId} autocomplete="off" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
       </label>
 
       <div class="space-y-2">

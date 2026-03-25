@@ -98,6 +98,7 @@
   <!-- Filters -->
   <div class="flex flex-wrap gap-3">
     <select
+      autocomplete="off"
       bind:value={typeFilter}
       onchange={() => { page = 0; load(); }}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -113,6 +114,7 @@
 
     <input
       type="text"
+      autocomplete="off"
       bind:value={sessionIdFilter}
       placeholder="Session ID…"
       oninput={() => { page = 0; load(); }}
@@ -121,6 +123,7 @@
 
     <input
       type="text"
+      autocomplete="off"
       bind:value={userIdFilter}
       placeholder="User ID…"
       oninput={() => { page = 0; load(); }}
@@ -129,6 +132,7 @@
 
     <input
       type="datetime-local"
+      autocomplete="off"
       bind:value={fromFilter}
       onchange={() => { page = 0; load(); }}
       class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -245,6 +249,7 @@
         <input
           id="prune-days"
           type="number"
+          autocomplete="off"
           bind:value={pruneDays}
           min="1"
           max="3650"

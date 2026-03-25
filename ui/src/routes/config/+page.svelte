@@ -161,25 +161,25 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Lookback <InfoTooltip text="Recent tool calls considered for focus scoring." />
               </span>
-              <input type="number" min="1" bind:value={policies.selector.focus.lookback} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.selector.focus.lookback} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Min dominant successes <InfoTooltip text="Minimum successes on a capability before it is treated as dominant." />
               </span>
-              <input type="number" min="1" bind:value={policies.selector.focus.minDominantSuccesses} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.selector.focus.minDominantSuccesses} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Reserve slots <InfoTooltip text="Slots reserved when building the tool window under focus mode." />
               </span>
-              <input type="number" min="0" bind:value={policies.selector.focus.reserveSlots} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="0" bind:value={policies.selector.focus.reserveSlots} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Cross-domain penalty <InfoTooltip text="Penalty when mixing unrelated capabilities in the same window." />
               </span>
-              <input type="number" step="0.1" bind:value={policies.selector.focus.crossDomainPenalty} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" step="0.1" bind:value={policies.selector.focus.crossDomainPenalty} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
           <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 pt-1">Publication compression</h3>
@@ -188,7 +188,7 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Description compression <InfoTooltip text="When conservative, shortens downstream tool descriptions in tools/list (gateway’s own tools are never compressed). Default off — full text." />
               </span>
-              <select bind:value={policies.selector.publication.descriptionCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <select autocomplete="off" bind:value={policies.selector.publication.descriptionCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="off">off</option>
                 <option value="conservative">conservative</option>
               </select>
@@ -197,7 +197,7 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Schema compression <InfoTooltip text="When conservative, simplifies JSON Schemas for downstream tools in tools/list. Default off — full schema." />
               </span>
-              <select bind:value={policies.selector.publication.schemaCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <select autocomplete="off" bind:value={policies.selector.publication.schemaCompression} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="off">off</option>
                 <option value="conservative">conservative</option>
               </select>
@@ -206,7 +206,7 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Description max length <InfoTooltip text="Cap on description length when description compression is conservative (ignored when off)." />
               </span>
-              <input type="number" min="1" bind:value={policies.selector.publication.descriptionMaxLength} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.selector.publication.descriptionMaxLength} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
           <div class="grid grid-cols-3 gap-3">
@@ -214,19 +214,19 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Write penalty <InfoTooltip text="In the selector ranker only: when the session mode is Read, multiplies a score penalty for tools marked High risk (magnitude = value × 5). 0 disables this bias." />
               </span>
-              <input type="number" step="0.05" bind:value={policies.selector.penalties.write} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" step="0.05" bind:value={policies.selector.penalties.write} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Admin penalty <InfoTooltip text="In the selector ranker only: when the session mode is Admin, score penalty for High-risk tools (magnitude = value × 5). 0 disables." />
               </span>
-              <input type="number" step="0.05" bind:value={policies.selector.penalties.admin} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" step="0.05" bind:value={policies.selector.penalties.admin} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Unhealthy penalty <InfoTooltip text="Scales fixed health-based score adjustments in the selector (degraded/offline/unknown). 0.5 matches historical strength; 0 removes that scaling (no extra penalty from this setting)." />
               </span>
-              <input type="number" step="0.05" bind:value={policies.selector.penalties.unhealthyDownstream} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" step="0.05" bind:value={policies.selector.penalties.unhealthyDownstream} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
         </div>
@@ -238,25 +238,25 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 TTL (s) <InfoTooltip text="Session expiry in seconds. After this time with no activity, the session is cleaned up." />
               </span>
-              <input type="number" bind:value={policies.session.ttlSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.session.ttlSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Cleanup interval (s) <InfoTooltip text="How often the cleanup sweep runs to remove expired sessions." />
               </span>
-              <input type="number" bind:value={policies.session.cleanupIntervalSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.session.cleanupIntervalSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Cooldown (s) <InfoTooltip text="Minimum time between window reselections triggered by tool outcomes." />
               </span>
-              <input type="number" bind:value={policies.triggers.cooldownSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.triggers.cooldownSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Window mode <InfoTooltip text="replace: new window replaces the old one. append: new tools are merged into the existing window." />
               </span>
-              <select bind:value={policies.triggers.replaceOrAppend} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <select autocomplete="off" bind:value={policies.triggers.replaceOrAppend} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <option value="replace">replace</option>
                 <option value="append">append</option>
               </select>
@@ -277,67 +277,67 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Connect timeout (ms) <InfoTooltip text="Max time to establish a TCP connection to a downstream server." />
               </span>
-              <input type="number" bind:value={policies.resilience.timeouts.connectMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.timeouts.connectMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Response timeout (ms) <InfoTooltip text="Max time to wait for the first byte of a response." />
               </span>
-              <input type="number" bind:value={policies.resilience.timeouts.responseMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.timeouts.responseMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Total timeout (ms) <InfoTooltip text="Hard limit for the entire request lifecycle." />
               </span>
-              <input type="number" bind:value={policies.resilience.timeouts.totalMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.timeouts.totalMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Rate limit / session <InfoTooltip text="Max requests per MCP session within the session window." />
               </span>
-              <input type="number" bind:value={policies.resilience.rateLimit.perSession.maxRequests} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.rateLimit.perSession.maxRequests} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Session rate window (s) <InfoTooltip text="Sliding window length for per-session rate limiting." />
               </span>
-              <input type="number" min="1" bind:value={policies.resilience.rateLimit.perSession.windowSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.resilience.rateLimit.perSession.windowSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Rate limit / user <InfoTooltip text="Max requests per user across all sessions within the user window." />
               </span>
-              <input type="number" bind:value={policies.resilience.rateLimit.perUser.maxRequests} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.rateLimit.perUser.maxRequests} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 User rate window (s) <InfoTooltip text="Sliding window length for per-user rate limiting." />
               </span>
-              <input type="number" min="1" bind:value={policies.resilience.rateLimit.perUser.windowSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.resilience.rateLimit.perUser.windowSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Downstream concurrency <InfoTooltip text="Max simultaneous requests forwarded to a single downstream server." />
               </span>
-              <input type="number" bind:value={policies.resilience.rateLimit.perDownstreamConcurrency} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.rateLimit.perDownstreamConcurrency} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Degraded after (failures) <InfoTooltip text="Mark server degraded after this many consecutive failures." />
               </span>
-              <input type="number" bind:value={policies.resilience.circuitBreaker.degradedAfterFailures} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.circuitBreaker.degradedAfterFailures} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Offline after (failures) <InfoTooltip text="Mark server offline (circuit open) after this many consecutive failures." />
               </span>
-              <input type="number" bind:value={policies.resilience.circuitBreaker.offlineAfterFailures} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.circuitBreaker.offlineAfterFailures} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Reset after (s) <InfoTooltip text="Time in seconds before attempting to reconnect an offline server." />
               </span>
-              <input type="number" bind:value={policies.resilience.circuitBreaker.resetAfterSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" bind:value={policies.resilience.circuitBreaker.resetAfterSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
         </div>
@@ -352,31 +352,31 @@
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Memory limit (MB) <InfoTooltip text="Max heap for the isolated JS runtime." />
               </span>
-              <input type="number" min="1" bind:value={policies.codeMode.memoryLimitMb} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.codeMode.memoryLimitMb} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Execution timeout (ms) <InfoTooltip text="Hard limit for a single gateway_run_code execution." />
               </span>
-              <input type="number" min="1" bind:value={policies.codeMode.executionTimeoutMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.codeMode.executionTimeoutMs} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Max tool calls / execution <InfoTooltip text="Cap on downstream tool calls from one code execution." />
               </span>
-              <input type="number" min="1" bind:value={policies.codeMode.maxToolCallsPerExecution} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.codeMode.maxToolCallsPerExecution} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Max result size (bytes) <InfoTooltip text="Maximum serialized result size returned from the sandbox." />
               </span>
-              <input type="number" min="1" bind:value={policies.codeMode.maxResultSizeBytes} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.codeMode.maxResultSizeBytes} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
             <label class="space-y-1">
               <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Artifact store TTL (s) <InfoTooltip text="How long saved artifacts remain available after a run." />
               </span>
-              <input type="number" min="1" bind:value={policies.codeMode.artifactStoreTtlSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+              <input type="number" autocomplete="off" min="1" bind:value={policies.codeMode.artifactStoreTtlSeconds} class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
             </label>
           </div>
         </div>
@@ -393,7 +393,7 @@
 
         <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-3">
           <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Starter Packs</h2>
-          <textarea bind:value={starterPackJson} rows="12" class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
+          <textarea autocomplete="off" bind:value={starterPackJson} rows="12" class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
         </div>
       </div>
 
