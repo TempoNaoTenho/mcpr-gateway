@@ -3,10 +3,15 @@
     options = [],
     value = $bindable<string[]>([]),
     placeholder = 'Add namespace...',
+    allowCreate = true,
+    onchange,
   }: {
     options?: string[];
     value?: string[];
     placeholder?: string;
+    /** When false, only entries from `options` can be added (picker + filter). */
+    allowCreate?: boolean;
+    onchange?: () => void;
   } = $props();
 
   let inputValue = $state('');
@@ -22,16 +27,19 @@
     if (!value.includes(ns)) value = [...value, ns];
     inputValue = '';
     open = false;
+    onchange?.();
   }
 
   function remove(ns: string) {
     value = value.filter((v) => v !== ns);
+    onchange?.();
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && inputValue.trim()) {
       e.preventDefault();
-      add(inputValue.trim());
+      const next = inputValue.trim();
+      if (allowCreate || options.includes(next)) add(next);
     }
     if (e.key === 'Escape') open = false;
   }
@@ -79,7 +87,7 @@
             </button>
           </li>
         {/each}
-        {#if inputValue.trim() && !options.includes(inputValue.trim())}
+        {#if allowCreate && inputValue.trim() && !options.includes(inputValue.trim())}
           <li>
             <button
               type="button"

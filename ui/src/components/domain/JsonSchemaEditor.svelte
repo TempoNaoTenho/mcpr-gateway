@@ -12,6 +12,8 @@
     value: string;
     readOnly?: boolean;
     oninput?: (value: string) => void;
+    /** Runs after paste (e.g. normalize JSON); content is applied in the same tick. */
+    onpaste?: () => void;
     /** Min height of the scroll area (e.g. compact rows in drawers). */
     scrollerMinHeight?: string;
   }
@@ -20,6 +22,7 @@
     value,
     readOnly = false,
     oninput,
+    onpaste,
     scrollerMinHeight = '18rem',
   }: Props = $props();
 
@@ -28,6 +31,17 @@
 
   const themeComp = new Compartment();
   const readOnlyComp = new Compartment();
+
+  /** CodeMirror extensions capture callbacks once; keep latest handlers here. */
+  const editorCallbacks: {
+    oninput?: (value: string) => void;
+    onpaste?: () => void;
+  } = {};
+
+  $effect(() => {
+    editorCallbacks.oninput = oninput;
+    editorCallbacks.onpaste = onpaste;
+  });
 
   function lightChrome() {
     return EditorView.theme({
@@ -86,10 +100,16 @@
       EditorView.lineWrapping,
       readOnlyComp.of(EditorState.readOnly.of(readOnly)),
       themeComp.of(preferDark ? darkExtensions() : [lightChrome()]),
+      EditorView.domEventHandlers({
+        paste: () => {
+          requestAnimationFrame(() => editorCallbacks.onpaste?.());
+          return false;
+        },
+      }),
       EditorView.updateListener.of((update) => {
-        if (!update.docChanged || !oninput) return;
+        if (!update.docChanged || !editorCallbacks.oninput) return;
         if (update.transactions.some((tr) => tr.isUserEvent('gateway.sync'))) return;
-        oninput(update.state.doc.toString());
+        editorCallbacks.oninput(update.state.doc.toString());
       }),
     ];
   }

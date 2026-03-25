@@ -3,10 +3,12 @@
     options = [],
     value = $bindable(''),
     placeholder = 'Select or create namespace...',
+    allowCreate = true,
   }: {
     options?: string[];
     value?: string;
     placeholder?: string;
+    allowCreate?: boolean;
   } = $props();
 
   let inputValue = $state('');
@@ -29,7 +31,8 @@
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && inputValue.trim()) {
       e.preventDefault();
-      select(inputValue.trim());
+      const next = inputValue.trim();
+      if (allowCreate || options.includes(next)) select(next);
     }
     if (e.key === 'Escape') open = false;
   }
@@ -75,7 +78,7 @@
             </button>
           </li>
         {/each}
-        {#if inputValue.trim() && !options.includes(inputValue.trim())}
+        {#if allowCreate && inputValue.trim() && !options.includes(inputValue.trim())}
           <li>
             <button
               type="button"

@@ -49,15 +49,20 @@ function stripMarkdownFence(text: string): string {
 }
 
 /**
- * First `{ ... }` balanced for JSON-like text (respects strings and escapes).
+ * `{ ... }` balanced from `openBraceIndex` (respects strings and escapes).
  */
-export function extractFirstJsonObject(text: string): string | null {
-  const start = text.indexOf('{')
-  if (start < 0) return null
+export function extractBalancedJsonObject(text: string, openBraceIndex: number): string | null {
+  if (
+    openBraceIndex < 0
+    || openBraceIndex >= text.length
+    || text.charAt(openBraceIndex) !== '{'
+  ) {
+    return null
+  }
   let depth = 0
   let inString = false
   let escape = false
-  for (let i = start; i < text.length; i++) {
+  for (let i = openBraceIndex; i < text.length; i++) {
     const c = text[i]!
     if (escape) {
       escape = false
@@ -75,10 +80,19 @@ export function extractFirstJsonObject(text: string): string | null {
     if (c === '{') depth++
     else if (c === '}') {
       depth--
-      if (depth === 0) return text.slice(start, i + 1)
+      if (depth === 0) return text.slice(openBraceIndex, i + 1)
     }
   }
   return null
+}
+
+/**
+ * First `{ ... }` balanced for JSON-like text (respects strings and escapes).
+ */
+export function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start < 0) return null
+  return extractBalancedJsonObject(text, start)
 }
 
 function stripTrailingCommas(json: string): string {
@@ -115,7 +129,39 @@ function parseJsonLenient(text: string): unknown {
 }
 
 function preprocessImportText(raw: string): string {
-  return stripMarkdownFence(raw)
+  let s = stripMarkdownFence(raw)
+  if (s.charCodeAt(0) === 0xfeff) {
+    s = s.slice(1)
+  }
+  return s
+}
+
+const MCP_SERVERS_KEY = '"mcpServers"'
+
+/**
+ * Raw text value of the `mcpServers` object (balanced `{ ... }`), if present.
+ * Handles concatenated objects where the first `{...}` is not the mcpServers wrapper.
+ */
+function findMcpServersObjectText(text: string): string | null {
+  let pos = 0
+  while (pos <= text.length) {
+    const i = text.indexOf(MCP_SERVERS_KEY, pos)
+    if (i < 0) return null
+    const afterKey = i + MCP_SERVERS_KEY.length
+    const m = text.slice(afterKey).match(/^\s*:\s*/)
+    if (!m) {
+      pos = i + 1
+      continue
+    }
+    let j = afterKey + m[0].length
+    while (j < text.length && /\s/.test(text.charAt(j))) j++
+    if (j >= text.length || text.charAt(j) !== '{') {
+      pos = i + 1
+      continue
+    }
+    return extractBalancedJsonObject(text, j)
+  }
+  return null
 }
 
 function looksLikeServerEntry(value: Record<string, unknown>): boolean {
@@ -175,27 +221,50 @@ export function parseMcpImportText(raw: string): CoerceMcpImportResult {
     return { ok: false, message: 'Import JSON is empty' }
   }
 
-  let parsed: unknown
+  const pre = preprocessImportText(raw)
+
+  let parsed: unknown | undefined
   try {
-    const pre = preprocessImportText(raw)
     parsed = parseJsonLenient(pre)
   } catch {
+    parsed = undefined
+  }
+
+  let noMcpMessage =
+    'No MCP servers found. Use an `mcpServers` object, or a map of server id → config (with `url` or `command`).'
+
+  if (parsed !== undefined) {
+    if (!isRecord(parsed)) {
+      return { ok: false, message: 'Import JSON must be an object at the top level' }
+    }
+    const extracted = extractMcpServersFromRecord(parsed)
+    if (extracted.found) {
+      return {
+        ok: true,
+        defaultNamespace: extracted.defaultNamespace,
+        mcpServers: extracted.mcpServers,
+      }
+    }
+    noMcpMessage = extracted.message
+  }
+
+  const mcpObjText = findMcpServersObjectText(pre)
+  if (mcpObjText) {
+    try {
+      const inner = parseJsonLenient(mcpObjText)
+      if (isRecord(inner)) {
+        return { ok: true, mcpServers: inner }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (parsed === undefined) {
     return { ok: false, message: 'Import JSON is invalid' }
   }
 
-  if (!isRecord(parsed)) {
-    return { ok: false, message: 'Import JSON must be an object at the top level' }
-  }
-
-  const extracted = extractMcpServersFromRecord(parsed)
-  if (!extracted.found) {
-    return { ok: false, message: extracted.message }
-  }
-  return {
-    ok: true,
-    defaultNamespace: extracted.defaultNamespace,
-    mcpServers: extracted.mcpServers,
-  }
+  return { ok: false, message: noMcpMessage }
 }
 
 /**

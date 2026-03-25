@@ -368,6 +368,39 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
+  it('splits comma-separated defaultNamespace into multiple namespaces on import preview', async () => {
+    const { configRepo, configManager } = createAdminHarness(createDefaultAdminConfig(['default', 'code']))
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/config/servers/import/preview',
+      payload: {
+        defaultNamespace: 'default,code',
+        mcpServers: {
+          multi: {
+            url: 'https://example.com/mcp',
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().normalizedServers).toEqual([
+      expect.objectContaining({
+        id: 'multi',
+        namespaces: ['default', 'code'],
+      }),
+    ])
+
+    await app.close()
+  })
+
   it('splits imported stdio command lines into command and args', async () => {
     const { configRepo, configManager } = createAdminHarness()
     const app = buildServer({ logLevel: 'silent' })

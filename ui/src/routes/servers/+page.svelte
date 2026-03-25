@@ -92,7 +92,7 @@
   let bulkMoveNamespace = $state('');
   let bulkMoving = $state(false);
   let importJsonText = $state('');
-  let importDefaultNamespace = $state('');
+  let importDefaultNamespaces = $state<string[]>([]);
   let importPreview = $state<ConfigServerImportPreview | null>(null);
   let importPreviewLoading = $state(false);
   let importClientError = $state('');
@@ -247,7 +247,7 @@
     healthcheckEnabled = true;
     discoveryAuto = false;
     importJsonText = '';
-    importDefaultNamespace = getPreferredNamespace();
+    importDefaultNamespaces = [getPreferredNamespace()];
     importPreview = null;
     importClientError = '';
     formOpen = true;
@@ -346,13 +346,29 @@
     importClientError = '';
   }
 
+  function applyImportNamespacesFromOptionalJson(defaultNamespace: string | undefined) {
+    if (!defaultNamespace?.trim()) return;
+    const parts = defaultNamespace
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const filtered = parts.filter((p) => knownNamespaces.includes(p));
+    if (filtered.length > 0) {
+      importDefaultNamespaces = [...new Set(filtered)];
+    } else {
+      importDefaultNamespaces = [getPreferredNamespace()];
+    }
+  }
+
   function buildImportPayload(): ConfigServerImportPayload {
     const fromText = parseMcpImportText(importJsonText);
     if (!fromText.ok) {
       throw new Error(fromText.message);
     }
     const defaultNamespace =
-      importDefaultNamespace.trim() || fromText.defaultNamespace || undefined;
+      importDefaultNamespaces.length > 0
+        ? importDefaultNamespaces.join(',')
+        : fromText.defaultNamespace || undefined;
     return {
       mcpServers: fromText.mcpServers,
       defaultNamespace,
@@ -363,8 +379,8 @@
     const coerced = parseMcpImportText(importJsonText);
     if (!coerced.ok) return false;
     importJsonText = formatMcpImportForEditor(coerced.mcpServers);
-    if (!importDefaultNamespace.trim() && coerced.defaultNamespace) {
-      importDefaultNamespace = coerced.defaultNamespace;
+    if (importDefaultNamespaces.length === 0 && coerced.defaultNamespace) {
+      applyImportNamespacesFromOptionalJson(coerced.defaultNamespace);
     }
     resetImportPreview();
     return true;
@@ -377,8 +393,8 @@
       return;
     }
     importJsonText = formatMcpImportForEditor(coerced.mcpServers);
-    if (!importDefaultNamespace.trim() && coerced.defaultNamespace) {
-      importDefaultNamespace = coerced.defaultNamespace;
+    if (importDefaultNamespaces.length === 0 && coerced.defaultNamespace) {
+      applyImportNamespacesFromOptionalJson(coerced.defaultNamespace);
     }
     importClientError = '';
     resetImportPreview();
@@ -763,6 +779,7 @@
             options={knownNamespaces}
             bind:value={bulkMoveNamespace}
             placeholder="Add to namespace..."
+            allowCreate={false}
           />
         </div>
         <button
@@ -1161,20 +1178,19 @@
       {:else}
         <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div class="grid grid-cols-1 md:grid-cols-[220px,1fr] gap-3">
-            <label class="space-y-1 text-sm">
+            <div class="space-y-1 text-sm">
               <span class="text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
                 Default namespace
-                <InfoTooltip text="Paste Cursor-style mcpServers, a fragment, or a flat server map. Extra wrapper text and trailing commas are tolerated." />
+                <InfoTooltip text="Namespaces applied to imported entries that do not declare their own. Only existing gateway namespaces can be selected." />
               </span>
-              <input
-                bind:value={importDefaultNamespace}
-                oninput={resetImportPreview}
-                list="server-namespaces"
-                placeholder="default"
-                autocomplete="off"
-                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+              <MultiNamespaceSelect
+                options={knownNamespaces}
+                bind:value={importDefaultNamespaces}
+                placeholder="Add namespace..."
+                allowCreate={false}
+                onchange={resetImportPreview}
               />
-            </label>
+            </div>
             <div class="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 px-3 py-3 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2">
               <span class="font-medium">Normalization</span>
               <InfoTooltip text="Entries with url default to streamable-http. Entries with command default to stdio. Command lines are split into executable plus args before persistence." />
@@ -1182,17 +1198,18 @@
           </div>
 
           <div class="flex items-center justify-between gap-2">
-            <label class="space-y-1 text-sm block flex-1 min-w-0">
+            <div class="space-y-1 text-sm block flex-1 min-w-0">
               <span class="text-slate-600 dark:text-slate-300">Import JSON</span>
-              <textarea
-                bind:value={importJsonText}
-                oninput={resetImportPreview}
+              <JsonSchemaEditor
+                value={importJsonText}
+                oninput={(v) => {
+                  importJsonText = v;
+                  resetImportPreview();
+                }}
                 onpaste={handleImportPaste}
-                rows="14"
-                placeholder={`{"mcpServers":{"context7":{"url":"https://mcp.context7.com/mcp","headers":{"CONTEXT7_API_KEY":"api"}}}}`}
-                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs"
-              ></textarea>
-            </label>
+                scrollerMinHeight="18rem"
+              />
+            </div>
           </div>
           <button
             type="button"

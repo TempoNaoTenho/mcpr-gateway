@@ -161,7 +161,10 @@ function extractImportedNamespaces(
   }
 
   if (defaultNamespace) {
-    return [defaultNamespace]
+    const list = normalizeStringList(defaultNamespace.split(','))
+    if (list.length > 0) {
+      return list
+    }
   }
 
   throw new Error('namespace is required when defaultNamespace is not provided')
