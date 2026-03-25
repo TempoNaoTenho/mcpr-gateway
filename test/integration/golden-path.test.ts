@@ -44,6 +44,7 @@ let app: FastifyInstance
 let store: SqliteSessionRepository
 let disposeSessionDb: () => void
 let fakeServer: FakeMcpServer
+let registry: DownstreamRegistry
 
 beforeAll(async () => {
   // 1. Start FakeMcpServer with low-risk gmail tools
@@ -137,7 +138,7 @@ beforeAll(async () => {
     created.store.stop()
     created.close()
   }
-  const registry = new DownstreamRegistry()
+  registry = new DownstreamRegistry()
 
   // Populate tool cache by fetching from FakeMcpServer
   await registry.start(config.servers)
@@ -153,6 +154,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app.close()
+  registry.stop()
   disposeSessionDb()
   await fakeServer.close()
   rmSync(TMP, { recursive: true, force: true })

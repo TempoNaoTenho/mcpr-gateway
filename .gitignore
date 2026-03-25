@@ -1,36 +1,77 @@
-implementation
-.claude
-gateway.json
-.cursor 
-AGENTS.md
-CLAUDE.md
-.sisyphus
-.codex
-bench
+# =============================================================================
+# Local / experimental (not part of the published tree)
+# =============================================================================
+implementation/
+.claude/
+.codex/
+.cursor/
+.sisyphus/
 
-# Node
+# =============================================================================
+# Dependencies & build
+# =============================================================================
 node_modules/
 dist/
-.env
+*.tsbuildinfo
 
-# Local config (copy from *.example.json)
+# Package managers
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# =============================================================================
+# Environment & secrets
+# =============================================================================
+.env
+.env.*.local
+
+# =============================================================================
+# Application config (copy from *.example / templates)
+# =============================================================================
 config/gateway.json
 config/bootstrap.json
 
-# Coverage
+# =============================================================================
+# Tests & quality
+# =============================================================================
 coverage/
+.vitest/
 
-# Build artifacts
-*.tsbuildinfo
-.gitnexus
+# Fixture dirs created by Vitest suites (beforeAll / tmp dirs — see __tmp_* in tests)
+test/**/__tmp_*__/
 
-# SQLite persistence (WAL sidecars are local/ephemeral)
+# =============================================================================
+# Data & SQLite (local persistence + WAL sidecars)
+# =============================================================================
+data/
 *.db-shm
 *.db-wal
-data/
 
-# Ephemeral SQLite + bootstrap from restart integration tests (created in beforeAll, removed in afterAll)
-test/integration/__tmp_restart__/
+# =============================================================================
+# Benchmarks (generated data & reports only; keep bench/*.ts sources tracked)
+# =============================================================================
 bench/datasets/local/
 bench/reports/
 
+# =============================================================================
+# Code intelligence / index (regenerate with `npx gitnexus analyze`)
+# =============================================================================
+.gitnexus/
+
+# =============================================================================
+# OS & editors (common noise)
+# =============================================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+.idea/
+*.sublime-workspace
+
+# Agent instruction files at repo root (often symlinked or copied per machine)
+AGENTS.md
+CLAUDE.md

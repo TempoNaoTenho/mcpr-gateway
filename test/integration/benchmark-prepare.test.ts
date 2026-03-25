@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSmokeFixture } from '../../bench/fixtures/smoke.js'
 import { loadEffectiveBenchmarkConfig } from '../../bench/lib/effective-config.js'
-import { generateDatasetFromRegistry, writePreparedArtifacts } from '../../bench/lib/local-dataset.js'
+import {
+  generateDatasetFromRegistry,
+  writePreparedArtifacts,
+} from '../../bench/lib/local-dataset.js'
 import { createEffectiveBenchmarkRuntime } from '../../bench/lib/local-runtime.js'
 
 const cleanup: Array<() => Promise<void>> = []
@@ -17,14 +20,18 @@ afterEach(async () => {
 
 describe('benchmark local preparation', () => {
   it('generates a runnable dataset from a live smoke fixture', async () => {
+    let runtimeClose: (() => Promise<void>) | undefined
+
     const fixture = await createSmokeFixture()
     cleanup.push(() => fixture.close())
 
     const effective = await loadEffectiveBenchmarkConfig(
       fixture.configDir,
-      join(tmpdir(), `missing-bench-db-${Date.now()}.sqlite`),
+      join(tmpdir(), `missing-bench-db-${Date.now()}.sqlite`)
     )
+
     const runtime = await createEffectiveBenchmarkRuntime(effective.config)
+    runtimeClose = () => runtime.close()
     cleanup.push(() => runtime.close())
 
     const prepared = generateDatasetFromRegistry(effective.config, runtime.registry, {
@@ -53,7 +60,9 @@ describe('benchmark local preparation', () => {
     expect(artifacts.datasetPath).toBeDefined()
     expect(existsSync(artifacts.datasetPath!)).toBe(true)
 
-    const dataset = JSON.parse(readFileSync(artifacts.datasetPath!, 'utf8')) as { scenarios: Array<{ expectedTools: string[] }> }
+    const dataset = JSON.parse(readFileSync(artifacts.datasetPath!, 'utf8')) as {
+      scenarios: Array<{ expectedTools: string[] }>
+    }
     expect(dataset.scenarios[0]?.expectedTools.length).toBeGreaterThan(0)
   })
 })

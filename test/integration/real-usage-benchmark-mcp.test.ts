@@ -42,8 +42,8 @@ const probes: Record<string, SearchProbe> = {
   },
 }
 
-let fixture: Awaited<ReturnType<typeof createRealUsageBenchmarkFixture>>
-let runtime: Awaited<ReturnType<typeof createBenchmarkRuntime>>
+let fixture: Awaited<ReturnType<typeof createRealUsageBenchmarkFixture>> | undefined
+let runtime: Awaited<ReturnType<typeof createBenchmarkRuntime>> | undefined
 
 beforeAll(async () => {
   fixture = await createRealUsageBenchmarkFixture()
@@ -51,16 +51,19 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await runtime.close()
-  await fixture.close()
+  if (runtime) await runtime.close()
+  if (fixture) await fixture.close()
 })
 
 describe('gateway_search_tools over real MCP flows (real_usage_benchmark fixture)', () => {
   it('finds relevant tools for distinct search queries', async () => {
+    if (!runtime || !fixture) throw new Error('Test setup failed - runtime or fixture undefined')
+
+    const runtimeRef = runtime
     const client = new BenchmarkMcpClient(
-      (input) => runtime.app.inject(input),
+      (input) => runtimeRef.app.inject(input),
       'research',
-      fixture.authHeader,
+      fixture.authHeader
     )
 
     const { sessionId } = await client.initialize('read')
@@ -76,11 +79,15 @@ describe('gateway_search_tools over real MCP flows (real_usage_benchmark fixture
         limit: 10,
       })
 
-      const matches = (searchResult as { matches: Array<{ name: string; serverId: string }> }).matches
+      const matches = (searchResult as { matches: Array<{ name: string; serverId: string }> })
+        .matches
       const found = matches.some(
-        (m) => m.name === probe.expectedTool && m.serverId === probe.expectedServerId,
+        (m) => m.name === probe.expectedTool && m.serverId === probe.expectedServerId
       )
-      expect(found, `${label}: expected ${probe.expectedTool} in search results for "${probe.query}"`).toBe(true)
+      expect(
+        found,
+        `${label}: expected ${probe.expectedTool} in search results for "${probe.query}"`
+      ).toBe(true)
     }
   }, 30_000)
 })

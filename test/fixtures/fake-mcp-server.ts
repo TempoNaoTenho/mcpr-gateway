@@ -26,9 +26,11 @@ const MCP_SESSION_HEADER = 'Mcp-Session-Id'
 const activeServers = new Map<string, FakeFetchHandler>()
 
 let originalFetch: typeof globalThis.fetch | undefined
+let shimInstallCount = 0
 
 function installFetchShim(): void {
-  if (originalFetch) return
+  shimInstallCount++
+  if (shimInstallCount > 1) return
 
   if (typeof globalThis.fetch !== 'function') {
     throw new Error('global fetch is not available in this test environment')
@@ -36,7 +38,8 @@ function installFetchShim(): void {
 
   originalFetch = globalThis.fetch.bind(globalThis) as typeof globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     const handler = activeServers.get(url)
     if (handler) {
       return handler(input, init)
@@ -51,7 +54,9 @@ function installFetchShim(): void {
 }
 
 function uninstallFetchShim(): void {
-  if (!originalFetch || activeServers.size > 0) return
+  shimInstallCount--
+  if (shimInstallCount > 0) return
+  if (!originalFetch) return
   globalThis.fetch = originalFetch
   originalFetch = undefined
 }
@@ -66,7 +71,7 @@ function getHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
 function readHeader(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
-  name: string,
+  name: string
 ): string | null {
   return getHeaders(input, init).get(name)
 }
@@ -75,26 +80,19 @@ function bodyToString(body: RequestInit['body']): string {
   if (typeof body === 'string') return body
   if (body instanceof URLSearchParams) return body.toString()
   if (body instanceof ArrayBuffer) return Buffer.from(body).toString('utf8')
-  if (ArrayBuffer.isView(body)) return Buffer.from(body.buffer, body.byteOffset, body.byteLength).toString('utf8')
+  if (ArrayBuffer.isView(body))
+    return Buffer.from(body.buffer, body.byteOffset, body.byteLength).toString('utf8')
   throw new Error('Unsupported request body type for fake MCP server')
 }
 
 function readBody(input: RequestInfo | URL, init?: RequestInit): JsonRpcBody {
   const rawBody =
-    init?.body !== undefined
-      ? bodyToString(init.body)
-      : input instanceof Request
-        ? ''
-        : ''
+    init?.body !== undefined ? bodyToString(init.body) : input instanceof Request ? '' : ''
 
   return JSON.parse(rawBody) as JsonRpcBody
 }
 
-function jsonResponse(
-  status: number,
-  body: unknown,
-  sessionId?: string,
-): Response {
+function jsonResponse(status: number, body: unknown, sessionId?: string): Response {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (sessionId) headers[MCP_SESSION_HEADER] = sessionId
 
@@ -133,15 +131,19 @@ export async function createFakeMcpServer(options: FakeMcpServerOptions): Promis
       const sessionId = `fake-session-${randomUUID()}`
       validSessionIds.add(sessionId)
 
-      return jsonResponse(200, {
-        jsonrpc: '2.0',
-        id: requestId,
-        result: {
-          protocolVersion: '2024-11-05',
-          capabilities: { tools: {} },
-          serverInfo: { name: 'fake-mcp-server', version: '1.0.0' },
+      return jsonResponse(
+        200,
+        {
+          jsonrpc: '2.0',
+          id: requestId,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'fake-mcp-server', version: '1.0.0' },
+          },
         },
-      }, sessionId)
+        sessionId
+      )
     }
 
     const sessionId = readHeader(input, init, MCP_SESSION_HEADER)
@@ -161,37 +163,49 @@ export async function createFakeMcpServer(options: FakeMcpServerOptions): Promis
     }
 
     if (method === 'tools/list') {
-      return jsonResponse(200, {
-        jsonrpc: '2.0',
-        id: requestId,
-        result: {
-          tools: tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
-          })),
+      return jsonResponse(
+        200,
+        {
+          jsonrpc: '2.0',
+          id: requestId,
+          result: {
+            tools: tools.map((t) => ({
+              name: t.name,
+              description: t.description,
+              inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
+            })),
+          },
         },
-      }, sessionId)
+        sessionId
+      )
     }
 
     if (method === 'tools/call') {
       const params = body['params'] as Record<string, unknown>
       const toolName = params?.['name'] as string
 
-      return jsonResponse(200, {
-        jsonrpc: '2.0',
-        id: requestId,
-        result: {
-          content: [{ type: 'text', text: `Result of ${toolName}` }],
+      return jsonResponse(
+        200,
+        {
+          jsonrpc: '2.0',
+          id: requestId,
+          result: {
+            content: [{ type: 'text', text: `Result of ${toolName}` }],
+          },
         },
-      }, sessionId)
+        sessionId
+      )
     }
 
-    return jsonResponse(400, {
-      jsonrpc: '2.0',
-      id: requestId,
-      error: { code: -32601, message: 'Method not found' },
-    }, sessionId)
+    return jsonResponse(
+      400,
+      {
+        jsonrpc: '2.0',
+        id: requestId,
+        error: { code: -32601, message: 'Method not found' },
+      },
+      sessionId
+    )
   })
 
   return {

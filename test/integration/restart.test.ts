@@ -45,7 +45,7 @@ function openSessionStore(dbPath: string): { store: SqliteSessionRepository; clo
  * Used to simulate a "restart" by switching to a new store.
  */
 async function buildApp(storeInstance: ISessionStore): Promise<FastifyInstance> {
-  const registry = new DownstreamRegistry()
+  const registry = trackRegistry(new DownstreamRegistry())
   const selector = new SelectorEngine()
   const triggerEngine = new TriggerEngine(storeInstance, registry, selector)
 
@@ -53,7 +53,15 @@ async function buildApp(storeInstance: ISessionStore): Promise<FastifyInstance> 
   instance.register(healthRoutes)
   instance.register(mcpRoutes, { store: storeInstance, registry, triggerEngine })
   await instance.ready()
+
   return instance
+}
+
+const createdRegistries: DownstreamRegistry[] = []
+
+function trackRegistry(registry: DownstreamRegistry): DownstreamRegistry {
+  createdRegistries.push(registry)
+  return registry
 }
 
 let originalApp: FastifyInstance | undefined
@@ -113,6 +121,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await originalApp?.close()
+  for (const registry of createdRegistries) {
+    registry.stop()
+  }
   rmSync(TMP, { recursive: true, force: true })
 })
 

@@ -1,0 +1,68 @@
+{
+  "name": "real_usage_benchmark",
+  "description": "Real MCP benchmark for gateway_search_tools + gateway_call_tool across web search, fetch, FastMCP docs, Context7, Supabase DB, and Cloudflare docs intents.",
+  "scenarios": [
+    {
+      "id": "web-search-intent",
+      "namespace": "research",
+      "prompt": "Search the web for recent MCP session gateway articles",
+      "expectedTools": ["search_web"],
+      "expectedServerIds": ["web-search"],
+      "discoveryQuery": "search the public web for MCP session gateway articles"
+    },
+    {
+      "id": "fetch-intent",
+      "namespace": "research",
+      "prompt": "Fetch the raw README markdown from a project URL",
+      "expectedTools": ["fetch_markdown"],
+      "expectedServerIds": ["fetch-hub"],
+      "discoveryQuery": "fetch markdown README from URL"
+    },
+    {
+      "id": "fastmcp-docs-intent",
+      "namespace": "research",
+      "prompt": "Search FastMCP docs for authentication examples",
+      "expectedTools": ["search_fastmcp_docs"],
+      "expectedServerIds": ["fastmcp-docs"],
+      "discoveryQuery": "FastMCP docs authentication examples",
+      "sessionSteps": [
+        {
+          "prompt": "Search FastMCP docs for authentication examples",
+          "expectedTools": ["search_fastmcp_docs"],
+          "expectedServerIds": ["fastmcp-docs"],
+          "discoveryQuery": "FastMCP docs authentication examples"
+        },
+        {
+          "prompt": "Read the FastMCP authentication page",
+          "expectedTools": ["read_fastmcp_doc"],
+          "expectedServerIds": ["fastmcp-docs"],
+          "discoveryQuery": "read FastMCP authentication documentation page"
+        }
+      ]
+    },
+    {
+      "id": "context7-library-intent",
+      "namespace": "research",
+      "prompt": "Resolve the FastMCP package in Context7 and open the library docs",
+      "expectedTools": ["resolve_library_reference"],
+      "expectedServerIds": ["context7-docs"],
+      "discoveryQuery": "Context7 resolve FastMCP library reference"
+    },
+    {
+      "id": "supabase-db-intent",
+      "namespace": "research",
+      "prompt": "Return the Supabase database tables for the public schema",
+      "expectedTools": ["list_tables"],
+      "expectedServerIds": ["supabase-db"],
+      "discoveryQuery": "Supabase Postgres list tables public schema"
+    },
+    {
+      "id": "cloudflare-docs-intent",
+      "namespace": "research",
+      "prompt": "Search Cloudflare docs for Workers KV limits",
+      "expectedTools": ["search_cloudflare_docs"],
+      "expectedServerIds": ["cloudflare-docs"],
+      "discoveryQuery": "Cloudflare Workers KV limits docs"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "public-smoke",
+  "description": "Deterministic smoke benchmark for the session-aware gateway using fixture MCP servers.",
+  "scenarios": [
+    {
+      "id": "email-search",
+      "namespace": "work",
+      "prompt": "Find emails from the finance team",
+      "expectedTools": ["search_emails"],
+      "expectedServerIds": ["gmail-server"],
+      "discoveryQuery": "email search inbox"
+    },
+    {
+      "id": "docs-search",
+      "namespace": "work",
+      "prompt": "Search the engineering documentation for auth setup",
+      "expectedTools": ["docs_search"],
+      "expectedServerIds": ["docs-server"],
+      "discoveryQuery": "documentation search auth"
+    },
+    {
+      "id": "github-issues",
+      "namespace": "work",
+      "prompt": "List open GitHub issues for the repository",
+      "expectedTools": ["list_issues"],
+      "expectedServerIds": ["github-server"],
+      "discoveryQuery": "github issues list repo"
+    }
+  ]
+}

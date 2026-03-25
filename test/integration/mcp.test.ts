@@ -27,6 +27,7 @@ const AUTH_USER = { Authorization: 'Bearer alice:user' }
 
 let app: FastifyInstance
 let disposeSessionDb: () => void
+let registry: DownstreamRegistry
 
 beforeAll(async () => {
   mkdirSync(TMP, { recursive: true })
@@ -100,7 +101,7 @@ beforeAll(async () => {
     store.stop()
     close()
   }
-  const registry = new DownstreamRegistry()
+  registry = new DownstreamRegistry()
   const selector = new SelectorEngine()
   const triggerEngine = new TriggerEngine(store, registry, selector)
   app = buildServer({ logLevel: 'silent' })
@@ -111,6 +112,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app.close()
+  registry.stop()
   disposeSessionDb()
   rmSync(TMP, { recursive: true, force: true })
 })

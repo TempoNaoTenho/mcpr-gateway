@@ -42,6 +42,7 @@ const AUTH_WRITE_DENIED = { Authorization: 'Bearer bob:write-denied-user' }
 let app: FastifyInstance
 let fakeServer: FakeMcpServer
 let disposeSessionDb: () => void
+let registry: DownstreamRegistry
 
 beforeAll(async () => {
   // FakeMcpServer with a mix of normal tools and a suspicious tool
@@ -133,7 +134,7 @@ beforeAll(async () => {
     store.stop()
     close()
   }
-  const registry = new DownstreamRegistry()
+  registry = new DownstreamRegistry()
   await registry.start(config.servers)
 
   const selector = new SelectorEngine()
@@ -147,6 +148,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app.close()
+  registry.stop()
   disposeSessionDb()
   await fakeServer.close()
   rmSync(TMP, { recursive: true, force: true })
