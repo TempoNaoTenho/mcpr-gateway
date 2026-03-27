@@ -13,6 +13,32 @@
   <section
     class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
   >
+    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Benchmark CLI</h2>
+    <p>
+      Use
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run benchmark -- --help</code>
+      to see the benchmark commands. The canonical flows are
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">smoke</code>,
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">real</code>,
+      and
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">prepare</code>.
+      The CLI auto-loads the repo root
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">.env</code>,
+      resolves
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">CONFIG_PATH</code>
+      and
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">DATABASE_PATH</code>,
+      and can benchmark selected namespaces from the active SQLite config.
+    </p>
+    <p>
+      Example:
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run benchmark -- real --namespaces research,prod --compare-modes default,compat,code</code>
+    </p>
+  </section>
+
+  <section
+    class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
+  >
     <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev</h2>
     <p>
       The admin UI is served by Vite using the same

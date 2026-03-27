@@ -44,6 +44,12 @@
 
 Modes are configured per namespace and can be mixed across different access paths. For instance, you can create a `mcp/dev` with complex tools to be used in code mode or `/mcp/personal` with a small set of tools to be used in default mode for example.
 
+## Demo
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="WebUI Dashboard"/>
+</p>
+
 ---
 
 ## 🏗️ Architecture
@@ -219,6 +225,16 @@ Served at `/ui/` — **SvelteKit 2 + TailwindCSS v4**. Requires admin login when
 | Health-aware ranking   | Automatic                  | Unhealthy servers penalized in tool selection |
 
 ---
+
+### 🔍 Benchmarking
+
+- Current benchmark suite is a work in progress and is not yet ready for production use. Ideally we should compare token usage for discovery tools and complete tool execution cases.
+
+### To-do
+
+- [ ] Create a realistic benchmark suite to compare different modes and downstream servers
+- [ ] Implement Gateway stdio transport
+- [ ] Implement PostgreSQL support
 
 ## 📚 Documentation
 

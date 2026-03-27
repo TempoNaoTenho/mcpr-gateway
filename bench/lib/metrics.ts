@@ -65,6 +65,26 @@ export function summarizeE2E(results: E2ETaskResult[], target: 'gateway' | 'code
   }
 }
 
+export function summarizeReportNamespace(
+  report: BenchmarkReport,
+  namespace: string,
+  target: 'gateway' | 'codeMode' | 'baseline',
+): {
+  retrieval: AggregateMetrics
+  e2e: E2EAggregateMetrics
+} {
+  return {
+    retrieval: summarizeRetrieval(
+      report.retrieval.cases.filter((entry) => entry.namespace === namespace),
+      target,
+    ),
+    e2e: summarizeE2E(
+      report.e2e.cases.filter((entry) => entry.namespace === namespace),
+      target,
+    ),
+  }
+}
+
 export function renderMarkdownReport(report: BenchmarkReport): string {
   const lines: string[] = []
   lines.push(`# Benchmark Report`)

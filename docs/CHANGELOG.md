@@ -9,11 +9,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 - `/admin/namespaces` metrics now estimate MCP `tools/list` token count after initialize, correctly distinguishing between default mode (full catalog) and compat/code modes (two meta-tools)
+- 2026-03-27 - Fixed - Benchmark executor now skips compat-only `gateway_search_tools` flows for namespaces configured in default/code mode instead of aborting mixed-mode real benchmark runs
+- 2026-03-27 - Fixed - Benchmark real-run output now deduplicates requested modes and reports metrics scoped per namespace instead of repeating global aggregates
 
 ### Added
 - `initializeInstructionsTokens` and `firstTurnEstimatedTokens` fields in `/admin/namespaces` metrics response
 - `catalogMetrics` in metrics response: per-downstream catalog token totals and per-tool overrides
 - Exported `buildGatewayInstructions` for use outside the MCP initialize handler, enabling parity between runtime and admin estimates
+- 2026-03-27 - Added - Canonical benchmark CLI via `npm run benchmark -- <smoke|real|prepare>` with repo-root `.env` loading, namespace filters, mode comparison, and preflight checks for Node/native SQLite readiness
+
+### Changed
+- 2026-03-27 - Changed - Benchmark dataset preparation now accepts namespace, server, and tool filters so real benchmarks can target user-defined catalogs instead of hardcoded names only
 
 ---
 

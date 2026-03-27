@@ -61,6 +61,9 @@ export function generateDatasetFromRegistry(
     authHeader?: string
     datasetName?: string
     maxScenariosPerServer?: number
+    namespaces?: string[]
+    serverIds?: string[]
+    toolPattern?: string
   },
 ): { dataset: BenchmarkDataset; diagnostics: Omit<DatasetPreparationDiagnostics, 'config' | 'mcpChecks'> } {
   const scenarios: BenchmarkScenario[] = []
@@ -68,33 +71,46 @@ export function generateDatasetFromRegistry(
   const serverDiagnostics: DatasetPreparationDiagnostics['servers'] = []
   const skippedServers = new Set<string>()
   const maxPerServer = options?.maxScenariosPerServer ?? 2
+  const namespaceFilter = options?.namespaces && options.namespaces.length > 0 ? new Set(options.namespaces) : undefined
+  const serverIdFilter = options?.serverIds && options.serverIds.length > 0 ? new Set(options.serverIds) : undefined
+  const toolRegex = options?.toolPattern ? new RegExp(options.toolPattern, 'i') : undefined
 
   for (const namespace of Object.keys(config.namespaces).sort()) {
+    if (namespaceFilter && !namespaceFilter.has(namespace)) continue
     const groups = registry.getToolsByNamespace(namespace)
+    const filteredGroups = groups
+      .filter((group) => !serverIdFilter || serverIdFilter.has(group.server.id))
+      .map((group) => ({
+        ...group,
+        records: toolRegex
+          ? group.records.filter((record) => toolRegex.test(record.name))
+          : group.records,
+      }))
     namespaceSummaries.push({
       name: namespace,
-      serverCount: groups.length,
-      toolCount: groups.reduce((sum, group) => sum + group.records.length, 0),
+      serverCount: filteredGroups.filter((group) => group.records.length > 0).length,
+      toolCount: filteredGroups.reduce((sum, group) => sum + group.records.length, 0),
     })
 
-    for (const group of groups) {
+    for (const group of filteredGroups) {
       const healthState = registry.getHealthState(group.server.id)
+      const eligibleRecords = group.records
       serverDiagnostics.push({
         serverId: group.server.id,
         transport: group.server.transport,
         namespaces: group.server.namespaces,
         enabled: group.server.enabled,
-        toolCount: group.records.length,
+        toolCount: eligibleRecords.length,
         healthStatus: healthState?.status,
         healthError: healthState?.error,
       })
 
-      if (group.records.length === 0) {
+      if (eligibleRecords.length === 0) {
         skippedServers.add(group.server.id)
         continue
       }
 
-      const selected = selectScenarioTools(group.records, maxPerServer)
+      const selected = selectScenarioTools(eligibleRecords, maxPerServer)
       for (const tool of selected) {
         const scenario = buildScenario(namespace, group.server.id, tool, options?.authHeader)
         if (scenario) scenarios.push(scenario)

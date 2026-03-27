@@ -26,12 +26,43 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 | `test:coverage` | `npm run test:coverage` | Typecheck + lint, then Vitest with v8 coverage |
 | `test:watch` | `npm run test:watch` | Vitest watch mode — skips pretest hook |
 | `verify` | `npm run verify` | Full pre-push suite: `npm ci`, coverage, UI check, production build |
+| `benchmark` | `npm run benchmark -- <command>` | Canonical benchmark CLI (`smoke`, `real`, `prepare`) |
 | `benchmark:smoke` | `npm run benchmark:smoke` | Quick smoke benchmark (single pass) |
+| `benchmark:real` | `npm run benchmark:real -- --namespaces ns1,ns2` | Benchmark the active DB/config using selected namespaces |
 | `benchmark:all` | `npm run benchmark:all` | Full benchmark suite |
 | `docker:build` | `npm run docker:build` | Build multi-stage Docker image |
 | `docker:up` | `npm run docker:up` | Build and start via Docker Compose |
 
 > `pretest` runs `typecheck + lint` automatically before `npm test` and `npm run test:coverage`. Use `test:watch` to skip it during rapid iteration.
+
+### Benchmark CLI
+
+Use the canonical CLI instead of calling files under `bench/` directly:
+
+```bash
+# Show commands and flags
+npm run benchmark -- --help
+
+# Quick fixture smoke pass
+npm run benchmark -- smoke
+
+# Real benchmark against the active SQLite/runtime config
+npm run benchmark -- real --namespaces research,prod
+
+# Prepare dataset + diagnostics only
+npm run benchmark -- prepare --namespaces research --output-dir ./bench/datasets/local
+
+# Prepare and execute immediately with explicit mode comparison
+npm run benchmark -- prepare --namespaces research --compare-modes default,compat,code --run
+```
+
+Behavior:
+
+- The CLI auto-loads repo-root `.env` before resolving `CONFIG_PATH` and `DATABASE_PATH`.
+- `real` requires `--namespaces`; `prepare` can default to all configured namespaces.
+- `--compare-modes` controls which mode summaries are printed. `compat` is only runnable when the namespace is currently configured in compat mode; otherwise it is reported as skipped.
+- `default` summary maps to the benchmark baseline exposure, and `code` maps to the code-mode simulation already used by the benchmark suite.
+- The command fails early on unsupported Node versions or incompatible `better-sqlite3` builds.
 
 ## Project layout
 

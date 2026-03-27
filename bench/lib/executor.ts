@@ -7,6 +7,7 @@ import {
 import { projectWindow } from '../../src/gateway/publish/project.js'
 import { getConfig } from '../../src/config/index.js'
 import type { DownstreamRegistry } from '../../src/registry/registry.js'
+import { GatewayMode } from '../../src/types/enums.js'
 import type {
   BenchmarkScenario,
   E2ETaskResult,
@@ -153,6 +154,54 @@ function reciprocalRank(rank: number | null): number {
 
 const defaultSearchLimit = 20
 
+function resolveConfiguredGatewayMode(namespace: string): GatewayMode {
+  return getConfig().namespaces[namespace]?.gatewayMode ?? GatewayMode.Compat
+}
+
+function buildSkippedGatewayRetrieval(
+  visibleToolCount: number,
+  listCatalogTokens: number,
+): RetrievalStepResult['gateway'] {
+  return {
+    visibleToolCount,
+    totalTokens: listCatalogTokens,
+    listCatalogTokens,
+    searchResponseTokens: 0,
+    matchedTool: undefined,
+    matchedServerId: undefined,
+    rank: null,
+    reciprocalRank: 0,
+    hitAt3: false,
+    hitAt5: false,
+    searchUsed: false,
+    searchMatchCount: 0,
+  }
+}
+
+function buildSkippedGatewayE2E(
+  visibleToolCount: number,
+  listCatalogTokens: number,
+  gatewayMode: GatewayMode,
+  latencyMs: number,
+): E2EStepResult['gateway'] {
+  return {
+    success: false,
+    chosenTool: undefined,
+    chosenServerId: undefined,
+    searchUsed: false,
+    searchCalls: 0,
+    toolCalls: 0,
+    visibleToolCount,
+    listCatalogTokens,
+    searchResponseTokens: 0,
+    proxyCallRequestTokens: 0,
+    proxyCallResponseTokens: 0,
+    totalContextTokens: listCatalogTokens,
+    latencyMs,
+    error: `Skipped compat gateway flow: namespace is configured as ${gatewayMode}`,
+  }
+}
+
 export async function runRetrievalCase(
   client: BenchmarkMcpClient,
   registry: DownstreamRegistry,
@@ -175,6 +224,7 @@ export async function runRetrievalCase(
     if (
       steps.length > 1 &&
       index < steps.length - 1 &&
+      resolveConfiguredGatewayMode(scenario.namespace) === GatewayMode.Compat &&
       result.gateway.matchedTool &&
       result.gateway.matchedServerId
     ) {
@@ -326,20 +376,39 @@ async function evaluateRetrievalStep(
   const visibleTools = await client.toolsList(sessionId)
   const listCatalogTokens = estimateSerializedTokens(visibleTools)
   const codeModeExposure = buildCodeModeExposure(baselineContext.namespace)
+  const gatewayMode = resolveConfiguredGatewayMode(baselineContext.namespace)
 
   const searchQuery = step.discoveryQuery ?? step.prompt
   const limit = step.searchLimit ?? defaultSearchLimit
-  const searchRaw = await client.callTool(sessionId, GATEWAY_SEARCH_TOOL_NAME, {
-    query: searchQuery,
-    limit,
-  })
-  const { matches, payload: searchPayload } = parseSearchResult(searchRaw)
-  const searchResponseTokens = estimateSerializedTokens(searchPayload)
+  let gatewayResult = buildSkippedGatewayRetrieval(visibleTools.length, listCatalogTokens)
+  if (gatewayMode === GatewayMode.Compat) {
+    const searchRaw = await client.callTool(sessionId, GATEWAY_SEARCH_TOOL_NAME, {
+      query: searchQuery,
+      limit,
+    })
+    const { matches, payload: searchPayload } = parseSearchResult(searchRaw)
+    const searchResponseTokens = estimateSerializedTokens(searchPayload)
 
-  const gatewayRank = findRank(matches, step)
-  const gatewayMatchedServerId =
-    gatewayRank.matchedServerId ||
-    resolveServerIdForTool(registry, baselineContext.namespace, gatewayRank.matchedTool, step.expectedServerIds)
+    const gatewayRank = findRank(matches, step)
+    const gatewayMatchedServerId =
+      gatewayRank.matchedServerId ||
+      resolveServerIdForTool(registry, baselineContext.namespace, gatewayRank.matchedTool, step.expectedServerIds)
+
+    gatewayResult = {
+      visibleToolCount: visibleTools.length,
+      totalTokens: listCatalogTokens + searchResponseTokens,
+      listCatalogTokens,
+      searchResponseTokens,
+      matchedTool: gatewayRank.matchedTool,
+      matchedServerId: gatewayMatchedServerId,
+      rank: gatewayRank.rank,
+      reciprocalRank: reciprocalRank(gatewayRank.rank),
+      hitAt3: gatewayRank.rank !== null && gatewayRank.rank <= 3,
+      hitAt5: gatewayRank.rank !== null && gatewayRank.rank <= 5,
+      searchUsed: true,
+      searchMatchCount: matches.length,
+    }
+  }
 
   // Code mode: simulate catalog.search() via local BM25 — same algorithm, avoids isolated-vm execution
   const codeModeProgram = buildCodeModeRetrievalProgram(searchQuery, limit)
@@ -361,20 +430,7 @@ async function evaluateRetrievalStep(
   return {
     prompt: step.prompt,
     expectedTools: step.expectedTools,
-    gateway: {
-      visibleToolCount: visibleTools.length,
-      totalTokens: listCatalogTokens + searchResponseTokens,
-      listCatalogTokens,
-      searchResponseTokens,
-      matchedTool: gatewayRank.matchedTool,
-      matchedServerId: gatewayMatchedServerId,
-      rank: gatewayRank.rank,
-      reciprocalRank: reciprocalRank(gatewayRank.rank),
-      hitAt3: gatewayRank.rank !== null && gatewayRank.rank <= 3,
-      hitAt5: gatewayRank.rank !== null && gatewayRank.rank <= 5,
-      searchUsed: true,
-      searchMatchCount: matches.length,
-    },
+    gateway: gatewayResult,
     codeMode: {
       visibleToolCount: codeModeExposure.tools.length,
       totalTokens: codeModeExposure.totalTokens + codeModeRequestTokens + codeModeResponseTokens,
@@ -415,9 +471,38 @@ async function evaluateE2EStep(
   const visibleTools = await client.toolsList(sessionId)
   const listCatalogTokens = estimateSerializedTokens(visibleTools)
   const codeModeExposure = buildCodeModeExposure(namespace)
+  const gatewayMode = resolveConfiguredGatewayMode(namespace)
 
   const searchQuery = step.discoveryQuery ?? step.prompt
   const limit = step.searchLimit ?? defaultSearchLimit
+  if (gatewayMode !== GatewayMode.Compat) {
+    const codeModeProgram = buildCodeModeE2EProgram(searchQuery, limit, step.expectedTools, step.toolArgs ?? {})
+    const codeModeRequestTokens = estimateSerializedTokens({ code: codeModeProgram })
+    const baselineBlock = await evaluateBaselineE2EBlock(registry, baselineContext, namespace, step)
+    const codeModeResponseTokens = estimateSerializedTokens(
+      baselineBlock.chosenTool ? { success: baselineBlock.success, chosenTool: baselineBlock.chosenTool } : { error: baselineBlock.error },
+    )
+    return {
+      prompt: step.prompt,
+      expectedTools: step.expectedTools,
+      gateway: buildSkippedGatewayE2E(visibleTools.length, listCatalogTokens, gatewayMode, Date.now() - startGateway),
+      codeMode: {
+        success: baselineBlock.success,
+        chosenTool: baselineBlock.chosenTool,
+        chosenServerId: baselineBlock.chosenServerId,
+        toolCalls: 1,
+        visibleToolCount: codeModeExposure.tools.length,
+        listCatalogTokens: codeModeExposure.totalTokens,
+        runCodeRequestTokens: codeModeRequestTokens,
+        runCodeResponseTokens: codeModeResponseTokens,
+        totalContextTokens: codeModeExposure.totalTokens + codeModeRequestTokens + codeModeResponseTokens,
+        latencyMs: Date.now() - startCodeMode,
+        error: baselineBlock.error,
+      },
+      baseline: baselineBlock,
+    }
+  }
+
   let searchRaw: unknown
   try {
     searchRaw = await client.callTool(sessionId, GATEWAY_SEARCH_TOOL_NAME, {
