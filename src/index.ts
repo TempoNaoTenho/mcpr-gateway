@@ -25,6 +25,7 @@ import { SqliteSessionRepository } from './repositories/sessions/sqlite.js'
 import { SqliteAuditRepository } from './repositories/audit/sqlite.js'
 import { SqliteConfigRepository } from './repositories/config/sqlite.js'
 import { SqliteDownstreamAuthRepository } from './repositories/downstreamAuth/sqlite.js'
+import { assertRuntimeSecurityConfig } from './security/runtime-config.js'
 import type { IAuditLogger, ISessionStore } from './types/interfaces.js'
 import type { IAuditRepository } from './repositories/audit/interface.js'
 import type { IConfigRepository } from './repositories/config/interface.js'
@@ -120,6 +121,7 @@ if (!isStdioTransport) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assertSupportedNodeRuntime()
+  assertRuntimeSecurityConfig()
   const configPath = process.env['CONFIG_PATH'] ?? './config'
   initConfig(configPath)
   let config = getConfig()

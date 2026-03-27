@@ -56,6 +56,7 @@ The gateway uses a **two-tier configuration model**:
 - **Override:** set the `CONFIG_PATH` environment variable to an absolute or relative path to that directory (not to the file itself). The gateway loads `CONFIG_PATH/bootstrap.json`.
 
 Docker and compose examples mount `./config` at `/config` and set `CONFIG_PATH=/config`.
+The published compose preset also loads the repo-root `.env` into the container with production-safe defaults.
 
 ## Process environment
 
@@ -153,6 +154,8 @@ UI-managed bearer secrets and downstream OAuth tokens require:
 
 - `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set to a base64-encoded 32-byte key
 
+If `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is present but malformed, the gateway now fails fast during startup instead of silently disabling managed secret storage.
+
 Managed downstream credentials are stored in SQLite separately from `configJson` and encrypted at rest. Downstream auth via `auth.source: env` / `literal` or legacy static `headers` does not use that store. **`SESSION_BACKEND=memory` disables SQLite** — managed downstream secrets cannot be persisted in that mode.
 
 ### OAuth provider allowlist
@@ -204,6 +207,7 @@ In the SQLite case:
 
 - **Client access token**: used by MCP clients on `/mcp/:namespace`
 - **Admin access**: not a Bearer token. When `ADMIN_TOKEN` is set, call `POST /admin/auth/login` with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`, then send the `admin_session` cookie on `/admin/*` (the WebUI does this automatically).
+- When `ADMIN_TOKEN` is set, `GATEWAY_ADMIN_PASSWORD` must be non-empty; startup fails fast if it is missing.
 
 Typical MCP client header:
 

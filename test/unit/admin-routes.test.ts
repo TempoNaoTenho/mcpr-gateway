@@ -131,6 +131,7 @@ function makeToolRecord(
 
 describe('adminRoutes', () => {
   it('GET /admin/auth/config returns username and passwordRequired', async () => {
+    process.env['ADMIN_TOKEN'] = 'secret-token'
     process.env['GATEWAY_ADMIN_USER'] = 'custom-admin'
     process.env['GATEWAY_ADMIN_PASSWORD'] = 'secret'
 
@@ -150,7 +151,7 @@ describe('adminRoutes', () => {
     expect(resNoPw.statusCode).toBe(200)
     expect(JSON.parse(resNoPw.payload)).toEqual({
       username: 'custom-admin',
-      passwordRequired: false,
+      passwordRequired: true,
     })
 
     await app.close()
@@ -178,7 +179,7 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
-  it('treats whitespace-only GATEWAY_ADMIN_PASSWORD as unset', async () => {
+  it('treats whitespace-only GATEWAY_ADMIN_PASSWORD as misconfigured when admin auth is enabled', async () => {
     process.env['ADMIN_TOKEN'] = 'secret-token'
     process.env['GATEWAY_ADMIN_PASSWORD'] = '  \t  '
 
@@ -188,19 +189,19 @@ describe('adminRoutes', () => {
 
     const cfgRes = await app.inject({ method: 'GET', url: '/admin/auth/config' })
     expect(cfgRes.statusCode).toBe(200)
-    expect(JSON.parse(cfgRes.payload)).toMatchObject({ passwordRequired: false })
+    expect(JSON.parse(cfgRes.payload)).toMatchObject({ passwordRequired: true })
 
     const loginRes = await app.inject({
       method: 'POST',
       url: '/admin/auth/login',
       payload: { username: 'mcpgateway', password: '' },
     })
-    expect(loginRes.statusCode).toBe(200)
+    expect(loginRes.statusCode).toBe(503)
 
     await app.close()
   })
 
-  it('allows cookie session with username only when GATEWAY_ADMIN_PASSWORD is unset', async () => {
+  it('rejects login when GATEWAY_ADMIN_PASSWORD is unset and admin auth is enabled', async () => {
     process.env['ADMIN_TOKEN'] = 'secret-token'
     delete process.env['GATEWAY_ADMIN_PASSWORD']
 
@@ -214,16 +215,7 @@ describe('adminRoutes', () => {
       payload: { username: 'mcpgateway', password: '' },
     })
 
-    expect(loginRes.statusCode).toBe(200)
-    const sessionCookie = loginRes.cookies.find((cookie) => cookie.name === 'admin_session')
-    expect(sessionCookie?.value).toBeTruthy()
-
-    const dashboardRes = await app.inject({
-      method: 'GET',
-      url: '/admin/dashboard',
-      cookies: { admin_session: sessionCookie!.value },
-    })
-    expect(dashboardRes.statusCode).toBe(200)
+    expect(loginRes.statusCode).toBe(503)
 
     await app.close()
   })

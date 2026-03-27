@@ -27,8 +27,8 @@
 | Downstream tool editing                              | ✅               | MCP Client Permission Management                | ✅             |
 | Downstream tool token usage counter                  | ✅               | Client Bearer Token Managment                   | ✅             |
 | HTTP-Streamable Support                              | ✅ - All         | Bootstrap file support                          | ✅             |
-| BM25 / lexical ranking                               | ✅ - Compat Mode |
-| Two-tool Low Schema Mode                             | ✅ - Compat Mode |
+| BM25 / lexical ranking                               | ✅ - Compat Mode | Downstream Server Token ENV Support             | ✅             |
+| Two-tool Low Schema Mode                             | ✅ - Compat Mode | Encrypted Downstream Server Token SQL Storage   | ✅             |
 | Performance-focused Sandbox Execution Tool discovery | ✅ - Code Mode   |
 | All Tools Loaded Mode                                | ✅ - Default     |
 | Stdio Support                                        | ❌               |
@@ -36,11 +36,13 @@
 
 ## Operating Modes
 
-| Mode        | Tool Window                                                | Best For                                              |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------------------- |
-| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Programmatic multi-tool orchestration in a JS sandbox |
-| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage                |
-| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets                    |
+| Mode        | Tool Window                                                | Best For                               |
+| ----------- | ---------------------------------------------------------- | -------------------------------------- |
+| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Auto orchestration in a JS sandbox     |
+| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage |
+| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets     |
+
+**Go to [Benchmarking](#-benchmarking) for current token-usage comparison details.**
 
 Modes are configured per namespace and can be mixed across different access paths. For instance, you can create a `mcp/dev` with complex tools to be used in code mode or `/mcp/personal` with a small set of tools to be used in default mode for example.
 
@@ -99,19 +101,48 @@ flowchart LR
 
 ## ⚡ Quick Setup
 
-### 1. Start the gateway
+### 1. Install and configure
 
 ```bash
-# Clone and set up interactively (.env + bootstrap.json)
+node --version   # must be 22.x or 24.x LTS
 git clone <repo-url> mcpr-gateway && cd mcpr-gateway
-npm run setup
-npm run dev        # UI on PORT, gateway on PORT+1
+npm ci && npm run setup   # install deps, then guided security config
+npm run dev               # UI on PORT, gateway API on PORT+1
 ```
 
+`npm run setup` asks for the security-critical variables and the admin username, and skips anything already configured — safe to re-run.
+
+> **Manual / scripted alternative** — skip the interactive prompt:
+>
+> ```bash
+> cp .env.example .env
+> # Edit .env and set the required security vars:
+> #   ADMIN_TOKEN=<any-non-empty-string>
+> #   GATEWAY_ADMIN_USER=<your-admin-user>
+> #   GATEWAY_ADMIN_PASSWORD=<your-password>
+> #   DOWNSTREAM_AUTH_ENCRYPTION_KEY=$(openssl rand -base64 32)
+> npm run dev
+> ```
+
+#### Minimum security variables
+
+| Variable                         | Purpose                                         | Required                                |
+| -------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| `ADMIN_TOKEN`                    | Enables authentication on all `/admin/*` routes | Yes                                     |
+| `GATEWAY_ADMIN_USER`             | Username typed at `/ui/` login                  | Yes for production                      |
+| `GATEWAY_ADMIN_PASSWORD`         | Password typed at `/ui/` login                  | Yes                                     |
+| `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | AES-256 key for downstream credentials at rest  | Required for managed downstream secrets |
+
+Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it.
+
+> For advanced configuration of all env vars run `npm run setup -- --advanced`.
+
 ```bash
-# Or with Docker Compose
-docker compose -f docker/docker-compose.yml up
+# Or with Docker Compose (loads ../.env, serves UI + MCP on :3000)
+docker compose -f docker/docker-compose.yml up --build
 ```
+
+The published Docker preset expects `.env` to exist and uses `NODE_ENV=production`. If `ADMIN_TOKEN` is set without `GATEWAY_ADMIN_PASSWORD`, or if `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is malformed, the container exits on startup with a clear error.
 
 ### 2. Connect an MCP client
 
@@ -124,7 +155,7 @@ Issue a **client Bearer token** from the Access Control panel at `/ui/access` (o
   "mcpServers": {
     "mcpr-gateway": {
       "type": "http",
-      "url": "http://localhost:3001/mcp/default",
+      "url": "http://localhost:3000/mcp/<namespace_name>",
       "headers": { "Authorization": "Bearer <your-token>" }
     }
   }
@@ -136,7 +167,7 @@ Issue a **client Bearer token** from the Access Control panel at `/ui/access` (o
 ```toml
 [mcp_servers.mcpr-gateway]
 type = "http"
-url  = "http://localhost:3001/mcp/default"
+url  = "http://localhost:3000/mcp/<namespace_name>"
 bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 ```
 
@@ -230,7 +261,36 @@ Served at `/ui/` — **SvelteKit 2 + TailwindCSS v4**. Requires admin login when
 
 - Current benchmark suite is a work in progress and is not yet ready for production use. Ideally we should compare token usage for discovery tools and complete tool execution cases.
 
-### To-do
+#### Benchmark results
+
+**Scenario: native benchmark**
+
+```bash
+export BENCH_AUTH_HEADER="Bearer key"
+npm run benchmark -- real --namespaces name_space1, name_space_2, ...
+```
+
+`~10 common dev mcp servers` with `~30 tools total` (context7, tavily, supabase, etc)
+
+| Configured Mode | Executed Mode | Retrieval Recall@3 | MRR | E2E Success | Avg Context |
+| --------------- | ------------- | ------------------ | --- | ----------- | ----------- |
+| code            | code          | 1                  | 1   | 1           | 654.2       |
+| code            | default       | 1                  | 1   | 1           | 9200.6      |
+| compat          | compat        | 0                  | 0   | 0           | 3883        |
+| compat          | default       | 1                  | 1   | 1           | 9155.2      |
+| compat          | code          | 1                  | 1   | 1           | 654.2       |
+| default         | default       | 1                  | 1   | 1           | 9162.8      |
+| default         | code          | 1                  | 1   | 1           | 654.2       |
+
+**Scenario: real-usage on MCP Client**
+
+| Mode                 | Total full execution tokens (approx.) | Approx. wall time                                                                                |
+| -------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| mcpr-gateway-code    | ~15,600                               | ~16 s (sandbox reported 13,875 ms inside the main run)                                           |
+| mcpr-gateway-compat  | ~32,000–38,000                        | ~35–50 s (many steps; gateway_search_tools answers are very large, often repeating long schemas) |
+| mcpr-gateway-default | ~14,500–15,500                        | ~20–30 s (six direct tool calls, no compat search preamble)                                      |
+
+### 📝 To-do
 
 - [ ] Create a realistic benchmark suite to compare different modes and downstream servers
 - [ ] Implement Gateway stdio transport

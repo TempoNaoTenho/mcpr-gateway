@@ -23,6 +23,8 @@ npm run setup
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
+For Docker Compose, the repo-root `.env` is part of the runtime contract: the compose file loads it into the container and assumes `NODE_ENV=production`.
+
 **Advanced:** copy a bootstrap template manually:
 
 ```bash
@@ -54,6 +56,12 @@ Defaults:
 - **Port:** `3000` (`PORT`) — with `npm run dev`, the **UI** uses this port and the **gateway** uses `PORT + 1`
 
 Full list of process environment variables: [Configuration — Process environment](CONFIGURATION.md#process-environment).
+
+**Docker runtime** — bundled UI and MCP share the same port (`PORT`, default `3000`):
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
 
 ## MCP over HTTP
 

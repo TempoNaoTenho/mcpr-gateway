@@ -6,7 +6,7 @@ The [Dockerfile](../docker/Dockerfile) is multi-stage:
 
 1. Builds the Svelte UI into `ui/build` (published in the image as `ui/dist` beside the server).
 2. Builds the TypeScript gateway to `dist/` via `npm run build:gateway` (UI is built in the previous stage only).
-3. Runtime image: `node:24-alpine`, `npm ci --omit=dev`, `CONFIG_PATH=/config`, exposes **3000**.
+3. Runtime image: `node:24-alpine`, installs native build prerequisites (`python3`, `make`, `g++`) for modules such as `better-sqlite3`, runs `npm ci --omit=dev`, sets `CONFIG_PATH=/config`, and exposes **3000**.
 
 Runtime requirement for `code` mode:
 
@@ -27,6 +27,7 @@ npm run docker:build
 
 - `../config` → `/config` (**read-only**)
 - `../data` → `/app/data` for SQLite
+- `../.env` → container environment via `env_file`
 
 Typical environment:
 
@@ -39,8 +40,11 @@ Typical environment:
 | `DATABASE_PATH`   | `/app/data/gateway.db`  | SQLite file when not using `memory`                                                              |
 | `UI_STATIC_DIR`   | `/app/ui/dist`          | Ensures the UI is found in the image layout                                                      |
 | `ADMIN_TOKEN`     | _(any non-empty value)_ | Enables admin protection for `/admin/*` when set (not the login password; use `GATEWAY_ADMIN_*`) |
+| `GATEWAY_ADMIN_USER` | `mcpgateway` or custom | Admin username for `/admin/auth/login`; set an explicit value before publishing |
+| `GATEWAY_ADMIN_PASSWORD` | _(non-empty secret)_ | Required when `ADMIN_TOKEN` is set; startup fails fast if omitted |
+| `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | `openssl rand -base64 32` | Required for managed downstream bearer/OAuth secrets; malformed values fail fast |
 
-Run from repo root (`npm run setup` is optional; compose can mount an empty config dir if you rely on defaults only):
+Run from repo root (`npm run setup` prepares `.env`; compose now depends on that file for container env):
 
 ```bash
 npm run docker:up
@@ -61,7 +65,7 @@ Implications:
 
 When admin routes are mounted **and** `ADMIN_TOKEN` is **unset**, `requireAdminAuth` does not add middleware: **admin endpoints are not protected by the gateway**. Rely on network policy or set `ADMIN_TOKEN` and sign in via `/admin/auth/login` (cookie).
 
-When `ADMIN_TOKEN` **is** set, admin users must complete `POST /admin/auth/login` with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` and send the resulting `admin_session` cookie on further `/admin/*` requests.
+When `ADMIN_TOKEN` **is** set, admin users must complete `POST /admin/auth/login` with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` and send the resulting `admin_session` cookie on further `/admin/*` requests. The gateway fails fast during startup if `ADMIN_TOKEN` is set without a non-empty `GATEWAY_ADMIN_PASSWORD`.
 
 ## Configuration file in containers
 
@@ -70,7 +74,7 @@ Compose uses `CONFIG_PATH=/config` and a read-only mount. Keep secrets out of gi
 Typical production flow:
 
 1. Copy `config/bootstrap.example.json` to `config/bootstrap.json` (or run `npm run setup`)
-2. Set `ADMIN_TOKEN` (any non-empty value) in the container environment to require admin login, and set `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` as needed
+2. Set `ADMIN_TOKEN`, `GATEWAY_ADMIN_USER`, and `GATEWAY_ADMIN_PASSWORD` in `.env` before starting the container
 3. Create or manage client access tokens from the Access Control panel (or use `${...}` interpolation in `bootstrap.json` for bootstrap-only secrets)
 4. Have MCP clients authenticate with `Authorization: Bearer <client-access-token>`
 
@@ -98,6 +102,7 @@ With SQLite, copy the database file while the process is stopped or use a filesy
 - [ ] `ADMIN_TOKEN` set to a non-empty, secret value — enables admin route protection
 - [ ] `GATEWAY_ADMIN_USER` and `GATEWAY_ADMIN_PASSWORD` set — credentials for `/admin/auth/login`
 - [ ] `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set if using managed downstream credentials (base64-encoded 32-byte key)
+- [ ] `docker compose ... config` shows `env_file: ../.env` and port `3000` only — bundled UI and MCP share the same runtime port
 - [ ] `DATABASE_PATH` mapped to a persistent volume (`/app/data/gateway.db` in Compose default)
 - [ ] Config volume (`/config`) mounted read-only — safe with SQLite-backed deployments
 - [ ] TLS terminated by reverse proxy (nginx, Traefik, Caddy) before the container — gateway speaks HTTP only

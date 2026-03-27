@@ -143,6 +143,8 @@ function mask(value: string, secret: boolean | undefined): string {
 }
 
 async function main(): Promise<void> {
+  const isAdvanced = process.argv.includes('--advanced')
+
   console.log('')
   console.log('MCPR Gateway — Setup')
   console.log('═══════════════════════════')
@@ -177,22 +179,23 @@ async function main(): Promise<void> {
   let envContent = readFileSync(envPath, 'utf8')
   let vars = readDotEnvFile(envPath)
 
-  const port = Number(vars['PORT'] ?? process.env['PORT'] ?? 3000)
-  const host = (vars['HOST'] ?? process.env['HOST'] ?? '127.0.0.1').trim() || '127.0.0.1'
-
-  console.log('Checking ports used by full-stack dev (npm run dev)…')
-  if (Number.isFinite(port) && port >= 1 && port <= 65534) {
-    await checkPort(host, port, 'Vite / UI')
-    await checkPort(host, port + 1, 'API gateway (PORT+1)')
-  } else {
-    console.warn('  PORT in .env is not valid; skipped port checks.')
+  // Returns true if the key has a non-empty value in .env OR in process.env.
+  // process.env takes priority in Docker/system deployments.
+  function isAlreadySet(key: string): boolean {
+    return (vars[key] ?? '').trim() !== '' || (process.env[key] ?? '').trim() !== ''
   }
-  console.log('')
+
+  // Describes where the value comes from (for display only).
+  function configuredIn(key: string): string {
+    if ((vars[key] ?? '').trim() !== '') return '(in .env)'
+    if ((process.env[key] ?? '').trim() !== '') return '(in environment — will not write to .env)'
+    return ''
+  }
 
   const sessionBackend = (vars['SESSION_BACKEND'] ?? '').trim()
   if (sessionBackend === 'memory') {
-    console.log('SESSION_BACKEND=memory: no SQLite file; admin saves go to bootstrap.json;')
-    console.log('no config versions, no SQLite audit table, no persisted downstream secrets.')
+    console.log('SESSION_BACKEND=memory: no SQLite file; admin saves go to bootstrap.json.')
+    console.log('No config versions, no SQLite audit table, no persisted downstream secrets.')
   } else {
     const db = resolveDbPath(vars)
     if (db) {
@@ -210,11 +213,102 @@ async function main(): Promise<void> {
   }
   console.log('')
 
-  const edit = (await ask('Edit .env values interactively now? [Y/n] ')).trim().toLowerCase()
-  if (edit !== 'n') {
+  const port = Number(vars['PORT'] ?? process.env['PORT'] ?? 3000)
+  const host = (vars['HOST'] ?? process.env['HOST'] ?? '127.0.0.1').trim() || '127.0.0.1'
+
+  console.log('Checking ports used by full-stack dev (npm run dev)…')
+  if (Number.isFinite(port) && port >= 1 && port <= 65534) {
+    await checkPort(host, port, 'Vite / UI')
+    await checkPort(host, port + 1, 'API gateway (PORT+1)')
+  } else {
+    console.warn('  PORT in .env is not valid; skipped port checks.')
+  }
+  console.log('')
+
+  // ─── Essential configuration (3 steps) ─────────────────────────────────────
+
+  console.log('Security setup (3 steps)')
+  console.log('────────────────────────')
+  console.log('')
+
+  const patches: Record<string, string | null | undefined> = {}
+
+  // STEP 1 — Admin panel password
+  const KEY_PW = 'GATEWAY_ADMIN_PASSWORD'
+  if (isAlreadySet(KEY_PW)) {
+    console.log(`  [1/3] ${KEY_PW}  ✓ already configured ${configuredIn(KEY_PW)}`)
+  } else {
+    console.log(`  [1/3] ${KEY_PW}`)
+    console.log('        Password you will type to log into the /admin panel.')
+    console.log('')
+    let pw = ''
+    while (pw === '') {
+      pw = (await ask('        Enter admin password (required): ')).trim()
+      if (pw === '') console.log('        Password cannot be empty.')
+    }
+    patches[KEY_PW] = pw
+    console.log('        Set. ✓')
+  }
+  console.log('')
+
+  // STEP 2 — Admin token (security enabler, not a user-facing credential)
+  const KEY_AT = 'ADMIN_TOKEN'
+  if (isAlreadySet(KEY_AT)) {
+    console.log(`  [2/3] ${KEY_AT}  ✓ already configured ${configuredIn(KEY_AT)}`)
+  } else {
+    const generated = randomBytes(24).toString('base64url')
+    console.log(`  [2/3] ${KEY_AT}`)
+    console.log('        Enables authentication on /admin routes.')
+    console.log('        This is not the login password — it is an internal gateway secret.')
+    console.log('')
+    const ans = (
+      await ask('        Press Enter to use auto-generated token, or paste your own: ')
+    ).trim()
+    patches[KEY_AT] = ans === '' ? generated : ans
+    console.log('        Set. ✓')
+  }
+  console.log('')
+
+  // STEP 3 — Downstream auth encryption key
+  const KEY_EK = 'DOWNSTREAM_AUTH_ENCRYPTION_KEY'
+  if (isAlreadySet(KEY_EK)) {
+    console.log(`  [3/3] ${KEY_EK}  ✓ already configured ${configuredIn(KEY_EK)}`)
+  } else {
+    const generated = randomBytes(32).toString('base64')
+    console.log(`  [3/3] ${KEY_EK}`)
+    console.log('        Encrypts downstream bearer/OAuth credentials stored in SQLite.')
+    console.log('        Without this key, managed downstream secrets cannot be saved.')
+    console.log('')
+    const ans = (
+      await ask(
+        '        Press Enter to auto-generate (recommended), or paste your own base64-32-byte key: ',
+      )
+    ).trim()
+    patches[KEY_EK] = ans === '' ? generated : ans
+    console.log('        Set. ✓')
+  }
+  console.log('')
+
+  // Write essential patches
+  const hasPatches = Object.values(patches).some((v) => v !== undefined)
+  if (hasPatches) {
+    envContent = applyEnvPatches(envContent, patches)
+    writeFileSync(envPath, envContent, 'utf8')
+    vars = readDotEnvFile(envPath)
+    console.log('Updated .env')
+  } else {
+    console.log('No changes to .env — all essential vars already configured.')
+  }
+  console.log('')
+
+  // ─── Advanced mode (all ENV_FIELDS) ────────────────────────────────────────
+
+  if (isAdvanced) {
+    console.log('Advanced configuration')
+    console.log('──────────────────────')
     console.log('Enter new value, or Enter to keep. Secrets: "g" = generate. "-" = remove key line.')
     console.log('')
-    const patches: Record<string, string | null | undefined> = {}
+    const advancedPatches: Record<string, string | null | undefined> = {}
 
     for (const field of ENV_FIELDS) {
       const cur = vars[field.key] ?? ''
@@ -230,15 +324,15 @@ async function main(): Promise<void> {
       const ans = line.trim()
       if (ans === '') continue
       if (ans === '-') {
-        patches[field.key] = null
+        advancedPatches[field.key] = null
         continue
       }
       if (ans.toLowerCase() === 'g' && field.generate === 'adminToken') {
-        patches[field.key] = randomBytes(24).toString('base64url')
+        advancedPatches[field.key] = randomBytes(24).toString('base64url')
         continue
       }
       if (ans.toLowerCase() === 'g' && field.generate === 'encryptionKey') {
-        patches[field.key] = randomBytes(32).toString('base64')
+        advancedPatches[field.key] = randomBytes(32).toString('base64')
         continue
       }
       if (field.key === 'PORT') {
@@ -248,19 +342,22 @@ async function main(): Promise<void> {
           continue
         }
       }
-      patches[field.key] = ans
+      advancedPatches[field.key] = ans
     }
 
-    if (Object.keys(patches).length > 0) {
-      envContent = applyEnvPatches(envContent, patches)
+    if (Object.keys(advancedPatches).length > 0) {
+      envContent = applyEnvPatches(envContent, advancedPatches)
       writeFileSync(envPath, envContent, 'utf8')
       vars = readDotEnvFile(envPath)
       console.log('')
-      console.log('Updated .env')
+      console.log('Updated .env (advanced)')
     } else {
       console.log('')
-      console.log('No changes to .env')
+      console.log('No changes to .env (advanced)')
     }
+    console.log('')
+  } else {
+    console.log('Tip: run `npm run setup -- --advanced` to configure all environment variables.')
     console.log('')
   }
 

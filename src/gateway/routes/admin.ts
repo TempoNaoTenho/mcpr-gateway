@@ -35,6 +35,9 @@ import { getConfig } from '../../config/index.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { generateToolcards } from '../../toolcard/index.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
+import {
+  getGatewayAdminUserFromEnv,
+} from '../../security/runtime-config.js'
 import { buildGatewayInstructions } from '../dispatch/initialize.js'
 import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { toolCandidateKey } from '../../candidate/lexical.js'
@@ -666,11 +669,8 @@ function revokeAdminSession(sessionId: string | undefined): void {
   adminSessions.delete(sessionId)
 }
 
-const DEFAULT_GATEWAY_ADMIN_USER = 'mcpgateway'
-
 function getGatewayAdminUser(): string {
-  const trimmed = process.env['GATEWAY_ADMIN_USER']?.trim()
-  return trimmed || DEFAULT_GATEWAY_ADMIN_USER
+  return getGatewayAdminUserFromEnv(process.env)
 }
 
 function getGatewayAdminPassword(): string | undefined {
@@ -764,7 +764,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
   app.get('/admin/auth/config', async (_request, reply) => {
     return reply.send({
       username: getGatewayAdminUser(),
-      passwordRequired: Boolean(getGatewayAdminPassword()),
+      passwordRequired: Boolean(process.env['ADMIN_TOKEN']),
     })
   })
 
@@ -802,11 +802,15 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       const username = body?.username?.trim()
       const password = (body?.password ?? '').trim()
 
+      if (!adminPasswordEnv) {
+        return reply.status(503).send({ error: 'Admin authentication is misconfigured' })
+      }
+
       if (username !== expectedUser) {
         return reply.status(401).send({ error: 'Invalid credentials' })
       }
 
-      if (adminPasswordEnv && password !== adminPasswordEnv) {
+      if (password !== adminPasswordEnv) {
         return reply.status(401).send({ error: 'Invalid credentials' })
       }
 

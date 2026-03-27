@@ -11,15 +11,31 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: mcpr-gateway:local
+    restart: unless-stopped
+    env_file:
+      - ../.env
     ports:
       - '3000:3000'
     volumes:
       - ../config:/config:ro
       - ../data:/app/data # SQLite persistence — backup: cp data/gateway.db data/gateway.db.bak
     environment:
+      NODE_ENV: production
       HOST: 0.0.0.0
+      PORT: 3000
+      CONFIG_PATH: /config
       LOG_LEVEL: info
       DATABASE_PATH: /app/data/gateway.db
       UI_STATIC_DIR: /app/ui/dist
-      # ADMIN_TOKEN: "1"   # any non-empty value: require admin login (GATEWAY_ADMIN_USER / GATEWAY_ADMIN_PASSWORD)
-      # Define any env vars referenced by ${VAR} in bootstrap.json (if present)
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s

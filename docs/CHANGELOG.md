@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- 2026-03-27 - Fixed - Docker Compose now loads the repo-root `.env`, sets production-safe runtime defaults, exposes the bundled UI and MCP on port 3000, and adds a healthcheck for publish-ready installs
+- 2026-03-27 - Fixed - Docker image now installs Alpine native build prerequisites so production builds can compile `better-sqlite3` and other native modules when no prebuilt binary is available
 - `/admin/namespaces` metrics now estimate MCP `tools/list` token count after initialize, correctly distinguishing between default mode (full catalog) and compat/code modes (two meta-tools)
 - 2026-03-27 - Fixed - Benchmark executor now skips compat-only `gateway_search_tools` flows for namespaces configured in default/code mode instead of aborting mixed-mode real benchmark runs
 - 2026-03-27 - Fixed - Benchmark real-run output now deduplicates requested modes and reports metrics scoped per namespace instead of repeating global aggregates
@@ -19,6 +21,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 2026-03-27 - Added - Canonical benchmark CLI via `npm run benchmark -- <smoke|real|prepare>` with repo-root `.env` loading, namespace filters, mode comparison, and preflight checks for Node/native SQLite readiness
 
 ### Changed
+- 2026-03-27 - Changed - Startup now fails fast when `ADMIN_TOKEN` is set without `GATEWAY_ADMIN_PASSWORD`, and when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is present but not a valid base64 32-byte key
+- 2026-03-27 - Changed - Docker and security docs now distinguish dev `PORT + 1` behavior from the single-port Docker runtime and require explicit admin credentials for production
 - 2026-03-27 - Changed - Benchmark dataset preparation now accepts namespace, server, and tool filters so real benchmarks can target user-defined catalogs instead of hardcoded names only
 
 ---
