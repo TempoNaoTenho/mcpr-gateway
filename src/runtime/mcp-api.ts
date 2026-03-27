@@ -49,7 +49,6 @@ export class McpRuntimeApi {
       while (true) {
         const index = this.currentIndex++
         if (index >= calls.length) break
-        this.toolCallCount++
         results[index] = await this.call(calls[index].handle, calls[index].args ?? {})
       }
     }

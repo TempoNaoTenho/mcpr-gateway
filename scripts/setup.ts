@@ -144,13 +144,15 @@ function mask(value: string, secret: boolean | undefined): string {
 
 async function main(): Promise<void> {
   console.log('')
-  console.log('MCP Session Gateway — Setup')
+  console.log('MCPR Gateway — Setup')
   console.log('═══════════════════════════')
   console.log('')
 
   const nodeMajor = Number(process.versions.node.split('.')[0])
-  if (!Number.isFinite(nodeMajor) || nodeMajor < 20) {
-    console.error('Node.js 20 or newer is required (see package.json engines).')
+  if (!Number.isFinite(nodeMajor) || nodeMajor < 22 || nodeMajor >= 25 || nodeMajor % 2 === 1) {
+    console.error(
+      `Node.js 22 or 24 LTS is required for isolated-vm stability. Current runtime: ${process.versions.node}.`
+    )
     process.exit(1)
   }
 

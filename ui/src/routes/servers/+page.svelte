@@ -830,7 +830,7 @@
 </script>
 
 <svelte:head>
-  <title>Servers — MCP Gateway</title>
+  <title>Servers — MCPR Gateway</title>
 </svelte:head>
 
 

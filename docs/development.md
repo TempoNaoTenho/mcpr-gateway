@@ -5,7 +5,7 @@
 | Script                       | Command                         | Purpose                             |
 | ---------------------------- | ------------------------------- | ----------------------------------- |
 | `dev`                        | `node scripts/dev-all.mjs`      | Full-stack: Vite on `PORT`, gateway on `PORT+1` |
-| `dev:gateway`                | `tsx watch src/index.ts`        | Hot-reload gateway only             |
+| `dev:gateway`                | `node scripts/dev-gateway.mjs`  | Hot-reload gateway only             |
 | `build`                      | `build:ui` then `build:gateway` | UI + production bundle to `dist/`   |
 | `build:gateway`              | `tsup`                          | Gateway bundle to `dist/` only      |
 | `typecheck`                  | `tsc --noEmit`                  | Type-check                          |

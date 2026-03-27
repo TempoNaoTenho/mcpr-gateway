@@ -7,6 +7,8 @@ export type McpHandlerContext = {
   authorization?: string
   requestId: string
   log?: FastifyBaseLogger
+  /** Streamable HTTP: MCP-Protocol-Version request header when present */
+  mcpProtocolVersionHeader?: string
   /** HTTP transport: maps to Mcp-Tools-Changed when the session opts into listChanged */
   setToolsListChangedHeader?: (toolsChanged: boolean) => void
 }
@@ -26,12 +28,16 @@ export function mcpContextFromFastifyRequest(
       }
     : undefined
 
+  const protoHdr = request.headers['mcp-protocol-version']
+  const mcpProtocolVersionHeader = typeof protoHdr === 'string' ? protoHdr : undefined
+
   return {
     namespace: (request.params as { namespace: string }).namespace,
     sessionId: options.sessionId ?? headerSession,
     authorization: typeof request.headers.authorization === 'string' ? request.headers.authorization : undefined,
     requestId: String(request.id),
     log: request.log,
+    mcpProtocolVersionHeader,
     setToolsListChangedHeader,
   }
 }

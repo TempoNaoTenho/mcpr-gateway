@@ -20,6 +20,7 @@ import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
 import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
+import { negotiateMcpProtocolVersion } from '../mcp-protocol-version.js'
 
 function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): string | undefined {
   switch (mode) {
@@ -28,10 +29,10 @@ function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): strin
         serverIds.length > 0
           ? ` Available servers: [${serverIds.map((id) => `"${id}"`).join(', ')}].`
           : ''
-      return `Gateway in compatibility mode. Discover available tools with gateway_search_tools, then invoke them with gateway_call_tool. Do not attempt to call upstream tools directly.${serverList}`
+      return `Gateway in compatibility mode. Discover available tools with gateway_search_tools, then invoke them with gateway_call_tool using the exact name and serverId returned by the search result. Do not guess aliases, historical names, or call upstream tools directly.${serverList}`
     }
     case GatewayMode.Code:
-      return 'Gateway in code mode. Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.search(query), catalog.list(), mcp.call(handle, args), mcp.batch([{handle, args}]), result.limit(n), result.pick(fields), artifacts.save(name, content). Call gateway_help for full API reference.'
+      return 'Gateway in code mode. Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.search(query, { k | limit, serverId, requiredArgs }), catalog.list({ serverId, requiredArgs }), catalog.describe(handle, { detail }), mcp.call(handle, args), mcp.batch([{handle, args}]), result.limit(array, n), result.items(value), result.text(value), result.pick(fields), artifacts.save(data, { label }). Handles returned by catalog.* are session-scoped and should be used from the current execution only. `detail: "signature"` includes required args plus short field metadata. For batch calls, prefer handles filtered by requiredArgs, inspect them with catalog.describe(), and check the result count before indexing tools[1]. The `result` global is reserved, `result.limit()` expects an array such as `out.content`, and returned values should be serializable. Call gateway_help for full API reference.'
     default:
       return undefined
   }
@@ -56,13 +57,14 @@ export async function handleInitialize(
   store: ISessionStore,
   registry: DownstreamRegistry,
   auditLogger?: IAuditLogger,
-): Promise<{ id: string; result: unknown }> {
+): Promise<{ id: string; negotiatedProtocolVersion: string; result: unknown }> {
   const startMs = Date.now()
   const config = getConfig()
   const identity = resolveIdentity(ctx.authorization, config.auth)
   const namespace = ctx.namespace
   const requestedMode = (body.params?.mode as Mode | undefined) ?? Mode.Read
   const initialIntentText = normalizeInitializeIntent(body.params)
+  const negotiatedProtocolVersion = negotiateMcpProtocolVersion(body.params?.protocolVersion)
 
   const decision = resolvePolicy(identity, namespace, requestedMode, config)
   if (!decision.allowed) {
@@ -172,6 +174,7 @@ export async function handleInitialize(
     },
     pendingToolListChange: false,
     clientCapabilities: { supportsToolListChanged },
+    mcpProtocolVersion: negotiatedProtocolVersion,
   }
 
   await store.set(sessionId, session)
@@ -208,18 +211,19 @@ export async function handleInitialize(
 
   return {
     id: sessionId,
+    negotiatedProtocolVersion,
     result: {
       jsonrpc: '2.0',
       id: body.id,
       result: {
-        protocolVersion: '2024-11-05',
+        protocolVersion: negotiatedProtocolVersion,
         capabilities: {
           tools: {
             listChanged: true,
           },
         },
         serverInfo: {
-          name: 'mcp-session-gateway',
+          name: 'mcpr-gateway',
           version: '0.1.0',
         },
         ...(instructions !== undefined && { instructions }),

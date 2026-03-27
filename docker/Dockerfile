@@ -2,7 +2,7 @@
 #   docker build -f docker/Dockerfile .
 #
 # ── Stage 1: build UI ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS ui-builder
+FROM node:24-alpine AS ui-builder
 
 WORKDIR /app/ui
 
@@ -15,7 +15,7 @@ COPY src/lib/ /app/src/lib/
 RUN npm run build
 
 # ── Stage 2: build backend ────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ COPY . .
 RUN npm run build:gateway
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -42,4 +42,4 @@ ENV CONFIG_PATH=/config
 
 VOLUME ["/config"]
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--no-node-snapshot", "dist/index.js"]

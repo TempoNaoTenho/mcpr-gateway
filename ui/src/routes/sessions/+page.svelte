@@ -74,7 +74,7 @@
 </script>
 
 <svelte:head>
-  <title>Sessions — MCP Gateway</title>
+  <title>Sessions — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-5">

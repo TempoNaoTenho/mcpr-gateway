@@ -6,7 +6,13 @@ The [Dockerfile](../docker/Dockerfile) is multi-stage:
 
 1. Builds the Svelte UI into `ui/build` (published in the image as `ui/dist` beside the server).
 2. Builds the TypeScript gateway to `dist/` via `npm run build:gateway` (UI is built in the previous stage only).
-3. Runtime image: `node:20-alpine`, `npm ci --omit=dev`, `CONFIG_PATH=/config`, exposes **3000**.
+3. Runtime image: `node:24-alpine`, `npm ci --omit=dev`, `CONFIG_PATH=/config`, exposes **3000**.
+
+Runtime requirement for `code` mode:
+
+- use **Node 22 or 24 LTS**
+- avoid odd-numbered releases such as **25**
+- start Node with `--no-node-snapshot` when `isolated-vm` is enabled
 
 Build from repository root:
 
@@ -24,14 +30,14 @@ npm run docker:build
 
 Typical environment:
 
-| Variable          | Example                | Purpose                                                           |
-| ----------------- | ---------------------- | ----------------------------------------------------------------- |
-| `HOST`            | `0.0.0.0`              | Bind address inside container                                     |
-| `LOG_LEVEL`       | `info`                 | Pino log level                                                    |
-| `SESSION_BACKEND` | _(omit)_               | Default: SQLite-backed persistence (`DATABASE_PATH`)              |
-| `SESSION_BACKEND` | `memory`               | In-process sessions only; admin config writes to `bootstrap.json` |
-| `DATABASE_PATH`   | `/app/data/gateway.db` | SQLite file when not using `memory`                               |
-| `UI_STATIC_DIR`   | `/app/ui/dist`         | Ensures the UI is found in the image layout                       |
+| Variable          | Example                 | Purpose                                                                                          |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `HOST`            | `0.0.0.0`               | Bind address inside container                                                                    |
+| `LOG_LEVEL`       | `info`                  | Pino log level                                                                                   |
+| `SESSION_BACKEND` | _(omit)_                | Default: SQLite-backed persistence (`DATABASE_PATH`)                                             |
+| `SESSION_BACKEND` | `memory`                | In-process sessions only; admin config writes to `bootstrap.json`                                |
+| `DATABASE_PATH`   | `/app/data/gateway.db`  | SQLite file when not using `memory`                                                              |
+| `UI_STATIC_DIR`   | `/app/ui/dist`          | Ensures the UI is found in the image layout                                                      |
 | `ADMIN_TOKEN`     | _(any non-empty value)_ | Enables admin protection for `/admin/*` when set (not the login password; use `GATEWAY_ADMIN_*`) |
 
 Run from repo root (`npm run setup` is optional; compose can mount an empty config dir if you rely on defaults only):
@@ -73,6 +79,12 @@ Bootstrap policy and auth still load from `CONFIG_PATH/bootstrap.json`. With SQL
 ## TLS and reverse proxies
 
 The gateway speaks HTTP only. Terminate TLS in your reverse proxy (nginx, Traefik, Caddy) and forward to the container port.
+
+## MCP client compatibility
+
+- JSON-RPC tool failures may still return **HTTP 200** with an `error` object in the body
+- some MCP clients may execute requests successfully but fail to expose the returned `result` payload to the model
+- when validating a deployment, keep a raw HTTP JSON-RPC check available in addition to client-native MCP testing
 
 ## Backups
 

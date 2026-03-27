@@ -624,7 +624,7 @@
 </script>
 
 <svelte:head>
-  <title>Access Control — MCP Gateway</title>
+  <title>Access Control — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-6">

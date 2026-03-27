@@ -96,8 +96,56 @@ describe('sandbox output bugs', () => {
       )) as { backend: string; value: unknown }
 
       // The result should contain the actual computed value, not just backend info
-      expect(result.backend).toBe('vm')
+      expect(result.backend).toBe('isolated-vm')
       expect(result.value).toBe(2)
+    })
+
+    it('should accept bare expressions without return for LLM-friendly usage', async () => {
+      const session = makeSession()
+      const registry = {
+        getToolsByNamespace: vi.fn().mockReturnValue([]),
+      }
+
+      const result = (await executeCodeMode(
+        '1 + 1',
+        session,
+        registry as never,
+        {
+          memoryLimitMb: 128,
+          executionTimeoutMs: 5_000,
+          maxToolCallsPerExecution: 10,
+          maxResultSizeBytes: 8_192,
+          artifactStoreTtlSeconds: 300,
+        },
+        vi.fn()
+      )) as { backend: string; value: unknown }
+
+      expect(result.backend).toBe('isolated-vm')
+      expect(result.value).toBe(2)
+    })
+
+    it('should accept statement snippets with explicit return', async () => {
+      const session = makeSession()
+      const registry = {
+        getToolsByNamespace: vi.fn().mockReturnValue([]),
+      }
+
+      const result = (await executeCodeMode(
+        'return 40 + 2',
+        session,
+        registry as never,
+        {
+          memoryLimitMb: 128,
+          executionTimeoutMs: 5_000,
+          maxToolCallsPerExecution: 10,
+          maxResultSizeBytes: 8_192,
+          artifactStoreTtlSeconds: 300,
+        },
+        vi.fn()
+      )) as { backend: string; value: unknown }
+
+      expect(result.backend).toBe('isolated-vm')
+      expect(result.value).toBe(42)
     })
 
     it('should return actual result from code with array operations', async () => {
@@ -120,7 +168,7 @@ describe('sandbox output bugs', () => {
         vi.fn()
       )) as { backend: string; value: unknown }
 
-      expect(result.backend).toBe('vm')
+      expect(result.backend).toBe('isolated-vm')
       expect(result.value).toEqual([2, 4, 6])
     })
   })
@@ -231,7 +279,7 @@ describe('sandbox output bugs', () => {
       expect(result).toBeDefined()
       if (typeof result === 'object' && result !== null) {
         const r = result as Record<string, unknown>
-        expect(r.backend).toBe('vm')
+        expect(r.backend).toBe('isolated-vm')
         // Bug: value might be undefined or missing due to race condition
         // Expected: should have an error property or throw
         if ('error' in r) {
@@ -285,6 +333,79 @@ describe('sandbox output bugs', () => {
           }
         }
       }
+    })
+  })
+
+  describe('AC4: code-mode errors should be actionable for LLM usage', () => {
+    it('should explain that result is a reserved global', async () => {
+      const session = makeSession()
+      const registry = {
+        getToolsByNamespace: vi.fn().mockReturnValue([]),
+      }
+
+      await expect(
+        executeCodeMode(
+          'const result = 1; return result',
+          session,
+          registry as never,
+          {
+            memoryLimitMb: 128,
+            executionTimeoutMs: 5_000,
+            maxToolCallsPerExecution: 10,
+            maxResultSizeBytes: 8_192,
+            artifactStoreTtlSeconds: 300,
+          },
+          vi.fn()
+        )
+      ).rejects.toThrow('`result` is reserved in code mode')
+    })
+
+    it('should surface a bridge timeout with the operation name', async () => {
+      const session = makeSession()
+      const registry = {
+        getToolsByNamespace: vi.fn().mockReturnValue([
+          {
+            server: {
+              id: 'github-main',
+              namespaces: ['github'],
+              transport: 'http',
+              url: 'https://example.com/mcp',
+              enabled: true,
+              trustLevel: 'internal',
+            },
+            records: [
+              {
+                name: 'slow_tool',
+                description: 'Never resolves',
+                inputSchema: { type: 'object', properties: {} },
+                serverId: 'github-main',
+                namespace: 'github',
+                retrievedAt: new Date().toISOString(),
+                sanitized: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      await expect(
+        executeCodeMode(
+          `
+          const tools = await catalog.search("slow tool", { k: 1 })
+          return await mcp.call(tools[0].handle, {})
+          `,
+          session,
+          registry as never,
+          {
+            memoryLimitMb: 128,
+            executionTimeoutMs: 80,
+            maxToolCallsPerExecution: 10,
+            maxResultSizeBytes: 8_192,
+            artifactStoreTtlSeconds: 300,
+          },
+          () => new Promise(() => undefined)
+        )
+      ).rejects.toThrow('Bridge operation mcp.call timed out')
     })
   })
 })

@@ -47,7 +47,7 @@
 </script>
 
 <svelte:head>
-  <title>Login — MCP Gateway</title>
+  <title>Login — MCPR Gateway</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
@@ -59,7 +59,7 @@
           <path d="M4 6h16M4 12h11M4 18h8" stroke="white" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </div>
-      <h1 class="text-xl font-semibold text-slate-900 dark:text-white">MCP Session Gateway</h1>
+      <h1 class="text-xl font-semibold text-slate-900 dark:text-white">MCPR Gateway</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Admin Console</p>
     </div>
 

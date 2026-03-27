@@ -114,7 +114,7 @@
 </script>
 
 <svelte:head>
-  <title>Configuration — MCP Gateway</title>
+  <title>Configuration — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-6">

@@ -103,7 +103,7 @@ describe('publish compression', () => {
 
   it('never compresses built-in gateway meta-tools regardless of publication settings', () => {
     const longDescription =
-      'Search for tools across all connected servers in this namespace. Returns matching tool names and server IDs. Use gateway_call_tool with these results to execute a tool. Suggestions: try short queries first.'
+      'Search for tools across all connected servers in this namespace. Returns matching tool names and server IDs. Use gateway_call_tool with the exact returned name+serverId to execute a match. Do not guess aliases or historical tool names. Tips: try short queries first.'
     const gatewayTool: VisibleTool = {
       name: 'gateway_search_tools',
       description: longDescription,

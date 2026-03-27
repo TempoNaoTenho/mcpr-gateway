@@ -120,6 +120,22 @@ describe('McpRuntimeApi.batch() parallel execution', () => {
     ).rejects.toThrow('Tool call limit exceeded (2)')
   })
 
+  it('allows batch size equal to maxToolCallsPerExecution (one increment per call)', async () => {
+    const executeTool = vi.fn(async () => 'ok')
+
+    const registry = makeRegistry()
+    const handles = registry.entries()
+    const api = new McpRuntimeApi(registry, executeTool, 2, 5)
+
+    const result = await api.batch([
+      { handle: handles[0].handle },
+      { handle: handles[1].handle },
+    ])
+
+    expect(result).toEqual(['ok', 'ok'])
+    expect(executeTool).toHaveBeenCalledTimes(2)
+  })
+
   it('returns empty array for empty calls', async () => {
     const executeTool = vi.fn()
 

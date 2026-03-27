@@ -192,7 +192,7 @@
 </script>
 
 <svelte:head>
-  <title>Namespaces — MCP Gateway</title>
+  <title>Namespaces — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-6">

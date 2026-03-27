@@ -2,14 +2,19 @@
 
 ## Requirements
 
-- **Node.js** ≥ 20 ([`package.json`](../package.json) `engines`)
+- **Node.js** 22 or 24 LTS ([`package.json`](../package.json) `engines`)
 - For Docker: Docker Engine and Compose v2
+
+Operational note:
+
+- `code` mode is supported on **Node 22/24 LTS** only
+- avoid **Node 25** and other odd-numbered releases for both the gateway and local validation scripts
 
 ## Install and configure
 
 ```bash
 git clone <repository-url>
-cd mcp-session-gateway
+cd mcpr-gateway
 npm ci
 npm run setup
 ```
@@ -40,6 +45,8 @@ npm run dev
 ```bash
 npm run dev:gateway
 ```
+
+For `code` mode stability, the gateway must run with `--no-node-snapshot`. The bundled dev scripts set this automatically.
 
 Defaults:
 
@@ -81,6 +88,7 @@ For streamable HTTP clients such as MCP Inspector, ChatGPT, or Claude:
 4. Continue with `tools/list` and `tools/call`
 
 Invalid namespace or body returns **400** with error details.
+Tool and downstream execution failures are returned as **HTTP 200** with a JSON-RPC `error` object in the body. Treat the JSON-RPC payload as the source of truth, not the HTTP status alone.
 
 ### Codex CLI
 
@@ -89,17 +97,19 @@ For Codex CLI, configure the MCP server URL plus a bearer token environment vari
 for streamable HTTP MCP servers.
 
 ```toml
-[mcp_servers.mcp-session-gateway]
+[mcp_servers.mcpr-gateway]
 url = "http://127.0.0.1:3000/mcp/all"
-bearer_token_env_var = "MCP_SESSION_GATEWAY_TOKEN"
+bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 ```
 
 ```bash
-export MCP_SESSION_GATEWAY_TOKEN=<client-access-token>
+export MCPR_GATEWAY_TOKEN=<client-access-token>
 ```
 
 If Codex sends `initialize` without the bearer token, the handshake often fails with a response decoding error before
 any tools are listed.
+
+Some MCP clients may also omit the JSON-RPC `result` body from what they show to the model even when the gateway request succeeded. When diagnosing `code` mode, compare the client view with a raw HTTP request to `/mcp/:namespace` before assuming the gateway lost the payload.
 
 ### Example: Hosted MCP with a bearer token
 

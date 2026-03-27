@@ -42,7 +42,7 @@
         </svg>
       </div>
       <div>
-        <p class="text-sm font-semibold text-slate-900 dark:text-white leading-tight">MCP Gateway</p>
+        <p class="text-sm font-semibold text-slate-900 dark:text-white leading-tight">MCPR Gateway</p>
         <p class="text-xs text-slate-500 dark:text-slate-400">Session Manager</p>
       </div>
     </div>
@@ -67,6 +67,6 @@
 
   <!-- Footer -->
   <div class="px-4 py-3 border-t border-slate-200 dark:border-slate-800">
-    <p class="text-xs text-slate-400 dark:text-slate-600">v1.0 — MCP Session Gateway</p>
+    <p class="text-xs text-slate-400 dark:text-slate-600">v1.0 — MCPR Gateway</p>
   </div>
 </aside>

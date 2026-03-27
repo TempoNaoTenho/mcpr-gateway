@@ -54,7 +54,7 @@
 </script>
 
 <svelte:head>
-  <title>Dashboard — MCP Gateway</title>
+  <title>Dashboard — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-6">

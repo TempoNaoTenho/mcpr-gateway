@@ -34,8 +34,35 @@ export function pick(value: unknown, fields: string[]): unknown {
 }
 
 export function limit<T>(value: T[], count: number): T[] {
-  if (!Array.isArray(value)) return []
+  if (!Array.isArray(value)) {
+    throw new Error(
+      'result.limit expects an array; pass an array value such as out.content instead of the whole object.'
+    )
+  }
   return value.slice(0, Math.max(0, count))
+}
+
+export function items(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (isRecord(value) && Array.isArray(value.content)) {
+    return value.content
+  }
+  return []
+}
+
+export function text(value: unknown): string {
+  if (typeof value === 'string') return value
+  const rows = items(value)
+  if (rows.length === 0) return ''
+
+  return rows
+    .map((entry) => {
+      if (typeof entry === 'string') return entry
+      if (isRecord(entry) && typeof entry.text === 'string') return entry.text
+      return ''
+    })
+    .filter((entry) => entry.length > 0)
+    .join('\n')
 }
 
 export function count(value: unknown): number {
@@ -104,6 +131,8 @@ export function createResultApi() {
   return {
     pick,
     limit,
+    items,
+    text,
     count,
     groupBy,
     grep,

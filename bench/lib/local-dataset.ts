@@ -265,7 +265,7 @@ function inferValueForKey(
   if (/\b(query|q|search|term|text|keyword)\b/.test(lowerKey)) {
     return tool.description ? tool.description.split(/\s+/).slice(0, 6).join(' ') : tool.name
   }
-  if (/\b(repo|repository)\b/.test(lowerKey)) return 'mcp-session-gateway'
+  if (/\b(repo|repository)\b/.test(lowerKey)) return 'mcpr-gateway'
   if (/\b(namespace)\b/.test(lowerKey)) return tool.namespace
   if (/\b(path|file)\b/.test(lowerKey)) return '.'
   if (/\b(url|uri)\b/.test(lowerKey)) return 'https://example.com'

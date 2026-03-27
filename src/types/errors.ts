@@ -10,6 +10,7 @@ export const GatewayErrorCode = {
   UNSUPPORTED_OPERATION: 'UNSUPPORTED_OPERATION',
   INTERNAL_GATEWAY_ERROR: 'INTERNAL_GATEWAY_ERROR',
   OAUTH_PROVIDER_NOT_ALLOWED: 'OAUTH_PROVIDER_NOT_ALLOWED',
+  INVALID_MCP_PROTOCOL_VERSION: 'INVALID_MCP_PROTOCOL_VERSION',
 } as const
 
 export type GatewayErrorCode = (typeof GatewayErrorCode)[keyof typeof GatewayErrorCode]
@@ -27,6 +28,7 @@ const defaultMessages: Record<GatewayErrorCode, string> = {
   UNSUPPORTED_OPERATION: 'Operation is not supported',
   INTERNAL_GATEWAY_ERROR: 'An unexpected internal error occurred',
   OAUTH_PROVIDER_NOT_ALLOWED: 'OAuth provider URL is not in the allowed list',
+  INVALID_MCP_PROTOCOL_VERSION: 'MCP-Protocol-Version does not match this session',
 }
 
 const defaultStatusCodes: Record<GatewayErrorCode, number> = {
@@ -41,6 +43,7 @@ const defaultStatusCodes: Record<GatewayErrorCode, number> = {
   UNSUPPORTED_OPERATION: 501,
   INTERNAL_GATEWAY_ERROR: 500,
   OAUTH_PROVIDER_NOT_ALLOWED: 403,
+  INVALID_MCP_PROTOCOL_VERSION: 400,
 }
 
 export class GatewayError extends Error {

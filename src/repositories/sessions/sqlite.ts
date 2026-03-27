@@ -147,7 +147,11 @@ export class SqliteSessionRepository implements ISessionRepository {
     if (this.ttlMs === 0) return
 
     this.cleanupTimer = setInterval(
-      () => { void this.deleteExpired() },
+      () => {
+        void this.deleteExpired().catch((err) => {
+          console.error('[session/sqlite] deleteExpired failed:', err)
+        })
+      },
       cleanupIntervalSeconds * 1000,
     )
     this.cleanupTimer.unref()

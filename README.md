@@ -1,22 +1,26 @@
-# Codeunctor MCP Gateway — MCP management and sandboxing
+# MCPR Gateway
 
-**A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them.**
+<p align="center">
+  <img src="https://img.shields.io/badge/node-22%20%7C%2024%20LTS-brightgreen" alt="Node.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License" />
+  <img src="https://img.shields.io/badge/MCP-2025--03--26-purple" alt="MCP Protocol" />
+</p>
 
-![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) ![MCP Protocol](https://img.shields.io/badge/MCP-2025--03--26-purple)
+**A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them. Primarly focused on sandboxed code execution so LLM can auto-discover downstreams servers and tools, also supports a compat mode (two tools) and default mode (all tools).**
 
----
+> Some say MCP is dead, hopefully we can take good care of it.
 
-## Overview
+## Inspired by
 
-Modern LLM workflows often involve dozens of MCP servers. Exposing every tool to the client at once inflates the context window, increases latency, and makes it harder for the model to pick the right tool. MCP Session Gateway sits between your AI client and your downstream MCP servers, acting as a smart proxy that curates what the model sees.
-
-The gateway maintains **stateful sessions** per client. Each session carries a **tool window** — a curated subset of available tools, selected by a BM25-ranked selector engine and refreshed dynamically based on execution history. Three operating modes let you choose how aggressively to compress the tool window for your use case.
-
-All of this is managed through a built-in **WebUI** and a full **Admin REST API**, with role-based access control, audit logging, and Docker-ready deployment.
-
----
+- [Anthropic's Code Execution](https://www.anthropic.com/engineering/code-execution-with-mcp?_hsmi=390282592)
+- [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode-mcp/)
 
 ## Features
+
+### WebUI and Admin API
+
+Features a WebUI and Admin API for easy management of downstream servers, namespaces, roles, access, audit logs and tokens approximate token usage per namespace.
 
 ### Operating Modes
 
@@ -104,119 +108,35 @@ Exposes a JavaScript sandbox (`isolated-vm`) with a built-in MCP runtime API:
 
 ```javascript
 // Discover tools
-const tools = await catalog.search('git operations', { limit: 5 })
+const tools = await catalog.search('fastmcp docs', {
+  serverId: 'fastmcp',
+  requiredArgs: ['query'],
+  detail: 'signature',
+  k: 5,
+})
 
 // Call tools and process results
-const files = await mcp.call('fs_list_dir', { path: '/src' })
-const filtered = result.grep(files, '\.ts$')
+const details = await catalog.describe(tools[0].handle, { detail: 'signature' })
+const out = await mcp.call(tools[0].handle, { query: 'quickstart' })
+const filtered = result.limit(result.items(out), 1)
+const text = result.text(out)
 
-// Batch calls
-const [a, b] = await mcp.batch([
-  ['tool_a', { arg: 1 }],
-  ['tool_b', { arg: 2 }],
-])
+// Batch only tools with compatible args
+if (tools.length >= 2) {
+  const [a, b] = await mcp.batch([
+    { handle: tools[0].handle, args: { query: 'quickstart' } },
+    { handle: tools[1].handle, args: { query: 'installation' } },
+  ])
+}
 
 // Store large results for later
-const ref = await artifacts.store(filtered)
-return { ref, count: result.count(filtered) }
+const saved = await artifacts.save(filtered, { label: 'filtered-files' })
+return { saved, count: result.count(filtered), sample: text }
 ```
 
-The sandbox is memory- and time-limited (configurable). The model writes a script; the gateway executes it against real downstream tools and returns the result. Useful for aggregation, filtering, and multi-step pipelines that would otherwise require many round-trips.
+The sandbox is memory- and time-limited (configurable). The model writes a script; the gateway executes it against real downstream tools and returns the result. `result` is a reserved global, snippets may be either a single expression or a block with `return`, and the final value should be JSON-friendly. `catalog.search()` accepts `k`, the compatibility alias `limit` (prefer `k`), and optional filters such as `serverId` and `requiredArgs` to make tool selection safer for LLMs. `catalog.describe(..., { detail: "signature" })` returns required args plus short property metadata (`type`, `description`, `enum` when available). `result.limit()` expects an array, while `result.items()` and `result.text()` help consume tool results that come back as `content[]`. For `mcp.batch`, only combine handles that accept the same arg shape; use `catalog.describe(..., { detail: "signature" })` when unsure and check that the search returned enough tools before indexing. For large or rich payloads, prefer `result.pick`, `result.limit`, `artifacts.save`, or `JSON.parse(JSON.stringify(value))`.
 
 ---
-
-## Quick Start
-
-**Prerequisites:** Node.js ≥ 20
-
-```bash
-git clone <repository-url>
-cd mcp-session-gateway
-npm ci
-npm run setup    # optional: .env checks, env prompts, optional bootstrap.json (advanced)
-```
-
-### Connecting your AI client (HTTP)
-
-The gateway serves MCP over **HTTP**. Downstream MCP servers you configure may still use **stdio** or **HTTP/streamable-HTTP** in `bootstrap.json` / runtime config.
-
-| Step         | What to do                                                                                                                                                                                                                  |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run          | Start the gateway; it listens on `HOST` / `PORT` (defaults `127.0.0.1` / `3000`).                                                                                                                                           |
-| MCP endpoint | `POST /mcp/<namespace>` for JSON-RPC. Streamable HTTP clients can also use `GET /mcp/<namespace>` for SSE. The path segment must match a configured namespace (many setups use `default`).                                  |
-| Auth         | Send `Authorization: Bearer <token>` on MCP requests. Tokens are issued via the admin UI / admin API and map through `static_key` auth (same as [docs/http-api.md](docs/http-api.md)).                                      |
-| Session      | After `initialize`, read `Mcp-Session-Id` from the **response** headers and send it on later `tools/list` and `tools/call` requests. Optional `Mcp-Tools-Changed` on responses indicates the tool catalog may have changed. |
-| Admin        | WebUI (`/ui/` after `npm run build` or `npm run build:ui`), `/admin/*`, and `/health` run in the **same** process.                                                                                                          |
-
-Full route list, CORS, and notification behavior: [docs/http-api.md](docs/http-api.md).
-
-### `npm run setup` vs `npm run dev`
-
-| Script              | What it does                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`npm run setup`** | Optional **first-time helper**: Node `engines` check, `.env` from [`.env.example`](.env.example) if missing, port checks for full-stack dev, SQLite path info, interactive `.env` prompts, and **optional** `config/bootstrap.json` (advanced / GitOps). Does not install dependencies or start servers. Full bootstrap reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md) and [config/README.md](config/README.md). |
-| **`npm run dev`**   | **Default local stack**: gateway (`npm run dev:gateway` on `HOST` / **`PORT + 1`**) plus SvelteKit **Vite** on **`PORT`** ([`scripts/dev-all.mjs`](scripts/dev-all.mjs)). Sets `GATEWAY_PROXY_TARGET` so the browser uses one origin for `/ui`, `/admin`, `/mcp`, `/health`.                                                                                                                                                |
-
-`npm run dev:all` is the same as `npm run dev`. `bootstrap.json` is **not** required: without it the gateway starts with built-in defaults and an empty server list (Web UI + SQLite hold runtime config after first start).
-
-### Run commands
-
-**Full-stack local dev (default)**
-
-```bash
-npm run dev
-```
-
-Open the URL Vite prints (typically `http://127.0.0.1:3000`); the gateway listens on **the next port** (typically `3001`).
-
-**API only (hot-reload gateway)**
-
-```bash
-npm run dev:gateway   # single process on HOST/PORT (default http://127.0.0.1:3000)
-```
-
-The admin WebUI at `/ui/` is served only if static files exist: run **`npm run build`** (UI + gateway) or **`npm run build:ui`** alone (output under `ui/build`; the server also accepts `ui/dist` or `UI_STATIC_DIR`).
-
-**Docker** (optional `npm run setup` for `.env` / bootstrap):
-
-```bash
-npm run docker:up  # http://localhost:3000
-```
-
-See [docs/getting-started.md](docs/getting-started.md) for a complete walkthrough including client configuration examples.
-
----
-
-## Configuration
-
-Configuration uses a **two-tier model**:
-
-| Tier          | Source                  | Role                                                                      |
-| ------------- | ----------------------- | ------------------------------------------------------------------------- |
-| **Bootstrap** | `config/bootstrap.json` | Seeds initial config on first start; `auth` section always read from file |
-| **Runtime**   | `gateway.db` (SQLite)   | Authoritative after first start; managed via Admin UI or API              |
-
-Changes made via the admin panel are written to SQLite and persist across restarts. Editing `bootstrap.json` after first start has no effect on servers/namespaces/roles (only `auth` is re-merged).
-
-### Key Environment Variables
-
-| Variable                         | Default             | Purpose                                                                                     |
-| -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
-| `HOST`                           | `127.0.0.1`         | Bind address (`0.0.0.0` for Docker)                                                         |
-| `PORT`                           | `3000`              | HTTP port                                                                                   |
-| `CONFIG_PATH`                    | `./config`          | Directory containing `bootstrap.json`                                                       |
-| `DATABASE_PATH`                  | `./data/gateway.db` | SQLite file path                                                                            |
-| `SESSION_BACKEND`                | _(unset = SQLite)_  | Set to `memory` for ephemeral sessions                                                      |
-| `ADMIN_TOKEN`                    | _(unset)_           | When set (any non-empty value), `/admin/*` requires login (cookie), not the password itself |
-| `GATEWAY_ADMIN_USER`             | `mcpgateway`        | Admin UI login username when `ADMIN_TOKEN` is set                                           |
-| `GATEWAY_ADMIN_PASSWORD`         | _(unset)_           | When set, required with username; when unset, username-only login                           |
-| `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | _(unset)_           | Base64 32-byte key for encrypted downstream secrets                                         |
-| `LOG_LEVEL`                      | `info`              | Pino log level                                                                              |
-| `AUDIT_RETENTION_DAYS`           | `90`                | Default audit log retention                                                                 |
-
-Bootstrap `auth` is only `{"mode": "static_key"}` (see [`config/bootstrap.example.json`](config/bootstrap.example.json)); **client Bearer tokens are created in the admin WebUI / API**, not listed in `bootstrap.json`. Other bootstrap strings may still use `${VAR_NAME}` environment interpolation where the schema allows it.
-
-See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full schema reference.
 
 ---
 
@@ -248,6 +168,7 @@ From the repo root, **`npm run verify`** (alias **`npm run ci`**, **`npm run pre
 | [docs/http-api.md](docs/http-api.md)               | HTTP routes reference                                      |
 | [docs/deployment.md](docs/deployment.md)           | Docker, environment, security hardening                    |
 | [docs/development.md](docs/development.md)         | Scripts, tests, UI development                             |
+| [CHANGELOG.md](CHANGELOG.md)                       | Release notes and current publication caveats              |
 | [config/README.md](config/README.md)               | Config directory quick reference                           |
 
 ---

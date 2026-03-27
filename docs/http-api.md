@@ -16,6 +16,8 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 - **Loopback CORS:** `OPTIONS`, `GET`, and `POST` emit CORS headers for loopback origins only (`localhost`, `127.0.0.1`, `::1`), and expose `Mcp-Session-Id` for browser-based clients.
 - **Client auth (`static_key`):** Send `Authorization: Bearer <client-access-token>`. The token must match a configured client token (from `auth.staticKeys` and/or tokens issued in the admin UI). Missing or unknown tokens resolve to `anonymous` with no roles, so role-protected namespaces require a valid token and matching policy.
 - **Codex CLI auth:** For Codex streamable HTTP servers, configure `bearer_token_env_var` in `~/.codex/config.toml`. A bare `Authorization = "Bearer ..."` entry in the server block is not interpreted as an HTTP header by Codex.
+- **JSON-RPC errors:** Tool failures, validation failures, and downstream failures often return **HTTP 200** with a JSON-RPC `error` object in the body. Clients must inspect the JSON-RPC payload, not only the HTTP status.
+- **Client display caveat:** Some MCP clients may not surface the full JSON-RPC `result` payload to the model even when the gateway returned it successfully. For server-side diagnosis, compare client behavior with a raw HTTP JSON-RPC request.
 
 Hybrid compatibility on the same route:
 
@@ -64,12 +66,12 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 
 ### Core routes (always present when admin is enabled)
 
-| Method | Path                 | Description                                                          |
-| ------ | -------------------- | -------------------------------------------------------------------- |
+| Method | Path                 | Description                                                                              |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------- |
 | `POST` | `/admin/auth/login`  | Body `{ "username", "password" }`; sets `admin_session` cookie when `ADMIN_TOKEN` is set |
-| `POST` | `/admin/auth/logout` | Clears cookie                                                        |
-| `GET`  | `/admin/auth/me`     | `{ "authenticated": boolean }`                                       |
-| `GET`  | `/admin/dashboard`   | Aggregated stats (sessions, servers, tools, recent audit if SQLite)  |
+| `POST` | `/admin/auth/logout` | Clears cookie                                                                            |
+| `GET`  | `/admin/auth/me`     | `{ "authenticated": boolean }`                                                           |
+| `GET`  | `/admin/dashboard`   | Aggregated stats (sessions, servers, tools, recent audit if SQLite)                      |
 
 ### When session store is available
 

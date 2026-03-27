@@ -193,7 +193,7 @@ export function startToolsListStdioSession(
         const initResp = await sendRequest('initialize', {
           protocolVersion: '2024-11-05',
           capabilities: {},
-          clientInfo: { name: 'mcp-session-gateway', version: '1.0.0' },
+          clientInfo: { name: 'mcpr-gateway', version: '1.0.0' },
         })
 
         if (initResp['error']) {
@@ -356,7 +356,7 @@ export async function callToolStdio(
         const initResp = await sendRequest('initialize', {
           protocolVersion: '2024-11-05',
           capabilities: {},
-          clientInfo: { name: 'mcp-session-gateway', version: '1.0.0' },
+          clientInfo: { name: 'mcpr-gateway', version: '1.0.0' },
         })
 
         if (initResp['error']) {

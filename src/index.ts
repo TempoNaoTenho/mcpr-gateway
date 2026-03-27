@@ -48,7 +48,7 @@ function resolveGatewayDatabasePath(): string {
   if (process.env['DATABASE_PATH']) return process.env['DATABASE_PATH']
   if (process.env['VITEST'] === 'true') {
     const workerId = process.env['VITEST_WORKER_ID'] ?? '0'
-    return join(tmpdir(), 'mcp-session-gateway-vitest', `worker-${workerId}.db`)
+    return join(tmpdir(), 'mcpr-gateway-vitest', `worker-${workerId}.db`)
   }
   return './data/gateway.db'
 }
@@ -86,6 +86,25 @@ const triggerEngine = new TriggerEngine(activeStore, registry, selector, auditLo
 let rateLimiter: RateLimiter | undefined
 let runtimeConfigManager: RuntimeConfigManager | undefined
 
+function hasNodeOption(flag: string): boolean {
+  return process.execArgv.includes(flag) || (process.env['NODE_OPTIONS'] ?? '').includes(flag)
+}
+
+function assertSupportedNodeRuntime(): void {
+  const nodeVersion = process.versions.node
+  const nodeMajor = Number(nodeVersion.split('.')[0] ?? '0')
+  if (!Number.isFinite(nodeMajor) || nodeMajor < 22 || nodeMajor >= 25 || nodeMajor % 2 === 1) {
+    throw new Error(
+      `Unsupported Node.js runtime ${nodeVersion}. Use Node 22 or 24 LTS with isolated-vm.`
+    )
+  }
+  if (!hasNodeOption('--no-node-snapshot')) {
+    throw new Error(
+      'isolated-vm requires --no-node-snapshot on Node 20+. Restart with NODE_OPTIONS=--no-node-snapshot or use npm run dev:gateway.'
+    )
+  }
+}
+
 if (!isStdioTransport) {
   app.register(healthRoutes, { registry })
   app.register(mcpRoutes, {
@@ -100,6 +119,7 @@ if (!isStdioTransport) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  assertSupportedNodeRuntime()
   const configPath = process.env['CONFIG_PATH'] ?? './config'
   initConfig(configPath)
   let config = getConfig()
@@ -136,12 +156,36 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(0)
   })
 
+  function formatUnhandledReason(reason: unknown): string {
+    if (reason instanceof Error) {
+      return reason.stack ?? reason.message
+    }
+    try {
+      return JSON.stringify(reason)
+    } catch {
+      return String(reason)
+    }
+  }
+
   process.on('uncaughtException', (err) => {
     console.error('Uncaught exception:', err)
+    if (err instanceof Error && err.stack) {
+      console.error(err.stack)
+    }
     process.exit(1)
   })
-  process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled rejection:', reason)
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled rejection at:', promise)
+    console.error('Reason:', formatUnhandledReason(reason))
+    if (
+      process.env['GATEWAY_RELAX_UNHANDLED_REJECTION'] === '1' &&
+      process.env['NODE_ENV'] !== 'production'
+    ) {
+      console.error(
+        'GATEWAY_RELAX_UNHANDLED_REJECTION=1 (non-production): process continues; state may be corrupt. Do not use in production.'
+      )
+      return
+    }
     process.exit(1)
   })
 
@@ -167,8 +211,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const port = Number(process.env['PORT'] ?? 3000)
   const host = process.env['HOST'] ?? '127.0.0.1'
+  /** When HOST=127.0.0.1, clients using http://localhost often hit ::1 (IPv6) and get connection errors;
+   * binding :: with ipv6Only=false accepts IPv4-mapped and IPv6 on typical Linux/macOS dual-stack sockets.
+   * May listen on all interfaces — use a firewall outside trusted dev networks. */
+  const dualStack = process.env['GATEWAY_DUAL_STACK'] === '1'
+  const listenOpts = dualStack
+    ? { port, host: '::' as const, ipv6Only: false as const }
+    : { port, host }
 
-  app.listen({ port, host }, (err) => {
+  if (dualStack) {
+    app.log.warn(
+      '[gateway] GATEWAY_DUAL_STACK=1: listening on :: (dual-stack). Ensure client URL matches your setup (e.g. http://127.0.0.1:PORT or http://localhost:PORT). Do not expose on untrusted LANs without a firewall.',
+    )
+  }
+
+  app.listen(listenOpts, (err) => {
     if (err) {
       app.log.error(err)
       process.exit(1)

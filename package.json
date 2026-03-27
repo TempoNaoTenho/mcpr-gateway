@@ -1,18 +1,18 @@
 {
-  "name": "mcp-session-gateway",
+  "name": "mcpr-gateway",
   "version": "0.1.0",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22 <25"
   },
   "type": "module",
   "bin": {
-    "mcp-session-gateway": "./dist/index.js"
+    "mcpr-gateway": "./dist/index.js"
   },
   "scripts": {
     "setup": "tsx scripts/setup.ts",
     "dev": "node scripts/dev-all.mjs",
-    "dev:gateway": "tsx watch src/index.ts",
+    "dev:gateway": "node scripts/dev-gateway.mjs",
     "build": "npm run build:ui && npm run build:gateway",
     "build:gateway": "tsup --config tsup.config.ts",
     "typecheck": "tsc --noEmit",

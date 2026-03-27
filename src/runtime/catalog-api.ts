@@ -11,20 +11,39 @@ import type { HandleRegistry } from './handle-registry.js'
 export type CatalogDetailLevel = 'name' | 'summary' | 'signature' | 'full'
 
 type CatalogListFilters = {
+  serverId?: string
   risk?: string
   tags?: string[]
+  requiredArgs?: string[]
   limit?: number
   detail?: CatalogDetailLevel
 }
 
 type CatalogSearchOptions = {
   k?: number
+  limit?: number
+  serverId?: string
+  risk?: string
+  tags?: string[]
+  requiredArgs?: string[]
   detail?: CatalogDetailLevel
 }
 
 type CatalogDescribeOptions = {
   detail?: CatalogDetailLevel
   fields?: string[]
+}
+
+type SignatureProperty = {
+  type?: string | string[]
+  description?: string
+  enum?: unknown[]
+}
+
+type SignatureShape = {
+  required: string[]
+  properties: Record<string, SignatureProperty>
+  acceptsAdditionalProperties?: boolean
 }
 
 function summarizeDescription(tool: Toolcard): string {
@@ -42,6 +61,80 @@ function signatureFields(tool: Toolcard): string[] {
   return required.filter((field): field is string => typeof field === 'string')
 }
 
+function buildSignatureShape(tool: Toolcard): SignatureShape {
+  const schema = tool.inputSchema
+  const rawProperties =
+    schema && typeof schema === 'object' && !Array.isArray(schema) && typeof schema.properties === 'object'
+      ? (schema.properties as Record<string, unknown>)
+      : {}
+
+  const properties = Object.fromEntries(
+    Object.entries(rawProperties).map(([name, value]) => {
+      const property: SignatureProperty = {}
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const type = (value as Record<string, unknown>).type
+        const description = (value as Record<string, unknown>).description
+        const enumValues = (value as Record<string, unknown>).enum
+
+        if (typeof type === 'string') {
+          property.type = type
+        } else if (Array.isArray(type) && type.every((entry) => typeof entry === 'string')) {
+          property.type = type as string[]
+        }
+
+        if (typeof description === 'string' && description.trim().length > 0) {
+          property.description = description.trim()
+        }
+
+        if (Array.isArray(enumValues) && enumValues.length > 0) {
+          property.enum = enumValues
+        }
+      }
+      return [name, property]
+    })
+  )
+
+  const acceptsAdditionalProperties =
+    schema && typeof schema === 'object' && !Array.isArray(schema) && typeof schema.additionalProperties === 'boolean'
+      ? schema.additionalProperties
+      : undefined
+
+  return {
+    required: signatureFields(tool),
+    properties,
+    acceptsAdditionalProperties,
+  }
+}
+
+function matchesFilters(
+  tool: Toolcard,
+  filters: {
+    serverId?: string
+    risk?: string
+    tags?: string[]
+    requiredArgs?: string[]
+  }
+): boolean {
+  if (filters.serverId && tool.serverId !== filters.serverId) {
+    return false
+  }
+  if (filters.risk && tool.riskLevel !== filters.risk) {
+    return false
+  }
+  if (filters.tags && filters.tags.length > 0) {
+    if (!filters.tags.every((tag) => tool.tags.includes(tag))) {
+      return false
+    }
+  }
+  if (filters.requiredArgs && filters.requiredArgs.length > 0) {
+    const required = new Set(signatureFields(tool))
+    if (!filters.requiredArgs.every((field) => required.has(field))) {
+      return false
+    }
+  }
+  return true
+}
+
 export class CatalogRuntimeApi {
   private readonly toolcards: Toolcard[]
 
@@ -55,27 +148,42 @@ export class CatalogRuntimeApi {
 
   search(query: string, options: CatalogSearchOptions = {}): unknown[] {
     const detail = options.detail ?? 'summary'
-    const ranked = rankToolsWithBm25(this.toolcards, query)
+    const requestedCount =
+      typeof options.k === 'number'
+        ? options.k
+        : typeof options.limit === 'number'
+          ? options.limit
+          : 5
+    const searchable = this.toolcards.filter((tool) =>
+      matchesFilters(tool, {
+        serverId: options.serverId,
+        risk: options.risk,
+        tags: options.tags,
+        requiredArgs: options.requiredArgs,
+      })
+    )
+    const ranked = rankToolsWithBm25(searchable, query)
       .filter((entry) => entry.score > 0)
       .sort((left, right) => {
         const diff = right.score - left.score
         if (diff !== 0) return diff
         return left.toolcard.name.localeCompare(right.toolcard.name)
       })
-      .slice(0, Math.max(1, Math.min(25, options.k ?? 5)))
+      .slice(0, Math.max(1, Math.min(25, requestedCount)))
 
     return ranked.map(({ toolcard }) => this.formatTool(toolcard, detail))
   }
 
   list(filters: CatalogListFilters = {}): unknown[] {
     const detail = filters.detail ?? 'summary'
-    let visible = [...this.toolcards]
-    if (filters.risk) {
-      visible = visible.filter((tool) => tool.riskLevel === filters.risk)
-    }
-    if (filters.tags && filters.tags.length > 0) {
-      visible = visible.filter((tool) => filters.tags!.every((tag) => tool.tags.includes(tag)))
-    }
+    const visible = this.toolcards.filter((tool) =>
+      matchesFilters(tool, {
+        serverId: filters.serverId,
+        risk: filters.risk,
+        tags: filters.tags,
+        requiredArgs: filters.requiredArgs,
+      })
+    )
     const limit = Math.max(1, Math.min(100, filters.limit ?? visible.length))
     return visible.slice(0, limit).map((tool) => this.formatTool(tool, detail))
   }
@@ -135,12 +243,16 @@ export class CatalogRuntimeApi {
     }
 
     if (detail === 'signature') {
+      const signature = buildSignatureShape(tool)
       return {
         handle,
         name: tool.name,
         summary: summarizeDescription(tool),
         risk: tool.riskLevel,
-        args: signatureFields(tool),
+        args: signature.required,
+        required: signature.required,
+        properties: signature.properties,
+        acceptsAdditionalProperties: signature.acceptsAdditionalProperties,
       }
     }
 

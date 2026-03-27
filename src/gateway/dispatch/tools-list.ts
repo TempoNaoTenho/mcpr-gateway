@@ -7,6 +7,7 @@ import { projectWindow } from '../publish/project.js'
 import { logRequest } from '../../observability/structured-log.js'
 import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
+import { assertMcpProtocolVersionMatches } from '../mcp-protocol-version.js'
 
 export async function handleToolsList(
   ctx: McpHandlerContext,
@@ -28,6 +29,8 @@ export async function handleToolsList(
   if (session.namespace !== namespace) {
     throw new GatewayError(GatewayErrorCode.SESSION_NOT_FOUND)
   }
+
+  assertMcpProtocolVersionMatches(session, ctx.mcpProtocolVersionHeader)
 
   const startMs = Date.now()
   const pendingToolListChange = session.pendingToolListChange === true

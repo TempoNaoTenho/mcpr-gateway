@@ -34,7 +34,7 @@ import {
   GATEWAY_HELP_TOOL_NAME,
 } from '../../src/gateway/discovery.js'
 
-const TMP = mkdtempSync(join(tmpdir(), 'mcp-session-gateway-trigger-'))
+const TMP = mkdtempSync(join(tmpdir(), 'mcpr-gateway-trigger-'))
 
 afterAll(() => {
   rmSync(TMP, { recursive: true, force: true })

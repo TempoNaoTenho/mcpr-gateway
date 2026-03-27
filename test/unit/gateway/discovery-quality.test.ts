@@ -15,7 +15,7 @@ import {
   defaultSession,
 } from '../../fixtures/bootstrap-json.js'
 
-const TMP = mkdtempSync(join(tmpdir(), 'mcp-session-gateway-discovery-'))
+const TMP = mkdtempSync(join(tmpdir(), 'mcpr-gateway-discovery-'))
 
 afterAll(() => {
   rmSync(TMP, { recursive: true, force: true })

@@ -111,7 +111,11 @@ async function readSseJsonRpcBody(
   let timedOut = false
   const timer = setTimeout(() => {
     timedOut = true
-    void reader.cancel(`[registry/http] Timed out waiting for SSE response from ${server.url}`)
+    void reader
+      .cancel(`[registry/http] Timed out waiting for SSE response from ${server.url}`)
+      .catch(() => {
+        /* ignore: avoid unhandledRejection if cancel fails */
+      })
   }, timeoutMs)
 
   const requestId = request.id
@@ -300,7 +304,7 @@ export async function fetchToolsHttp(server: DownstreamServer, timeoutMs?: numbe
     params: {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'mcp-session-gateway', version: '1.0.0' },
+      clientInfo: { name: 'mcpr-gateway', version: '1.0.0' },
     },
   }, undefined, timeoutMs)
 
@@ -353,7 +357,7 @@ export async function callToolHttp(
     params: {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'mcp-session-gateway', version: '1.0.0' },
+      clientInfo: { name: 'mcpr-gateway', version: '1.0.0' },
     },
   }, undefined, timeoutMs)
 

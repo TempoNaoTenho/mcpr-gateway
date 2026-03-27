@@ -48,6 +48,8 @@ export const SessionStateSchema = z.object({
       supportsToolListChanged: z.boolean(),
     })
     .optional(),
+  /** Negotiated Streamable HTTP MCP protocol version (initialize). */
+  mcpProtocolVersion: z.string().min(1).optional(),
 })
 
 export type SessionState = z.infer<typeof SessionStateSchema>

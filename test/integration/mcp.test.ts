@@ -151,9 +151,27 @@ describe('POST /mcp/gmail — initialize', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.headers['mcp-session-id']).toBeDefined()
+    expect(res.headers['mcp-protocol-version']).toBe('2024-11-05')
     const body = res.json()
     expect(body.result.protocolVersion).toBe('2024-11-05')
-    expect(body.result.serverInfo.name).toBe('mcp-session-gateway')
+    expect(body.result.serverInfo.name).toBe('mcpr-gateway')
+  })
+
+  it('negotiates Streamable HTTP protocol version when client requests 2025-06-18', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp/gmail',
+      headers: { 'Content-Type': 'application/json', ...AUTH_USER },
+      payload: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18' },
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['mcp-protocol-version']).toBe('2025-06-18')
+    expect(res.json().result.protocolVersion).toBe('2025-06-18')
   })
 
   it('exposes MCP session headers for loopback browser origins', async () => {
@@ -170,7 +188,9 @@ describe('POST /mcp/gmail — initialize', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.headers['access-control-allow-origin']).toBe('http://127.0.0.1:6274')
-    expect(res.headers['access-control-expose-headers']).toBe('Mcp-Session-Id, Mcp-Tools-Changed')
+    expect(res.headers['access-control-expose-headers']).toBe(
+      'Mcp-Session-Id, Mcp-Tools-Changed, MCP-Protocol-Version',
+    )
     expect(res.headers['vary']).toBe('Origin')
   })
 
@@ -219,7 +239,9 @@ describe('OPTIONS /mcp/gmail', () => {
     expect(res.headers['access-control-allow-headers']).toBe(
       'Authorization, Content-Type, Mcp-Session-Id'
     )
-    expect(res.headers['access-control-expose-headers']).toBe('Mcp-Session-Id, Mcp-Tools-Changed')
+    expect(res.headers['access-control-expose-headers']).toBe(
+      'Mcp-Session-Id, Mcp-Tools-Changed, MCP-Protocol-Version',
+    )
   })
 
   it('does not emit CORS headers for non-loopback origins', async () => {
@@ -307,6 +329,35 @@ describe('POST /mcp/gmail — tools/list', () => {
     })
     expect(res.statusCode).toBe(404)
     expect(res.json().error).toBe('SESSION_NOT_FOUND')
+  })
+
+  it('returns 400 when MCP-Protocol-Version header disagrees with negotiated session', async () => {
+    const initRes = await app.inject({
+      method: 'POST',
+      url: '/mcp/gmail',
+      headers: { 'Content-Type': 'application/json', ...AUTH_USER },
+      payload: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18' },
+      },
+    })
+    const sessionId = initRes.headers['mcp-session-id'] as string
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp/gmail',
+      headers: {
+        'Content-Type': 'application/json',
+        ...AUTH_USER,
+        'mcp-session-id': sessionId,
+        'mcp-protocol-version': '2024-11-05',
+      },
+      payload: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe('INVALID_MCP_PROTOCOL_VERSION')
   })
 })
 

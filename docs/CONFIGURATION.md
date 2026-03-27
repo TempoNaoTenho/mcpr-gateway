@@ -1,4 +1,4 @@
-# Configuring MCP Session Gateway
+# Configuring MCPR Gateway
 
 **Documentation index:** [docs/README.md](README.md) — getting started, architecture, HTTP API, deployment, and development guides.
 
@@ -215,9 +215,9 @@ Codex CLI expects this bearer token to be supplied through `bearer_token_env_var
 example:
 
 ```toml
-[mcp_servers.mcp-session-gateway]
+[mcp_servers.mcpr-gateway]
 url = "http://127.0.0.1:3000/mcp/all"
-bearer_token_env_var = "MCP_SESSION_GATEWAY_TOKEN"
+bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 ```
 
 Typical admin request after login:

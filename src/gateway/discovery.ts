@@ -48,7 +48,7 @@ function buildGatewaySearchTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_SEARCH_TOOL_NAME,
     description: `Find tools by keyword across all connected servers. Returns matches ranked by relevance, each with a name and serverId.
-      Use gateway_call_tool with the returned name+serverId to execute a match.
+      Use gateway_call_tool with the exact returned name+serverId to execute a match. Do not guess aliases or historical tool names.
       Tips: use 2–3 distinctive words ("github list issues"); if no matches, try fewer words ("github issues").`,
     inputSchema: {
       type: 'object',
@@ -80,12 +80,18 @@ function buildGatewayCallTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_CALL_TOOL_NAME,
     description:
-      'Execute a named tool by providing its name and serverId. Use gateway_search_tools first to discover available tools and obtain their name and serverId.',
+      'Execute a named tool by providing its exact name and serverId as returned by gateway_search_tools. Do not substitute aliases or historical tool names.',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Tool name as returned by gateway_search_tools.' },
-        serverId: { type: 'string', description: 'Server ID as returned by gateway_search_tools.' },
+        name: {
+          type: 'string',
+          description: 'Exact tool name as returned by gateway_search_tools.',
+        },
+        serverId: {
+          type: 'string',
+          description: 'Exact server ID as returned by gateway_search_tools.',
+        },
         arguments: { type: 'object', description: 'Arguments to pass to the tool.', default: {} },
       },
       required: ['name', 'serverId'],
@@ -103,9 +109,10 @@ function buildGatewayRunCodeTool(namespace: string): VisibleTool {
     name: GATEWAY_RUN_CODE_TOOL_NAME,
     description: `Execute JavaScript in the gateway sandbox to orchestrate multiple tools in one call.
       Workflow:
-        catalog.search(q) / catalog.list()         — discover tools, returns handles
-        mcp.call(handle, args) / mcp.batch([...])  — execute one or many tools
-        result.pick/limit/grep/groupBy/summarize() — transform output
+        catalog.search(q, { k | limit, serverId, requiredArgs }) / catalog.list({ serverId, requiredArgs }) — discover tools, returns session-scoped handles
+        catalog.describe(handle, { detail: "signature" }) — inspect required args and short field metadata before execution
+        mcp.call(handle, args) / mcp.batch([...])  — execute one or many tools with handles from this execution
+        result.pick/limit/items/text/grep/groupBy/summarize() — transform output
         artifacts.save(data)                       — store oversized results
       Always await async calls. Call gateway_help for the full API reference and examples.`,
     inputSchema: {
@@ -114,7 +121,7 @@ function buildGatewayRunCodeTool(namespace: string): VisibleTool {
         code: {
           type: 'string',
           description:
-            'JavaScript to execute. Available globals: catalog, mcp, result, artifacts. Always await async calls. Return a value directly or call artifacts.save() for large data.',
+            'JavaScript to execute. Available globals: catalog, mcp, result, artifacts. `result` is reserved and should not be redeclared. Simple expressions like `1 + 1` work without `return`. For multi-line statements, use `return` for the final value. `catalog.search()` accepts `k`, compatibility alias `limit` (prefer `k`), and optional filters such as `serverId` and `requiredArgs`. `catalog.describe(..., { detail: "signature" })` exposes required fields plus short property metadata. Prefer `result.items()` or `result.text()` when tools return content blocks. Prefer `catalog.describe()` before `mcp.batch()` when mixing tools. Always await async calls and return serializable JSON-friendly data.',
         },
       },
       required: ['code'],
@@ -275,4 +282,3 @@ export function parseGatewayRunCodeArgs(args: unknown): GatewayRunCodeArgs | { e
   }
   return { code: obj.code }
 }
-

@@ -69,6 +69,7 @@ export async function runStdioMcp(options: RunStdioMcpOptions): Promise<void> {
     options.healthMonitor,
     options.getRateLimiter,
     options.getResponseTimeoutMs,
+    log,
   )
 
   let boundSessionId: string | undefined

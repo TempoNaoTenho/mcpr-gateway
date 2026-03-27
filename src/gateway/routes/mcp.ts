@@ -17,7 +17,7 @@ import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
 
 const LOOPBACK_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i
 const MCP_ALLOWED_HEADERS = 'Authorization, Content-Type, Mcp-Session-Id'
-const MCP_EXPOSED_HEADERS = 'Mcp-Session-Id, Mcp-Tools-Changed'
+const MCP_EXPOSED_HEADERS = 'Mcp-Session-Id, Mcp-Tools-Changed, MCP-Protocol-Version'
 const SSE_PING_INTERVAL_MS = 15_000
 
 interface McpRouteOptions {
@@ -84,7 +84,8 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
     store,
     healthMonitor,
     opts.getRateLimiter,
-    opts.getResponseTimeoutMs
+    opts.getResponseTimeoutMs,
+    app.log
   )
 
   app.options<{ Params: { namespace: string } }>('/mcp/:namespace', async (request, reply) => {
@@ -167,8 +168,15 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
     switch (body.method) {
       case 'initialize': {
         const ctx = mcpContextFromFastifyRequest(request)
-        const { id, result } = await handleInitialize(ctx, body, store, registry, auditLogger)
+        const { id, negotiatedProtocolVersion, result } = await handleInitialize(
+          ctx,
+          body,
+          store,
+          registry,
+          auditLogger,
+        )
         reply.header('Mcp-Session-Id', id)
+        reply.header('MCP-Protocol-Version', negotiatedProtocolVersion)
         return reply.send(result)
       }
 

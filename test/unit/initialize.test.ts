@@ -487,6 +487,7 @@ describe('handleInitialize', () => {
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
     expect(result.instructions).toContain('gateway_call_tool')
+    expect(result.instructions).toContain('exact name and serverId returned by the search result')
     expect(result.instructions).toContain('"gmail-server"')
   })
 

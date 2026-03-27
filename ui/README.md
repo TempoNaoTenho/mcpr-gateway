@@ -1,6 +1,6 @@
 # Admin Web UI
 
-Svelte-based admin interface for MCP Session Gateway. It is served by the gateway at **`/ui/`** when static assets exist (see [`src/gateway/routes/ui.ts`](../src/gateway/routes/ui.ts)).
+Svelte-based admin interface for MCPR Gateway. It is served by the gateway at **`/ui/`** when static assets exist (see [`src/gateway/routes/ui.ts`](../src/gateway/routes/ui.ts)).
 
 ## Prerequisites
 

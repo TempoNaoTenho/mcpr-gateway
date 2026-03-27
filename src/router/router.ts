@@ -1,3 +1,4 @@
+import type { FastifyBaseLogger } from 'fastify'
 import { SessionStatus, OutcomeClass, DownstreamHealth, Mode, GatewayMode } from '../types/enums.js'
 import type { SessionId } from '../types/identity.js'
 import type {
@@ -15,7 +16,11 @@ import { callToolStdio } from '../registry/transport/stdio.js'
 import { isDownstreamAuthError } from '../registry/auth/index.js'
 import { getConfig } from '../config/index.js'
 import { isToolDisabledForNamespace } from '../config/disabled-tool-keys.js'
-import { executeCodeModeHelp, executeCodeMode } from '../runtime/index.js'
+import {
+  executeCodeModeHelp,
+  executeCodeMode,
+  type SandboxDiagnosticEvent,
+} from '../runtime/index.js'
 import {
   executeGatewaySearch,
   parseGatewayCallArgs,
@@ -33,6 +38,30 @@ import {
 export { GATEWAY_SERVER_ID as GATEWAY_DISCOVERY_SERVER_ID } from '../gateway/discovery.js'
 
 const MAX_RECENT_OUTCOMES = 50
+const CODE_LOG_PREVIEW_LIMIT = 160
+
+function summarizeCode(code: string): string {
+  const normalized = code.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= CODE_LOG_PREVIEW_LIMIT) return normalized
+  return `${normalized.slice(0, CODE_LOG_PREVIEW_LIMIT)}...`
+}
+
+function codeBytes(code: string): number {
+  return Buffer.byteLength(code, 'utf8')
+}
+
+function formatDownstreamRpcError(value: unknown): string {
+  if (value === undefined || value === null) return 'unknown error'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
 
 function findVisibleToolsByName(
   toolWindow: Array<{ name: string; serverId: string }>,
@@ -55,8 +84,33 @@ export class ExecutionRouter implements IExecutionRouter {
     private readonly store: ISessionStore,
     private readonly healthMonitor?: IHealthMonitor,
     private readonly getRateLimiter?: () => RateLimiter | undefined,
-    private readonly getResponseTimeoutMs?: () => number | undefined
+    private readonly getResponseTimeoutMs?: () => number | undefined,
+    private readonly log?: FastifyBaseLogger,
   ) {}
+
+  private logDownstreamFailure(
+    session: SessionState,
+    sessionId: SessionId,
+    toolName: string,
+    serverId: string,
+    outcome: OutcomeClass,
+    error: string | undefined,
+    durationMs: number
+  ): void {
+    this.log?.warn(
+      {
+        sessionId,
+        namespace: session.namespace,
+        method: 'tools/call',
+        toolName,
+        downstreamServer: serverId,
+        outcomeClass: outcome,
+        latencyMs: durationMs,
+        ...(error !== undefined ? { errorMessage: error } : {}),
+      },
+      'downstream tool call failed',
+    )
+  }
 
   async resolveServer(
     toolName: string,
@@ -318,6 +372,78 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     const startTime = Date.now()
+    this.log?.info(
+      {
+        sessionId,
+        namespace: session.namespace,
+        method: 'tools/call',
+        toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+        codeBytes: codeBytes(parsed.code),
+        codePreview: summarizeCode(parsed.code),
+      },
+      'gateway_run_code started'
+    )
+
+    const logDiagnosticEvent = (event: SandboxDiagnosticEvent): void => {
+      switch (event.type) {
+        case 'bridge_start':
+          this.log?.info(
+            {
+              sessionId,
+              namespace: session.namespace,
+              toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+              bridgeOp: event.operation,
+              pendingCount: event.pendingCount,
+              timeoutMs: event.timeoutMs,
+            },
+            'gateway_run_code bridge started'
+          )
+          return
+        case 'bridge_settled':
+          this.log?.info(
+            {
+              sessionId,
+              namespace: session.namespace,
+              toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+              bridgeOp: event.operation,
+              pendingCount: event.pendingCount,
+              outcome: event.outcome,
+              durationMs: event.durationMs,
+              payloadBytes: event.payloadBytes,
+              itemCount: event.itemCount,
+              empty: event.empty,
+              normalized: event.normalized,
+              truncated: event.truncated,
+              error: event.error,
+            },
+            'gateway_run_code bridge settled'
+          )
+          return
+        case 'cleanup_wait_start':
+          this.log?.info(
+            {
+              sessionId,
+              namespace: session.namespace,
+              toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+              pendingCount: event.pendingCount,
+            },
+            'gateway_run_code cleanup wait started'
+          )
+          return
+        case 'cleanup_wait_complete':
+          this.log?.info(
+            {
+              sessionId,
+              namespace: session.namespace,
+              toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+              pendingCount: event.pendingCount,
+            },
+            'gateway_run_code cleanup wait completed'
+          )
+          return
+      }
+    }
+
     try {
       const result = await executeCodeMode(
         parsed.code,
@@ -341,7 +467,23 @@ export class ExecutionRouter implements IExecutionRouter {
             throw new Error(outcome.error ?? outcome.outcome)
           }
           return outcome.result
-        }
+        },
+        { onDiagnosticEvent: logDiagnosticEvent }
+      )
+
+      const durationMs = Date.now() - startTime
+      this.log?.info(
+        {
+          sessionId,
+          namespace: session.namespace,
+          method: 'tools/call',
+          toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+          latencyMs: durationMs,
+          resultBytes: codeBytes(JSON.stringify(result) ?? 'null'),
+          storedAsArtifact:
+            !!result && typeof result === 'object' && 'artifactRef' in (result as Record<string, unknown>),
+        },
+        'gateway_run_code completed'
       )
 
       return {
@@ -350,17 +492,29 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result,
-        durationMs: Date.now() - startTime,
+        durationMs,
         timestamp: new Date().toISOString(),
       }
     } catch (error) {
+      const durationMs = Date.now() - startTime
+      this.log?.warn(
+        {
+          sessionId,
+          namespace: session.namespace,
+          method: 'tools/call',
+          toolName: GATEWAY_RUN_CODE_TOOL_NAME,
+          latencyMs: durationMs,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'gateway_run_code failed'
+      )
       return {
         toolName: GATEWAY_RUN_CODE_TOOL_NAME,
         serverId: GATEWAY_SERVER_ID,
         sessionId,
         outcome: OutcomeClass.ToolError,
         error: error instanceof Error ? error.message : String(error),
-        durationMs: Date.now() - startTime,
+        durationMs,
         timestamp: new Date().toISOString(),
       }
     }
@@ -395,6 +549,15 @@ export class ExecutionRouter implements IExecutionRouter {
             durationMs: 0,
             timestamp: new Date().toISOString(),
           }
+          this.logDownstreamFailure(
+            session,
+            sessionId,
+            toolName,
+            server.id,
+            outcome.outcome,
+            outcome.error,
+            0,
+          )
           await this.persistOutcome(sessionId, outcome)
           return outcome
         }
@@ -409,6 +572,15 @@ export class ExecutionRouter implements IExecutionRouter {
             durationMs: 0,
             timestamp: new Date().toISOString(),
           }
+          this.logDownstreamFailure(
+            session,
+            sessionId,
+            toolName,
+            server.id,
+            outcome.outcome,
+            outcome.error,
+            0,
+          )
           await this.persistOutcome(sessionId, outcome)
           return outcome
         }
@@ -420,12 +592,22 @@ export class ExecutionRouter implements IExecutionRouter {
     if (rateLimiter) {
       const release = rateLimiter.acquireDownstream(server.id)
       if (release === null) {
+        const errMsg = 'Downstream concurrency limit reached'
+        this.logDownstreamFailure(
+          session,
+          sessionId,
+          toolName,
+          server.id,
+          OutcomeClass.UnavailableDownstream,
+          errMsg,
+          0,
+        )
         return {
           toolName,
           serverId: server.id,
           sessionId,
           outcome: OutcomeClass.UnavailableDownstream,
-          error: 'Downstream concurrency limit reached',
+          error: errMsg,
           durationMs: 0,
           timestamp: new Date().toISOString(),
         }
@@ -473,6 +655,7 @@ export class ExecutionRouter implements IExecutionRouter {
         timestamp: new Date().toISOString(),
       }
 
+      this.logDownstreamFailure(session, sessionId, toolName, server.id, outcomeClass, errMsg, durationMs)
       await this.persistOutcome(sessionId, outcome)
       return outcome
     } finally {
@@ -480,6 +663,10 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     const durationMs = Date.now() - startTime
+    const downstreamErr =
+      outcomeClass === OutcomeClass.Success
+        ? undefined
+        : formatDownstreamRpcError(callResult.error)
     const outcome: ExecutionOutcome = {
       toolName,
       serverId: server.id,
@@ -490,11 +677,20 @@ export class ExecutionRouter implements IExecutionRouter {
       ...(outcomeClass === OutcomeClass.Success
         ? { result: callResult.result }
         : {
-            error:
-              typeof callResult.error === 'string'
-                ? callResult.error
-                : JSON.stringify(callResult.error),
+            error: downstreamErr,
           }),
+    }
+
+    if (outcomeClass !== OutcomeClass.Success) {
+      this.logDownstreamFailure(
+        session,
+        sessionId,
+        toolName,
+        server.id,
+        outcomeClass,
+        downstreamErr,
+        durationMs,
+      )
     }
 
     await this.persistOutcome(sessionId, outcome)

@@ -573,7 +573,7 @@ export class DownstreamAuthManager {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_name: 'MCP Session Gateway',
+          client_name: 'MCPR Gateway',
           redirect_uris: [redirectUri],
           grant_types: ['authorization_code', 'refresh_token'],
           response_types: ['code'],

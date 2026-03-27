@@ -136,7 +136,7 @@ export class HealthMonitor implements IHealthMonitor {
           params: {
             protocolVersion: '2024-11-05',
             capabilities: {},
-            clientInfo: { name: 'mcp-session-gateway-health', version: '1.0.0' },
+            clientInfo: { name: 'mcpr-gateway-health', version: '1.0.0' },
           },
         },
         undefined,

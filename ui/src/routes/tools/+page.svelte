@@ -251,7 +251,7 @@
 </script>
 
 <svelte:head>
-  <title>Tools — MCP Gateway</title>
+  <title>Tools — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-5">

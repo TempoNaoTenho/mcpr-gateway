@@ -184,7 +184,7 @@ describe('Golden path — initialize', () => {
 
     const body = res.json()
     expect(body.result.protocolVersion).toBe('2024-11-05')
-    expect(body.result.serverInfo.name).toBe('mcp-session-gateway')
+    expect(body.result.serverInfo.name).toBe('mcpr-gateway')
   })
 })
 

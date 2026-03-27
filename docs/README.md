@@ -1,4 +1,4 @@
-# MCP Session Gateway — Documentation
+# MCPR Gateway — Documentation
 
 Human-oriented guides for installing, configuring, operating, and developing the gateway. For machine-readable config details, the Zod schemas in [`src/config/schemas.ts`](../src/config/schemas.ts) are authoritative.
 
@@ -12,6 +12,7 @@ Human-oriented guides for installing, configuring, operating, and developing the
 | [HTTP API](http-api.md)               | Integrators            | Health, MCP JSON-RPC, admin, debug, static UI                    |
 | [Deployment](deployment.md)           | Operators              | Docker Compose, persistence, production hardening                |
 | [Development](development.md)         | Contributors           | npm scripts, tests, building the Web UI                          |
+| [../CHANGELOG.md](../CHANGELOG.md)    | Operators, adopters    | Current release notes, supported runtimes, publication caveats   |
 
 ## Repository map
 

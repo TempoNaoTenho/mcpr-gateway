@@ -3,14 +3,14 @@
 #   From docker/:     docker compose up --build
 #
 # Paths below are relative to this file (docker/): ../ = repository root.
-name: mcp-session-gateway
+name: mcpr-gateway
 
 services:
   gateway:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: mcp-session-gateway:local
+    image: mcpr-gateway:local
     ports:
       - '3000:3000'
     volumes:

@@ -5,10 +5,10 @@
     {
       "id": "web-search-intent",
       "namespace": "research",
-      "prompt": "Search the web for recent MCP session gateway articles",
+      "prompt": "Search the web for recent MCPR Gateway articles",
       "expectedTools": ["search_web"],
       "expectedServerIds": ["web-search"],
-      "discoveryQuery": "search the public web for MCP session gateway articles"
+      "discoveryQuery": "search the public web for MCPR Gateway articles"
     },
     {
       "id": "fetch-intent",

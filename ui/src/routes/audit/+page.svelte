@@ -78,7 +78,7 @@
 </script>
 
 <svelte:head>
-  <title>Audit Logs — MCP Gateway</title>
+  <title>Audit Logs — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-5">

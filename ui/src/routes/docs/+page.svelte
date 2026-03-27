@@ -1,5 +1,5 @@
 <svelte:head>
-  <title>Docs — MCP Gateway</title>
+  <title>Docs — MCPR Gateway</title>
 </svelte:head>
 
 <div class="space-y-6 max-w-3xl">
