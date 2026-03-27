@@ -9,7 +9,7 @@
 
 **A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them. Primarly focused on sandboxed code execution so LLM can auto-discover downstreams servers and tools, also supports a compat mode (two tools) and default mode (all tools).**
 
-> Some say MCP is dead, hopefully we can take good care of it.
+> Some say MCP is dead, hopefully we can give it **CPR**.. 🥁
 
 ## Inspired by
 
@@ -71,6 +71,12 @@ flowchart LR
     end
 
     adminui["🖥️ Admin WebUI\n/ui/"]
+    subgraph webui["Admin Panels"]
+        direction TB
+        wp1["📊 Dashboard · 🔌 Servers · 🛠️ Tools"]
+        wp2["💬 Sessions · 🔑 Access Control"]
+        wp3["📋 Audit · ⚙️ Config & History · 🌐 Namespaces"]
+    end
     sqlite[("🗄️ SQLite\nSessions · Audit · Config")]
 
     clients -->|"Bearer token\nPOST /mcp/:namespace"| auth
@@ -80,6 +86,7 @@ flowchart LR
     sessions <--> sqlite
     gateway --- sessions
     adminui -->|"admin_session cookie\n/admin/*"| gateway
+    adminui --- webui
 ```
 
 ---
@@ -141,89 +148,89 @@ export MCPR_GATEWAY_TOKEN=<your-token>
 
 ### 🔐 Security
 
-| Concern | Implementation |
-| ------- | -------------- |
-| Client auth | Bearer token per user/service, issued via Admin UI or `auth.staticKeys` in bootstrap |
-| Admin protection | `ADMIN_TOKEN` enables login; `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` are the credentials; in `NODE_ENV=production` with no `ADMIN_TOKEN`, admin routes are not mounted |
-| Downstream credentials | AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set (default in `npm run setup`) |
-| HTTP security headers | `@fastify/helmet` applied to all responses |
-| CORS | Restricted to loopback origins (`localhost`, `127.0.0.1`, `::1`) for MCP endpoints |
+| Concern                | Implementation                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Client auth            | Bearer token per user/service, issued via Admin UI or `auth.staticKeys` in bootstrap                                                                                           |
+| Admin protection       | `ADMIN_TOKEN` enables login; `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` are the credentials; in `NODE_ENV=production` with no `ADMIN_TOKEN`, admin routes are not mounted |
+| Downstream credentials | AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set (default in `npm run setup`)                                                                              |
+| HTTP security headers  | `@fastify/helmet` applied to all responses                                                                                                                                     |
+| CORS                   | Restricted to loopback origins (`localhost`, `127.0.0.1`, `::1`) for MCP endpoints                                                                                             |
 
 ### 🌐 Sessions & Transport
 
-| Topic | Detail |
-| ----- | ------ |
-| Persistence | SQLite (default) or in-memory (`SESSION_BACKEND=memory`) |
-| TTL | 30 min default (`session.ttlSeconds = 1800`), automatic cleanup |
-| Transport | HTTP-Streamable: `GET /mcp/:namespace` (SSE) + `POST /mcp/:namespace` (JSON-RPC) |
-| Session header | `Mcp-Session-Id` required on all requests after `initialize` |
-| Admin ops | Query, inspect, and revoke sessions via `/ui/sessions` or `GET /admin/sessions` |
+| Topic          | Detail                                                                           |
+| -------------- | -------------------------------------------------------------------------------- |
+| Persistence    | SQLite (default) or in-memory (`SESSION_BACKEND=memory`)                         |
+| TTL            | 30 min default (`session.ttlSeconds = 1800`), automatic cleanup                  |
+| Transport      | HTTP-Streamable: `GET /mcp/:namespace` (SSE) + `POST /mcp/:namespace` (JSON-RPC) |
+| Session header | `Mcp-Session-Id` required on all requests after `initialize`                     |
+| Admin ops      | Query, inspect, and revoke sessions via `/ui/sessions` or `GET /admin/sessions`  |
 
 ### 🔌 Downstream Servers
 
-| Topic | Detail |
-| ----- | ------ |
-| Transports | `stdio` and `http` / streamable-HTTP |
-| Auth options | `none`, `bearer` (env var or inline), `oauth` |
-| Credentials | Encrypted at rest; UI-managed via `/ui/servers` |
+| Topic             | Detail                                                                  |
+| ----------------- | ----------------------------------------------------------------------- |
+| Transports        | `stdio` and `http` / streamable-HTTP                                    |
+| Auth options      | `none`, `bearer` (env var or inline), `oauth`                           |
+| Credentials       | Encrypted at rest; UI-managed via `/ui/servers`                         |
 | Health monitoring | Continuous checks; degraded servers penalized in tool selection ranking |
-| Namespacing | Servers assigned per namespace; tool pool isolated per access path |
+| Namespacing       | Servers assigned per namespace; tool pool isolated per access path      |
 
 ### 🛡️ Role-Based Access Control
 
-| Concept | Description |
-| ------- | ----------- |
-| Namespace | Isolated access path — e.g. `/mcp/dev`, `/mcp/prod`, `/mcp/personal` |
-| Role | Maps a bearer token to one or more namespaces with allowed operating modes |
-| Token | Per-client Bearer token, issued via Admin UI and stored in SQLite |
+| Concept   | Description                                                                  |
+| --------- | ---------------------------------------------------------------------------- |
+| Namespace | Isolated access path — e.g. `/mcp/dev`, `/mcp/prod`, `/mcp/personal`         |
+| Role      | Maps a bearer token to one or more namespaces with allowed operating modes   |
+| Token     | Per-client Bearer token, issued via Admin UI and stored in SQLite            |
 | Auth mode | `static_key` — token resolved to role; role checked against namespace policy |
 
 ### 🖥️ Admin WebUI
 
 Served at `/ui/` — **SvelteKit 2 + TailwindCSS v4**. Requires admin login when `ADMIN_TOKEN` is set.
 
-| Panel | Path | What you can do |
-| ----- | ---- | --------------- |
-| Dashboard | `/ui/` | Session counts, server health overview |
-| Servers | `/ui/servers` | Add, edit, delete downstream servers; view health status |
-| Sessions | `/ui/sessions` | Inspect active sessions; revoke individual sessions |
-| Access Control | `/ui/access` | Issue and revoke client bearer tokens |
-| Audit | `/ui/audit` | Browse events filtered by user, tool, event type, date range |
-| Config | `/ui/config` | Edit runtime config; view full version history; one-click rollback |
-| Namespaces | `/ui/namespaces` | Token estimates, catalog sizes, mode metrics per namespace |
-| Tools | `/ui/tools` | Browse full downstream tool catalog |
+| Panel          | Path             | What you can do                                                    |
+| -------------- | ---------------- | ------------------------------------------------------------------ |
+| Dashboard      | `/ui/`           | Session counts, server health overview                             |
+| Servers        | `/ui/servers`    | Add, edit, delete downstream servers; view health status           |
+| Sessions       | `/ui/sessions`   | Inspect active sessions; revoke individual sessions                |
+| Access Control | `/ui/access`     | Issue and revoke client bearer tokens                              |
+| Audit          | `/ui/audit`      | Browse events filtered by user, tool, event type, date range       |
+| Config         | `/ui/config`     | Edit runtime config; view full version history; one-click rollback |
+| Namespaces     | `/ui/namespaces` | Token estimates, catalog sizes, mode metrics per namespace         |
+| Tools          | `/ui/tools`      | Browse full downstream tool catalog                                |
 
 ### 📊 Audit & Observability
 
-| Topic | Detail |
-| ----- | ------ |
-| Logging | Pino structured logs to stdout; level set via `LOG_LEVEL` env var |
-| Audit trail | SQLite-persisted per-event records; prunable by retention window (`AUDIT_RETENTION_DAYS`) |
-| Audit events | `SessionCreated`, `ToolExecuted`, `ExecutionDenied`, `DownstreamMarkedUnhealthy` |
-| Query API | `GET /admin/audit` — filters: `session_id`, `user_id`, `event_type`, `tool_name`, `from`, `to` |
+| Topic        | Detail                                                                                         |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| Logging      | Pino structured logs to stdout; level set via `LOG_LEVEL` env var                              |
+| Audit trail  | SQLite-persisted per-event records; prunable by retention window (`AUDIT_RETENTION_DAYS`)      |
+| Audit events | `SessionCreated`, `ToolExecuted`, `ExecutionDenied`, `DownstreamMarkedUnhealthy`               |
+| Query API    | `GET /admin/audit` — filters: `session_id`, `user_id`, `event_type`, `tool_name`, `from`, `to` |
 
 ### ⚡ Resilience
 
-| Feature | Config key | Default |
-| ------- | ---------- | ------- |
-| Rate limiting | `resilience.rateLimit.*` | Per-session and per-user windows |
-| Downstream concurrency | `resilience.concurrency.*` | Per-server cap |
-| Response timeout | `resilience.timeoutMs` | Configurable |
-| Health-aware ranking | Automatic | Unhealthy servers penalized in tool selection |
+| Feature                | Config key                 | Default                                       |
+| ---------------------- | -------------------------- | --------------------------------------------- |
+| Rate limiting          | `resilience.rateLimit.*`   | Per-session and per-user windows              |
+| Downstream concurrency | `resilience.concurrency.*` | Per-server cap                                |
+| Response timeout       | `resilience.timeoutMs`     | Configurable                                  |
+| Health-aware ranking   | Automatic                  | Unhealthy servers penalized in tool selection |
 
 ---
 
 ## 📚 Documentation
 
-| Guide | Audience | Contents |
-| ----- | -------- | -------- |
-| [Getting Started](docs/GETTING-STARTED.md) | Operators, integrators | Dependencies, setup, MCP client flow, auth basics |
-| [Configuration](docs/CONFIGURATION.md) | Operators | `bootstrap.json`, selector publication, `CONFIG_PATH`, two-tier config model |
-| [Architecture](docs/ARCHITECTURE.md) | Contributors | Sessions, registry, selector, triggers, high-level flow |
-| [HTTP API](docs/reference/HTTP-API.md) | Integrators | Health, MCP JSON-RPC, admin, debug, static UI — full endpoint reference |
-| [Deployment](docs/DEPLOYMENT.md) | Operators | Docker Compose, persistence, production hardening, TLS |
-| [Development](docs/DEVELOPMENT.md) | Contributors | npm scripts, project layout, tests, Web UI workflow |
-| [Changelog](docs/CHANGELOG.md) | Operators, adopters | Release notes, runtime requirements, known caveats |
+| Guide                                      | Audience               | Contents                                                                     |
+| ------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------- |
+| [Getting Started](docs/GETTING-STARTED.md) | Operators, integrators | Dependencies, setup, MCP client flow, auth basics                            |
+| [Configuration](docs/CONFIGURATION.md)     | Operators              | `bootstrap.json`, selector publication, `CONFIG_PATH`, two-tier config model |
+| [Architecture](docs/ARCHITECTURE.md)       | Contributors           | Sessions, registry, selector, triggers, high-level flow                      |
+| [HTTP API](docs/reference/HTTP-API.md)     | Integrators            | Health, MCP JSON-RPC, admin, debug, static UI — full endpoint reference      |
+| [Deployment](docs/DEPLOYMENT.md)           | Operators              | Docker Compose, persistence, production hardening, TLS                       |
+| [Development](docs/DEVELOPMENT.md)         | Contributors           | npm scripts, project layout, tests, Web UI workflow                          |
+| [Changelog](docs/CHANGELOG.md)             | Operators, adopters    | Release notes, runtime requirements, known caveats                           |
 
 > Config schema source of truth: [`src/config/schemas.ts`](src/config/schemas.ts). For bootstrap examples and copy-paste snippets, see [`config/README.md`](config/README.md).
 
