@@ -22,7 +22,8 @@ import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
 import { negotiateMcpProtocolVersion } from '../mcp-protocol-version.js'
 
-function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): string | undefined {
+/** Same string the MCP client receives in `initialize.result.instructions` (compat/code only). */
+export function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): string | undefined {
   switch (mode) {
     case GatewayMode.Compat: {
       const serverList =

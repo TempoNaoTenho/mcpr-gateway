@@ -213,7 +213,10 @@
   <div class="grid gap-6 xl:grid-cols-[320px_1fr]">
     <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
       <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-        <p class="text-sm font-semibold text-slate-900 dark:text-white">Namespace catalog</p>
+        <div class="flex items-center gap-2">
+          <p class="text-sm font-semibold text-slate-900 dark:text-white">Namespace catalog</p>
+          <InfoTooltip text="Token pills are tools/list only. Compat/code also send long initialize.instructions; when present, the line below shows first-turn estimate (tools/list + instructions). Server count is downstream servers assigned to the namespace." />
+        </div>
       </div>
       {#if loading}
         <div class="px-4 py-8 text-sm text-slate-500 dark:text-slate-400">Loading…</div>
@@ -232,7 +235,12 @@
                 <Badge variant="muted">~{namespace.metrics.totalTokens}</Badge>
               </div>
               <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {namespace.metrics.toolCount} tools · {namespace.metrics.serverCount} servers
+                {namespace.metrics.toolCount} on tools/list · {namespace.metrics.serverCount} servers
+                {#if namespace.metrics.initializeInstructionsTokens > 0}
+                  <span class="block text-[11px] mt-0.5 text-slate-600 dark:text-slate-400">
+                    ~{namespace.metrics.firstTurnEstimatedTokens} est. 1st turn (incl. init text)
+                  </span>
+                {/if}
               </div>
             </button>
           {/each}
@@ -248,22 +256,57 @@
       {:else}
         <div class="grid gap-3 md:grid-cols-4">
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Visible tools</p>
+            <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Tools on tools/list
+              <InfoTooltip text="Count of tools returned to the MCP client on tools/list after initialize (gateway mode affects this: default exposes downstream tools; compat and code expose two meta-tools each)." />
+            </div>
             <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{selectedNamespace.metrics.toolCount}</p>
           </div>
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Schema tokens</p>
+            <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Schema tokens (tools/list)
+              <InfoTooltip text="Estimated tokens from input schemas in the published tools/list payload (UTF-8 length ÷ 4)." />
+            </div>
             <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">~{selectedNamespace.metrics.schemaTokens}</p>
           </div>
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Avg tokens / tool</p>
+            <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Avg tokens / tool (tools/list)
+              <InfoTooltip text="mean total tokens per tool in the tools/list surface (not the full downstream catalog in compat/code)." />
+            </div>
             <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">~{selectedNamespace.metrics.averageTokensPerTool}</p>
           </div>
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Customized tools</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{selectedNamespace.metrics.customizedTools}</p>
+            <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Customized tools
+              <InfoTooltip text="Downstream tools in this namespace with description/schema overrides (see Effective tools). Gateway meta-tools are not counted. In compat/code the tools/list window does not include downstream tools, but overrides still apply when those tools run." />
+            </div>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{selectedNamespace.catalogMetrics.customizedTools}</p>
           </div>
         </div>
+
+        {#if selectedNamespace.metrics.initializeInstructionsTokens > 0}
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Initialize instructions (est.)
+                <InfoTooltip text="Separate from tools/list: the instructions field returned on MCP initialize in compat/code (UTF-8 length ÷ 4), matching server buildGatewayInstructions." />
+              </div>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                ~{selectedNamespace.metrics.initializeInstructionsTokens}
+              </p>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                First turn estimate
+                <InfoTooltip text="tools/list token total plus initialize instructions — rough upper bound for what the client may surface right after connect (actual client handling varies)." />
+              </div>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                ~{selectedNamespace.metrics.firstTurnEstimatedTokens}
+              </p>
+            </div>
+          </div>
+        {/if}
 
         <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-5">
           <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -400,7 +443,7 @@
           <div class="space-y-3">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
               Assigned servers
-              <InfoTooltip text="Server assignment controls which imported tools contribute schema tokens to this namespace." />
+              <InfoTooltip text="Server assignment controls which downstream tools appear in this namespace catalog (and default-mode tools/list). In compat/code, meta-tools still search/call this catalog." />
             </div>
             <div class="grid gap-2 md:grid-cols-2">
               {#each configServers as server}
@@ -425,7 +468,7 @@
           <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
             <div class="flex items-center gap-2">
               <p class="text-sm font-semibold text-slate-900 dark:text-white">Effective tools</p>
-              <InfoTooltip text="Token estimates are computed from the effective public tool payload: name, description, and input schema after overrides. Row switches exclude a tool from this namespace (saved with Save Namespace)." />
+              <InfoTooltip text="Downstream catalog for this namespace: token estimates use name, description, and input schema after overrides (not the compat/code tools/list window). Row switches exclude a tool from this namespace (saved with Save Namespace)." />
             </div>
           </div>
           <table class="w-full text-sm">

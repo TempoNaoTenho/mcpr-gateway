@@ -1,6 +1,6 @@
 # Architecture
 
-High-level view of how the gateway processes MCP traffic and keeps sessions. For exact HTTP paths see [HTTP API](http-api.md); for config keys see [Configuration](CONFIGURATION.md).
+High-level view of how the gateway processes MCP traffic and keeps sessions. For exact HTTP paths see [HTTP API](reference/HTTP-API.md); for config keys see [Configuration](CONFIGURATION.md).
 
 ## Main components
 
@@ -19,8 +19,7 @@ High-level view of how the gateway processes MCP traffic and keeps sessions. For
 
 ## Request flow (MCP)
 
-```mermaid
-sequenceDiagram
+```sequenceDiagram
   participant Client
   participant Gateway as Gateway_HTTP
   participant Policy
@@ -67,3 +66,26 @@ Downstream tool definitions are normalized into **toolcards** (sanitized descrip
 ## Namespaces and downstream servers
 
 Each downstream server entry carries a `namespace`. The gateway groups tools by namespace for candidate pools and routing. Cross-references in config (`starterPacks` keys, `servers[].namespace`, `roles`) are validated at startup (warnings or errors per loader logic in [`src/config/loader.ts`](../src/config/loader.ts)).
+
+## Operating modes
+
+Each namespace runs in one of three modes, configured under `namespaces[].mode`:
+
+| Mode | Exposed tools | Best for |
+| ---- | ------------- | -------- |
+| **Default** | All enabled downstream tools filtered by namespace | Small tool sets, maximum transparency |
+| **Compat** | Two meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large catalogs, context-window efficiency |
+| **Code** | Two tools: `gateway_run_code` + `gateway_help` | Programmatic multi-tool orchestration in a JS sandbox |
+
+- [Default Mode](modes/DEFAULT-MODE.md) — full tool catalog, no indirection
+- [Compat Mode](modes/COMPAT-MODE.md) — BM25-backed discovery via meta-tools
+- [Code Mode](modes/CODE-MODE.md) — `isolated-vm` sandbox with built-in MCP runtime API
+
+## Resilience layer
+
+Sits between the execution router and downstream servers. Configured under [`resilience`](CONFIGURATION.md) in the config file:
+
+- **Rate limiting** — per-client request throttling via `@fastify/rate-limit`
+- **Concurrency limits** — per-downstream server cap on simultaneous in-flight tool calls
+- **Timeouts** — per-request deadline enforcement for downstream HTTP calls
+- **Health-aware ranking** — unhealthy servers are penalized in selector scoring (compat/code modes); degraded servers surface lower in results before being fully excluded

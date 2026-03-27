@@ -16,163 +16,219 @@
 - [Anthropic's Code Execution](https://www.anthropic.com/engineering/code-execution-with-mcp?_hsmi=390282592)
 - [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode-mcp/)
 
-## Features
+## Current features
 
-### WebUI and Admin API
+| Feature                                              | ✅/❌/Optional   | Feature                                         | ✅/❌/Optional |
+| ---------------------------------------------------- | ---------------- | ----------------------------------------------- | -------------- |
+| WebUI and Admin API                                  | ✅               | OAuth Support                                   | ✅             |
+| Active sessions management                           | ✅               | Audit & Observability                           | ✅             |
+| Auto refresh tools                                   | ✅               | Namespaces for MCP Downstream Servers Isolation | ✅             |
+| SQLite Support                                       | ✅               | Active sessions management                      | ✅             |
+| Downstream tool editing                              | ✅               | MCP Client Permission Management                | ✅             |
+| Downstream tool token usage counter                  | ✅               | Client Bearer Token Managment                   | ✅             |
+| HTTP-Streamable Support                              | ✅ - All         | Bootstrap file support                          | ✅             |
+| BM25 / lexical ranking                               | ✅ - Compat Mode |
+| Two-tool Low Schema Mode                             | ✅ - Compat Mode |
+| Performance-focused Sandbox Execution Tool discovery | ✅ - Code Mode   |
+| All Tools Loaded Mode                                | ✅ - Default     |
+| Stdio Support                                        | ❌               |
+| PGSQL Support                                        | ❌               |
 
-Features a WebUI and Admin API for easy management of downstream servers, namespaces, roles, access, audit logs and tokens approximate token usage per namespace.
+## Operating Modes
 
-### Operating Modes
+| Mode        | Tool Window                                                | Best For                                              |
+| ----------- | ---------------------------------------------------------- | ----------------------------------------------------- |
+| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Programmatic multi-tool orchestration in a JS sandbox |
+| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage                |
+| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets                    |
 
-| Mode        | Tool Window                                                | Best For                                                                                                                                   |
-| ----------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Programmatic multi-tool orchestration in a JS sandbox - my tests shows better performance than compat mode, especially for large tool sets |
-| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage                                                                                                     |
-| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets                                                                                                         |
-
-Modes are configured per namespace and can be mixed across different access paths. You can create a `mcp/dev` with complex tools to be used in code mode or `/mcp/personal` with a small set of tools to be used in compat mode for example.
-
-### Session Management
-
-- Persistent sessions backed by **SQLite** (default) or in-memory store
-- Configurable TTL (default 30 minutes via `session.ttlSeconds` = 1800) with automatic cleanup
-- Session-scoped tool window tracks recent execution outcomes
-- Admin can query, inspect, and revoke sessions via API or WebUI
-
-### Downstream MCP Servers
-
-- Supports **stdio** and **HTTP/streamable-HTTP** transports
-- Per-server authentication: `none`, `bearer` (env var or literal), `oauth`
-- UI-managed credentials encrypted at rest (`DOWNSTREAM_AUTH_ENCRYPTION_KEY`)
-- Health monitoring with automatic penalization of degraded servers
-
-### Role-Based Access Control
-
-- **Namespaces** define isolated access paths (e.g. `/mcp/dev`, `/mcp/prod`)
-- **Roles** map to namespaces with configurable allowed modes (`read`/`write`/`admin`)
-- **Bearer tokens** issued per user/service via the admin API or WebUI, mapped to roles in config (`static_key` auth)
-
-### WebUI Admin Panel
-
-- Built with SvelteKit 2 + TailwindCSS v4, served at `/ui/`
-- Manage downstream servers (add, edit, delete, health status)
-- Issue and revoke client bearer tokens
-- Inspect and revoke active sessions
-- Browse audit logs with filters (user, event type, tool name, date range)
-- Edit runtime config with version history and one-click rollback
-- Manage namespaces, roles, and starter packs
-
-### Audit & Observability
-
-- Structured logging via **Pino** (stdout, configurable level)
-- SQLite-persisted **audit trail**: every session created, tool called, access denied
-- Queryable via `GET /admin/audit` with filters; prunable by retention days
-- Events: `SessionCreated`, `ToolExecuted`, `ExecutionDenied`, `DownstreamMarkedUnhealthy`
-
-### Resilience
-
-- Per-session and per-user **rate limiting** (configurable windows)
-- Per-downstream **concurrency limits**
-- Configurable **response timeouts**
-- Health-aware tool selector (unhealthy servers penalized in rankings)
+Modes are configured per namespace and can be mixed across different access paths. For instance, you can create a `mcp/dev` with complex tools to be used in code mode or `/mcp/personal` with a small set of tools to be used in default mode for example.
 
 ---
 
-## Operating Modes In Depth
+## 🏗️ Architecture
 
-### Default Mode
+```mermaid
+flowchart LR
+    subgraph clients["MCP Clients"]
+        claude["Claude / Claude Code"]
+        codex["OpenAI Codex"]
+        inspector["MCP Inspector"]
+    end
 
-Exposes all enabled downstream tools directly. The selector engine still applies namespace filtering and role policies, but the full tool catalog is visible. Best when you have a small, curated set of tools and want full transparency.
+    subgraph gateway["MCPR Gateway  (Fastify + TypeScript)"]
+        direction TB
+        auth["🔐 Auth & RBAC\nBearer token → role → namespace"]
+        modes["⚙️ Operating Modes\nCode · Compat · Default"]
+        registry["📡 Server Registry\n& Health Monitor"]
+        sessions["💾 Session Store"]
+    end
 
-### Compat Mode _(recommended default)_
+    subgraph downstream["Downstream MCP Servers"]
+        s1["Server A\n(stdio)"]
+        s2["Server B\n(HTTP)"]
+        s3["Server C\n(SSE)"]
+    end
 
-Replaces the entire tool catalog with two meta-tools:
+    adminui["🖥️ Admin WebUI\n/ui/"]
+    sqlite[("🗄️ SQLite\nSessions · Audit · Config")]
 
-- **`gateway_search_tools`** — BM25 lexical search over all available tools. Returns name, description, and server ID.
-- **`gateway_call_tool`** — Proxy call to any tool returned by search. Handles routing, auth, and error normalization.
-
-The client's context window only ever sees these two tools, regardless of how many downstream servers are registered. The model discovers and calls tools on demand.
-
+    clients -->|"Bearer token\nPOST /mcp/:namespace"| auth
+    auth --> modes
+    modes --> registry
+    registry --> s1 & s2 & s3
+    sessions <--> sqlite
+    gateway --- sessions
+    adminui -->|"admin_session cookie\n/admin/*"| gateway
 ```
-# Typical flow:
-1. gateway_search_tools("list files in repository")
-   → returns: [{ name: "fs_list_dir", serverId: "filesystem" }, ...]
 
-2. gateway_call_tool({ name: "fs_list_dir", serverId: "filesystem", arguments: { path: "/" } })
-   → returns tool result
+---
+
+## ⚡ Quick Setup
+
+### 1. Start the gateway
+
+```bash
+# Clone and set up interactively (.env + bootstrap.json)
+git clone <repo-url> mcpr-gateway && cd mcpr-gateway
+npm run setup
+npm run dev        # UI on PORT, gateway on PORT+1
 ```
 
-### Code Mode
+```bash
+# Or with Docker Compose
+docker compose -f docker/docker-compose.yml up
+```
 
-Exposes a JavaScript sandbox (`isolated-vm`) with a built-in MCP runtime API:
+### 2. Connect an MCP client
 
-```javascript
-// Discover tools
-const tools = await catalog.search('fastmcp docs', {
-  serverId: 'fastmcp',
-  requiredArgs: ['query'],
-  detail: 'signature',
-  k: 5,
-})
+Issue a **client Bearer token** from the Access Control panel at `/ui/access` (or add it to `auth.staticKeys` in `bootstrap.json`), then configure your client:
 
-// Call tools and process results
-const details = await catalog.describe(tools[0].handle, { detail: 'signature' })
-const out = await mcp.call(tools[0].handle, { query: 'quickstart' })
-const filtered = result.limit(result.items(out), 1)
-const text = result.text(out)
+**Claude Code** (`~/.claude/settings.json`):
 
-// Batch only tools with compatible args
-if (tools.length >= 2) {
-  const [a, b] = await mcp.batch([
-    { handle: tools[0].handle, args: { query: 'quickstart' } },
-    { handle: tools[1].handle, args: { query: 'installation' } },
-  ])
+```json
+{
+  "mcpServers": {
+    "mcpr-gateway": {
+      "type": "http",
+      "url": "http://localhost:3001/mcp/default",
+      "headers": { "Authorization": "Bearer <your-token>" }
+    }
+  }
 }
-
-// Store large results for later
-const saved = await artifacts.save(filtered, { label: 'filtered-files' })
-return { saved, count: result.count(filtered), sample: text }
 ```
 
-The sandbox is memory- and time-limited (configurable). The model writes a script; the gateway executes it against real downstream tools and returns the result. `result` is a reserved global, snippets may be either a single expression or a block with `return`, and the final value should be JSON-friendly. `catalog.search()` accepts `k`, the compatibility alias `limit` (prefer `k`), and optional filters such as `serverId` and `requiredArgs` to make tool selection safer for LLMs. `catalog.describe(..., { detail: "signature" })` returns required args plus short property metadata (`type`, `description`, `enum` when available). `result.limit()` expects an array, while `result.items()` and `result.text()` help consume tool results that come back as `content[]`. For `mcp.batch`, only combine handles that accept the same arg shape; use `catalog.describe(..., { detail: "signature" })` when unsure and check that the search returned enough tools before indexing. For large or rich payloads, prefer `result.pick`, `result.limit`, `artifacts.save`, or `JSON.parse(JSON.stringify(value))`.
+**OpenAI Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.mcpr-gateway]
+type = "http"
+url  = "http://localhost:3001/mcp/default"
+bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
+```
+
+```bash
+export MCPR_GATEWAY_TOKEN=<your-token>
+```
+
+**Any HTTP MCP client**: send `Authorization: Bearer <token>` on every request. After `initialize`, include the `Mcp-Session-Id` header returned by the gateway.
+
+> 💡 Replace `default` in the URL with the namespace configured in `bootstrap.json`. Multiple namespaces can map to different modes and downstream server pools.
 
 ---
 
+## 🔍 Feature Details
+
+### 🔐 Security
+
+| Concern | Implementation |
+| ------- | -------------- |
+| Client auth | Bearer token per user/service, issued via Admin UI or `auth.staticKeys` in bootstrap |
+| Admin protection | `ADMIN_TOKEN` enables login; `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` are the credentials; in `NODE_ENV=production` with no `ADMIN_TOKEN`, admin routes are not mounted |
+| Downstream credentials | AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set (default in `npm run setup`) |
+| HTTP security headers | `@fastify/helmet` applied to all responses |
+| CORS | Restricted to loopback origins (`localhost`, `127.0.0.1`, `::1`) for MCP endpoints |
+
+### 🌐 Sessions & Transport
+
+| Topic | Detail |
+| ----- | ------ |
+| Persistence | SQLite (default) or in-memory (`SESSION_BACKEND=memory`) |
+| TTL | 30 min default (`session.ttlSeconds = 1800`), automatic cleanup |
+| Transport | HTTP-Streamable: `GET /mcp/:namespace` (SSE) + `POST /mcp/:namespace` (JSON-RPC) |
+| Session header | `Mcp-Session-Id` required on all requests after `initialize` |
+| Admin ops | Query, inspect, and revoke sessions via `/ui/sessions` or `GET /admin/sessions` |
+
+### 🔌 Downstream Servers
+
+| Topic | Detail |
+| ----- | ------ |
+| Transports | `stdio` and `http` / streamable-HTTP |
+| Auth options | `none`, `bearer` (env var or inline), `oauth` |
+| Credentials | Encrypted at rest; UI-managed via `/ui/servers` |
+| Health monitoring | Continuous checks; degraded servers penalized in tool selection ranking |
+| Namespacing | Servers assigned per namespace; tool pool isolated per access path |
+
+### 🛡️ Role-Based Access Control
+
+| Concept | Description |
+| ------- | ----------- |
+| Namespace | Isolated access path — e.g. `/mcp/dev`, `/mcp/prod`, `/mcp/personal` |
+| Role | Maps a bearer token to one or more namespaces with allowed operating modes |
+| Token | Per-client Bearer token, issued via Admin UI and stored in SQLite |
+| Auth mode | `static_key` — token resolved to role; role checked against namespace policy |
+
+### 🖥️ Admin WebUI
+
+Served at `/ui/` — **SvelteKit 2 + TailwindCSS v4**. Requires admin login when `ADMIN_TOKEN` is set.
+
+| Panel | Path | What you can do |
+| ----- | ---- | --------------- |
+| Dashboard | `/ui/` | Session counts, server health overview |
+| Servers | `/ui/servers` | Add, edit, delete downstream servers; view health status |
+| Sessions | `/ui/sessions` | Inspect active sessions; revoke individual sessions |
+| Access Control | `/ui/access` | Issue and revoke client bearer tokens |
+| Audit | `/ui/audit` | Browse events filtered by user, tool, event type, date range |
+| Config | `/ui/config` | Edit runtime config; view full version history; one-click rollback |
+| Namespaces | `/ui/namespaces` | Token estimates, catalog sizes, mode metrics per namespace |
+| Tools | `/ui/tools` | Browse full downstream tool catalog |
+
+### 📊 Audit & Observability
+
+| Topic | Detail |
+| ----- | ------ |
+| Logging | Pino structured logs to stdout; level set via `LOG_LEVEL` env var |
+| Audit trail | SQLite-persisted per-event records; prunable by retention window (`AUDIT_RETENTION_DAYS`) |
+| Audit events | `SessionCreated`, `ToolExecuted`, `ExecutionDenied`, `DownstreamMarkedUnhealthy` |
+| Query API | `GET /admin/audit` — filters: `session_id`, `user_id`, `event_type`, `tool_name`, `from`, `to` |
+
+### ⚡ Resilience
+
+| Feature | Config key | Default |
+| ------- | ---------- | ------- |
+| Rate limiting | `resilience.rateLimit.*` | Per-session and per-user windows |
+| Downstream concurrency | `resilience.concurrency.*` | Per-server cap |
+| Response timeout | `resilience.timeoutMs` | Configurable |
+| Health-aware ranking | Automatic | Unhealthy servers penalized in tool selection |
+
 ---
 
-## Security
+## 📚 Documentation
 
-- **Local bind by default** — `HOST=127.0.0.1` prevents accidental network exposure
-- **Client auth** — `static_key`: MCP clients use Bearer tokens created in the admin UI / admin API (bootstrap only carries `auth.mode`; tokens are not embedded in `bootstrap.json`)
-- **Admin API protection** — set `ADMIN_TOKEN` to require `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` via `/admin/auth/login` (session cookie); in `NODE_ENV=production` with debug off and no `ADMIN_TOKEN`, admin routes are not mounted at all
-- **Downstream credentials** — stored AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set
-- **Rate limiting** — per-session and per-user request limits via `@fastify/rate-limit`
-- **Security headers** — `@fastify/helmet` applied to all responses
-- **CORS** — restricted to loopback origins for MCP endpoints
+| Guide | Audience | Contents |
+| ----- | -------- | -------- |
+| [Getting Started](docs/GETTING-STARTED.md) | Operators, integrators | Dependencies, setup, MCP client flow, auth basics |
+| [Configuration](docs/CONFIGURATION.md) | Operators | `bootstrap.json`, selector publication, `CONFIG_PATH`, two-tier config model |
+| [Architecture](docs/ARCHITECTURE.md) | Contributors | Sessions, registry, selector, triggers, high-level flow |
+| [HTTP API](docs/reference/HTTP-API.md) | Integrators | Health, MCP JSON-RPC, admin, debug, static UI — full endpoint reference |
+| [Deployment](docs/DEPLOYMENT.md) | Operators | Docker Compose, persistence, production hardening, TLS |
+| [Development](docs/DEVELOPMENT.md) | Contributors | npm scripts, project layout, tests, Web UI workflow |
+| [Changelog](docs/CHANGELOG.md) | Operators, adopters | Release notes, runtime requirements, known caveats |
 
-See [docs/deployment.md](docs/deployment.md) for production hardening checklist.
-
-### Local verification (pre-push / CI parity)
-
-From the repo root, **`npm run verify`** (alias **`npm run ci`**, **`npm run prepush`**) runs: fresh `npm ci`, typecheck, lint, Vitest with coverage, `npm --prefix ui ci` + **`svelte-check`**, then **`npm run build`**. For day-to-day runs without reinstalling deps or building the UI, use **`npm test`** (typecheck + lint + tests via npm `pretest`) or **`npm run test:coverage`**.
+> Config schema source of truth: [`src/config/schemas.ts`](src/config/schemas.ts). For bootstrap examples and copy-paste snippets, see [`config/README.md`](config/README.md).
 
 ---
 
-## Documentation
-
-| Doc                                                | Description                                                |
-| -------------------------------------------------- | ---------------------------------------------------------- |
-| [docs/getting-started.md](docs/getting-started.md) | Install, config, first run                                 |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)     | `bootstrap.json` schema, env interpolation, SQLite vs file |
-| [docs/architecture.md](docs/architecture.md)       | Concepts, request flow, selector engine                    |
-| [docs/http-api.md](docs/http-api.md)               | HTTP routes reference                                      |
-| [docs/deployment.md](docs/deployment.md)           | Docker, environment, security hardening                    |
-| [docs/development.md](docs/development.md)         | Scripts, tests, UI development                             |
-| [CHANGELOG.md](CHANGELOG.md)                       | Release notes and current publication caveats              |
-| [config/README.md](config/README.md)               | Config directory quick reference                           |
-
----
-
-## License
+## 📄 License
 
 MIT — see [package.json](package.json).

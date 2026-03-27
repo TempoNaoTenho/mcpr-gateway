@@ -89,3 +89,18 @@ The gateway speaks HTTP only. Terminate TLS in your reverse proxy (nginx, Traefi
 ## Backups
 
 With SQLite, copy the database file while the process is stopped or use a filesystem snapshot. Compose comment suggests e.g. `cp data/gateway.db data/gateway.db.bak`.
+
+## First-time production checklist
+
+- [ ] **Node.js 22 or 24 LTS** in the runtime environment — not Node 25 or odd-numbered releases
+- [ ] `NODE_ENV=production` set — prevents admin routes from mounting without an explicit `ADMIN_TOKEN`
+- [ ] `HOST=0.0.0.0` set — container needs to bind on all interfaces; `127.0.0.1` (default) won't work inside Docker
+- [ ] `ADMIN_TOKEN` set to a non-empty, secret value — enables admin route protection
+- [ ] `GATEWAY_ADMIN_USER` and `GATEWAY_ADMIN_PASSWORD` set — credentials for `/admin/auth/login`
+- [ ] `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set if using managed downstream credentials (base64-encoded 32-byte key)
+- [ ] `DATABASE_PATH` mapped to a persistent volume (`/app/data/gateway.db` in Compose default)
+- [ ] Config volume (`/config`) mounted read-only — safe with SQLite-backed deployments
+- [ ] TLS terminated by reverse proxy (nginx, Traefik, Caddy) before the container — gateway speaks HTTP only
+- [ ] MCP clients configured with valid Bearer tokens issued via the Access Control panel (or `auth.staticKeys` in bootstrap for file-first setups)
+- [ ] Backup strategy in place for `gateway.db` — copy while stopped or use filesystem snapshots
+- [ ] `--no-node-snapshot` passed to Node when starting the gateway outside of Docker (Docker image and dev scripts handle this automatically)

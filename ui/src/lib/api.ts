@@ -455,6 +455,29 @@ export async function getServerSchema(serverId: string): Promise<ServerSchemaDet
   return request(`/admin/servers/${encodeURIComponent(serverId)}/schema`)
 }
 
+/** Estimated MCP tools/list footprint after initialize (varies by gateway mode). */
+export interface NamespaceSessionMetrics {
+  toolCount: number
+  schemaTokens: number
+  totalTokens: number
+  customizedTools: number
+  /** MCP `initialize.result.instructions` (compat/code); 0 in default. */
+  initializeInstructionsTokens: number
+  /** tools/list total + initialize instructions estimate (first-turn context hint). */
+  firstTurnEstimatedTokens: number
+  serverCount: number
+  averageTokensPerTool: number
+}
+
+/** Downstream catalog enabled in this namespace (effective tools table); excludes gateway meta-tools. */
+export interface NamespaceCatalogMetrics {
+  toolCount: number
+  schemaTokens: number
+  totalTokens: number
+  customizedTools: number
+  averageTokensPerTool: number
+}
+
 export interface NamespaceSummary {
   key: string
   allowedRoles: string[]
@@ -467,14 +490,8 @@ export interface NamespaceSummary {
     transport: string
     trustLevel: string
   }>
-  metrics: {
-    toolCount: number
-    schemaTokens: number
-    totalTokens: number
-    customizedTools: number
-    serverCount: number
-    averageTokensPerTool: number
-  }
+  metrics: NamespaceSessionMetrics
+  catalogMetrics: NamespaceCatalogMetrics
   tools: ToolRecord[]
 }
 

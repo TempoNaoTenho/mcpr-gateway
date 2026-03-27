@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildServer } from '../../src/gateway/server.js'
 import { adminRoutes } from '../../src/gateway/routes/admin.js'
 import { createDefaultAdminConfig, type AdminConfig } from '../../src/config/loader.js'
-import { SourceTrustLevel } from '../../src/types/enums.js'
+import { GatewayMode, SourceTrustLevel } from '../../src/types/enums.js'
 import { RuntimeConfigManager } from '../../src/config/runtime.js'
 import { DownstreamRegistry } from '../../src/registry/registry.js'
 import { downstreamAuthManager } from '../../src/registry/auth/index.js'
@@ -1939,7 +1939,7 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
-  it('returns namespace summaries with effective token metrics', async () => {
+  it('returns namespace summaries with tools/list session metrics and catalog metrics', async () => {
     const toolRecord = makeToolRecord({ namespace: 'gmail' })
     const { configRepo, configManager } = createAdminHarness({
       servers: [
@@ -1977,19 +1977,95 @@ describe('adminRoutes', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    expect(res.json()).toEqual({
-      namespaces: [
-        expect.objectContaining({
-          key: 'gmail',
-          metrics: expect.objectContaining({
-            toolCount: 1,
-            serverCount: 1,
-            totalTokens: expect.any(Number),
-            schemaTokens: expect.any(Number),
-          }),
+    const body = res.json() as { namespaces: Record<string, unknown>[] }
+    expect(body.namespaces).toEqual([
+      expect.objectContaining({
+        key: 'gmail',
+        metrics: expect.objectContaining({
+          toolCount: 2,
+          customizedTools: 0,
+          serverCount: 1,
+          totalTokens: expect.any(Number),
+          schemaTokens: expect.any(Number),
+          initializeInstructionsTokens: expect.any(Number),
+          firstTurnEstimatedTokens: expect.any(Number),
         }),
+        catalogMetrics: expect.objectContaining({
+          toolCount: 1,
+          totalTokens: expect.any(Number),
+          schemaTokens: expect.any(Number),
+        }),
+      }),
+    ])
+    const gmailNs = body.namespaces[0] as {
+      metrics: {
+        totalTokens: number
+        initializeInstructionsTokens: number
+        firstTurnEstimatedTokens: number
+      }
+    }
+    expect(gmailNs.metrics.initializeInstructionsTokens).toBeGreaterThan(0)
+    expect(gmailNs.metrics.firstTurnEstimatedTokens).toBe(
+      gmailNs.metrics.totalTokens + gmailNs.metrics.initializeInstructionsTokens,
+    )
+
+    await app.close()
+  })
+
+  it('namespace session metrics use full downstream catalog in default gateway mode', async () => {
+    const toolRecord = makeToolRecord({ namespace: 'gmail' })
+    const base = createDefaultAdminConfig(['gmail'])
+    const { configRepo, configManager } = createAdminHarness({
+      ...base,
+      namespaces: {
+        ...base.namespaces,
+        gmail: {
+          ...base.namespaces.gmail,
+          gatewayMode: GatewayMode.Default,
+        },
+      },
+      servers: [
+        {
+          id: 'docs',
+          namespaces: ['gmail'],
+          transport: 'streamable-http',
+          url: 'https://example.com/mcp',
+          enabled: true,
+          trustLevel: SourceTrustLevel.Verified,
+        },
       ],
     })
+    const registry = {
+      async getTools() {
+        return [toolRecord]
+      },
+      getToolsByNamespace() {
+        return [
+          {
+            server: configManager.getAdminConfig().servers[0],
+            records: [{ ...toolRecord, namespace: 'gmail' }],
+          },
+        ]
+      },
+    } as any
+
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, { configRepo, configManager, registry })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/namespaces',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as { namespaces: { metrics: { toolCount: number }; catalogMetrics: { toolCount: number } }[] }
+    const gmailNs = body.namespaces.find((n) => n.key === 'gmail')
+    expect(gmailNs?.metrics.toolCount).toBe(1)
+    expect(gmailNs?.catalogMetrics.toolCount).toBe(1)
+    expect(gmailNs?.metrics.totalTokens).toBe(gmailNs?.catalogMetrics.totalTokens)
+    expect(gmailNs?.metrics.initializeInstructionsTokens).toBe(0)
+    expect(gmailNs?.metrics.firstTurnEstimatedTokens).toBe(gmailNs?.metrics.totalTokens)
 
     await app.close()
   })

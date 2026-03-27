@@ -25,7 +25,18 @@ import {
 } from '../../types/server.js'
 import { coerceMcpImport } from '../../lib/mcp-import-parse.js'
 import { splitCommandLine } from '../../lib/command-line.js'
-import { buildAdminToolEntry, summarizeToolEntries } from '../../admin/catalog.js'
+import {
+  buildAdminToolEntry,
+  estimateSerializedTokens,
+  summarizeClientToolWindow,
+  summarizeToolEntries,
+} from '../../admin/catalog.js'
+import { getConfig } from '../../config/index.js'
+import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
+import { generateToolcards } from '../../toolcard/index.js'
+import { buildVisibleToolCatalog } from '../../session/catalog.js'
+import { buildGatewayInstructions } from '../dispatch/initialize.js'
+import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { toolCandidateKey } from '../../candidate/lexical.js'
 import { downstreamAuthManager } from '../../registry/auth/index.js'
 import { DownstreamAuthStatus } from '../../types/enums.js'
@@ -1596,7 +1607,59 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
               ...entry,
               enabled: !disabledSet.has(toolCandidateKey(entry.serverId, entry.name)),
             }))
-            const summary = summarizeToolEntries(tools)
+            const catalogMetrics = summarizeToolEntries(tools)
+
+            const gatewayMode: GatewayMode =
+              policy.gatewayMode === GatewayMode.Code
+                ? GatewayMode.Code
+                : policy.gatewayMode === GatewayMode.Default
+                  ? GatewayMode.Default
+                  : GatewayMode.Compat
+
+            const selector = getConfig().selector
+            let sessionSummary =
+              gatewayMode === GatewayMode.Default && registry
+                ? summarizeClientToolWindow(
+                    buildVisibleToolCatalog(
+                      registry
+                        .getToolsByNamespace(key)
+                        .flatMap(({ server, records }) =>
+                          generateToolcards(records, server, server.toolOverrides),
+                        ),
+                      disabledToolKeysForNamespace(getConfig(), key),
+                    ),
+                    selector,
+                  )
+                : summarizeClientToolWindow(
+                    buildGatewayToolWindowForMode(key, gatewayMode),
+                    selector,
+                  )
+
+            if (gatewayMode === GatewayMode.Default && !registry) {
+              sessionSummary = {
+                toolCount: 0,
+                schemaTokens: 0,
+                totalTokens: 0,
+              }
+            }
+
+            const sessionCustomizedTools =
+              gatewayMode === GatewayMode.Default
+                ? catalogMetrics.customizedTools
+                : 0
+
+            const serverIdsForInstructions = registry
+              ? registry.getToolsByNamespace(key).map((group) => group.server.id)
+              : servers.map((server) => server.id)
+            const initializeInstructions = buildGatewayInstructions(
+              gatewayMode,
+              serverIdsForInstructions,
+            )
+            const initializeInstructionsTokens = initializeInstructions
+              ? estimateSerializedTokens(initializeInstructions)
+              : 0
+            const firstTurnEstimatedTokens =
+              sessionSummary.totalTokens + initializeInstructionsTokens
 
             return {
               key,
@@ -1611,10 +1674,27 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
                 trustLevel: server.trustLevel,
               })),
               metrics: {
-                ...summary,
+                toolCount: sessionSummary.toolCount,
+                schemaTokens: sessionSummary.schemaTokens,
+                totalTokens: sessionSummary.totalTokens,
+                customizedTools: sessionCustomizedTools,
+                initializeInstructionsTokens,
+                firstTurnEstimatedTokens,
                 serverCount: servers.length,
                 averageTokensPerTool:
-                  summary.toolCount > 0 ? Math.round(summary.totalTokens / summary.toolCount) : 0,
+                  sessionSummary.toolCount > 0
+                    ? Math.round(sessionSummary.totalTokens / sessionSummary.toolCount)
+                    : 0,
+              },
+              catalogMetrics: {
+                toolCount: catalogMetrics.toolCount,
+                schemaTokens: catalogMetrics.schemaTokens,
+                totalTokens: catalogMetrics.totalTokens,
+                customizedTools: catalogMetrics.customizedTools,
+                averageTokensPerTool:
+                  catalogMetrics.toolCount > 0
+                    ? Math.round(catalogMetrics.totalTokens / catalogMetrics.toolCount)
+                    : 0,
               },
               tools,
             }

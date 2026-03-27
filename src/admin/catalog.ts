@@ -1,5 +1,6 @@
 import type { DownstreamServer } from '../types/server.js'
-import type { ToolRecord, ToolcardOverride } from '../types/tools.js'
+import type { ToolRecord, ToolcardOverride, VisibleTool } from '../types/tools.js'
+import type { SelectorConfig } from '../config/schemas.js'
 import { getConfig } from '../config/index.js'
 import { projectToPublic } from '../gateway/publish/project.js'
 import { generateToolcard } from '../toolcard/index.js'
@@ -62,6 +63,25 @@ export function summarizeToolEntries(tools: AdminToolEntry[]) {
     schemaTokens: effective.reduce((sum, tool) => sum + tool.schemaTokens, 0),
     totalTokens: effective.reduce((sum, tool) => sum + tool.totalTokens, 0),
     customizedTools: effective.filter((tool) => tool.customized).length,
+  }
+}
+
+/** Token estimates for the MCP `tools/list` payload (same projection as `projectWindow`). */
+export function summarizeClientToolWindow(
+  visibleTools: VisibleTool[],
+  selectorConfig?: SelectorConfig,
+) {
+  let schemaTokens = 0
+  let totalTokens = 0
+  for (const tool of visibleTools) {
+    const publicShape = projectToPublic(tool, selectorConfig)
+    schemaTokens += estimateSerializedTokens(publicShape.inputSchema)
+    totalTokens += estimateSerializedTokens(publicShape)
+  }
+  return {
+    toolCount: visibleTools.length,
+    schemaTokens,
+    totalTokens,
   }
 }
 

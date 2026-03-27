@@ -62,7 +62,7 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 ### Admin authentication
 
 - **`/admin/auth/*`** — No prior auth (used to log in).
-- **All other `/admin/*`** — If `ADMIN_TOKEN` is set: require a valid `admin_session` cookie from `POST /admin/auth/login` (`GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`). If `ADMIN_TOKEN` is **unset**, no admin auth hook runs (any caller can hit admin routes **when they are registered** — see [Deployment](deployment.md#admin-api-and-production)).
+- **All other `/admin/*`** — If `ADMIN_TOKEN` is set: require a valid `admin_session` cookie from `POST /admin/auth/login` (`GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`). If `ADMIN_TOKEN` is **unset**, no admin auth hook runs (any caller can hit admin routes **when they are registered** — see [Deployment](../DEPLOYMENT.md#admin-api-and-production)).
 
 ### Core routes (always present when admin is enabled)
 
@@ -97,19 +97,20 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 
 ### When config management is available
 
-| Method   | Path                              | Description                                                                      |
-| -------- | --------------------------------- | -------------------------------------------------------------------------------- |
-| `GET`    | `/admin/config`                   | Admin-managed config + read-only auth summary + `source`                         |
-| `POST`   | `/admin/config`                   | Replace admin config (validated); optional headers `x-user-id`, `x-comment`      |
-| `GET`    | `/admin/config/versions`          | Version list from SQLite (`[]` when `SESSION_BACKEND=memory`)                    |
-| `POST`   | `/admin/config/rollback/:version` | Roll back to version number                                                      |
-| `GET`    | `/admin/config/export`            | JSON export of admin slice                                                       |
-| `GET`    | `/admin/config/servers`           | Current `servers` array                                                          |
-| `POST`   | `/admin/config/servers`           | Append server                                                                    |
-| `PUT`    | `/admin/config/servers/:id`       | Patch server by id                                                               |
-| `DELETE` | `/admin/config/servers/:id`       | Remove server                                                                    |
-| `GET`    | `/admin/config/policies`          | Namespaces, roles, selector, session, triggers, resilience, debug, starter packs |
-| `PUT`    | `/admin/config/policies`          | Update those sections                                                            |
+| Method   | Path                              | Description                                                                                                                                                                                               |
+| -------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/admin/config`                   | Admin-managed config + read-only auth summary + `source`                                                                                                                                                  |
+| `POST`   | `/admin/config`                   | Replace admin config (validated); optional headers `x-user-id`, `x-comment`                                                                                                                               |
+| `GET`    | `/admin/config/versions`          | Version list from SQLite (`[]` when `SESSION_BACKEND=memory`)                                                                                                                                             |
+| `POST`   | `/admin/config/rollback/:version` | Roll back to version number                                                                                                                                                                               |
+| `GET`    | `/admin/config/export`            | JSON export of admin slice                                                                                                                                                                                |
+| `GET`    | `/admin/config/servers`           | Current `servers` array                                                                                                                                                                                   |
+| `POST`   | `/admin/config/servers`           | Append server                                                                                                                                                                                             |
+| `PUT`    | `/admin/config/servers/:id`       | Patch server by id                                                                                                                                                                                        |
+| `DELETE` | `/admin/config/servers/:id`       | Remove server                                                                                                                                                                                             |
+| `GET`    | `/admin/config/policies`          | Namespaces, roles, selector, session, triggers, resilience, debug, starter packs                                                                                                                          |
+| `PUT`    | `/admin/config/policies`          | Update those sections                                                                                                                                                                                     |
+| `GET`    | `/admin/namespaces`               | Namespace list for admin UI: `metrics` (MCP `tools/list` token estimates, plus compat/code `initializeInstructionsTokens` and `firstTurnEstimatedTokens`), `catalogMetrics` (downstream catalog), `tools` |
 
 Implementation: [`src/gateway/routes/admin.ts`](../src/gateway/routes/admin.ts).
 

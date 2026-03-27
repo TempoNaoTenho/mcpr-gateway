@@ -1,6 +1,6 @@
 # Configuring MCPR Gateway
 
-**Documentation index:** [docs/README.md](README.md) — getting started, architecture, HTTP API, deployment, and development guides.
+**Documentation index:** [Getting Started](GETTING-STARTED.md) · [Architecture](ARCHITECTURE.md) · [HTTP API](reference/HTTP-API.md) · [Deployment](DEPLOYMENT.md) · [Development](DEVELOPMENT.md)
 
 ## Bootstrap vs Runtime Config
 

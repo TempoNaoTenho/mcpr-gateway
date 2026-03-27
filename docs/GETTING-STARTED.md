@@ -104,6 +104,7 @@ bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 
 ```bash
 export MCPR_GATEWAY_TOKEN=<client-access-token>
+codex
 ```
 
 If Codex sends `initialize` without the bearer token, the handshake often fails with a response decoding error before
@@ -165,10 +166,14 @@ If static files exist under `ui/dist` or `ui/build` (or `UI_STATIC_DIR`), the se
 npm run build:ui
 ```
 
-See [Development](development.md#web-ui) for day-to-day UI work (`npm run dev` runs Vite + gateway together).
+See [Development](DEVELOPMENT.md#web-ui) for day-to-day UI work (`npm run dev` runs Vite + gateway together).
 
 ## Next steps
 
-- [Configuration](CONFIGURATION.md) — all `bootstrap.json` sections and `${VAR}` interpolation
-- [HTTP API](http-api.md) — health, admin, debug routes
-- [Deployment](deployment.md) — Compose, persistence, admin protection (`ADMIN_TOKEN` / `GATEWAY_ADMIN_*`), and `NODE_ENV`
+| Guide | What's in it |
+| ----- | ------------ |
+| [Configuration](CONFIGURATION.md) | All `bootstrap.json` sections, env interpolation, two-tier model |
+| [HTTP API](reference/HTTP-API.md) | Health, admin, debug routes — full endpoint reference |
+| [Deployment](DEPLOYMENT.md) | Docker Compose, persistence, admin protection, TLS |
+| [Development](DEVELOPMENT.md) | Scripts, project layout, test strategy, UI workflow |
+| [Architecture](ARCHITECTURE.md) | Components, request flow, session lifecycle |

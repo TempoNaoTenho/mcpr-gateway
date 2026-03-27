@@ -4,7 +4,7 @@ The gateway uses a **bootstrap file**: `bootstrap.json` in this directory (or un
 
 **Important:** `bootstrap.json` is only used for initial setup. After first start with SQLite, all runtime configuration is managed through the admin panel and stored in the database. See [docs/CONFIGURATION.md](../docs/CONFIGURATION.md) for the full architecture.
 
-**Documentation hub:** [docs/README.md](../docs/README.md) — guides and navigation.
+**Documentation hub:** [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) — guides and navigation.
 
 **Full reference:** [docs/CONFIGURATION.md](../docs/CONFIGURATION.md) (sections, schemas, env interpolation, SQLite/UI, migration from YAML).
 
@@ -21,9 +21,9 @@ By default the HTTP server binds to `127.0.0.1`, which keeps development local t
 
 ### Profiles (examples)
 
-| File                     | Use case                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------- |
-| `bootstrap.example.json` | Template for optional `bootstrap.json` (advanced); `static_key` auth, full default-shaped config    |
+| File                     | Use case                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `bootstrap.example.json` | Template for optional `bootstrap.json` (advanced); `static_key` auth, full default-shaped config |
 
 ### Docker
 
