@@ -6,6 +6,7 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 
 - **Node.js 22 or 24 LTS** (`engines: ">=22 <25"` in `package.json`)
   - ⚠️ Avoid Node 25 and other odd-numbered releases — `isolated-vm` (code mode) is incompatible
+  - After switching Node versions with `nvm`, rebuild native modules before running tests: `npm rebuild isolated-vm better-sqlite3`
 - **npm 10+** (bundled with Node 22/24)
 - For Docker work: Docker Engine and Compose v2
 

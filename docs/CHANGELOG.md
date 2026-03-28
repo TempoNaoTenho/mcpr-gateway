@@ -10,6 +10,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Fixed
 - 2026-03-27 - Fixed - `npm run docker:up` and docs now use `docker compose --project-directory .` so repo-root `.env` is loaded for `${ADMIN_TOKEN:?}` / port interpolation (compose file under `docker/` otherwise skips root `.env`); README notes container `HOST=0.0.0.0` vs dev `.env` and `127.0.0.1` vs `localhost` for browsers
 - 2026-03-27 - Fixed - Docker Compose now loads the repo-root `.env`, sets production-safe runtime defaults, exposes the bundled UI and MCP on port 3000, and adds a healthcheck for publish-ready installs
+- 2026-03-27 - Fixed - Benchmark and integration tests now read `gateway_search_tools` matches from MCP `structuredContent`, matching the current `tools/call` contract
+- 2026-03-27 - Fixed - Sandbox timeout tests now assert the current fail-closed timeout error instead of expecting partial runtime results
+- 2026-03-27 - Docs - Development guide now tells contributors to rebuild `isolated-vm` and `better-sqlite3` after switching Node versions
 - 2026-03-27 - Fixed - Docker image now installs Alpine native build prerequisites so production builds can compile `better-sqlite3` and other native modules when no prebuilt binary is available
 - `/admin/namespaces` metrics now estimate MCP `tools/list` token count after initialize, correctly distinguishing between default mode (full catalog) and compat/code modes (two meta-tools)
 - 2026-03-27 - Fixed - Benchmark executor now skips compat-only `gateway_search_tools` flows for namespaces configured in default/code mode instead of aborting mixed-mode real benchmark runs
