@@ -46,4 +46,7 @@ ENV CONFIG_PATH=/config
 
 VOLUME ["/config"]
 
+RUN chown -R node:node /app
+USER node
+
 CMD ["node", "--no-node-snapshot", "dist/index.js"]
