@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-28 - Fixed - `npm run setup` is now the canonical first-run entrypoint: it requires Node 24 LTS, installs missing root and `ui/` dependencies, repairs `isolated-vm` / `better-sqlite3` after Node switches, writes local `.env` defaults automatically, and integrated dev no longer warns about a missing static UI build when Vite is serving the frontend
 - 2026-03-28 - Fixed - Root `npm ci` now installs `ui/` dependencies via a guarded `postinstall` that skips when `ui/package.json` is absent, preserving Docker/staged installs while keeping fresh-clone setup automatic; setup still warns when either dependency tree is missing
 - 2026-03-27 - Fixed - `npm run docker:up` and docs now use `docker compose --project-directory .` so repo-root `.env` is loaded for `${ADMIN_TOKEN:?}` / port interpolation (compose file under `docker/` otherwise skips root `.env`); README notes container `HOST=0.0.0.0` vs dev `.env` and `127.0.0.1` vs `localhost` for browsers
 - 2026-03-27 - Fixed - Docker Compose now loads the repo-root `.env`, sets production-safe runtime defaults, exposes the bundled UI and MCP on port 3000, and adds a healthcheck for publish-ready installs
@@ -67,8 +68,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Runtime
 
-- **Node.js 22 or 24 LTS** required (`engines: ">=22 <25"`)
-- Node 25 and odd-numbered releases explicitly unsupported (isolated-vm incompatibility)
+- **Node.js 24 LTS** required (`engines: "24.x"`)
 - Docker runtime pinned to `node:24-alpine`
 - `--no-node-snapshot` required for `isolated-vm`; set automatically by dev scripts and Docker entrypoint
 

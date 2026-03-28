@@ -2,26 +2,24 @@
 
 ## Requirements
 
-- **Node.js** 22 or 24 LTS ([`package.json`](../package.json) `engines`)
+- **Node.js** 24 LTS ([`package.json`](../package.json) `engines`, [`.nvmrc`](../.nvmrc), [`.node-version`](../.node-version))
 - For Docker: Docker Engine and Compose v2
 
 Operational note:
 
-- `code` mode is supported on **Node 22/24 LTS** only
-- avoid **Node 25** and other odd-numbered releases for both the gateway and local validation scripts
+- `code` mode is supported on **Node 24 LTS**
 
 ## Install and configure
 
 ```bash
 git clone <repository-url>
 cd mcpr-gateway
-npm ci
 npm run setup
 ```
 
-`npm ci` installs the root gateway dependencies and, when `ui/package.json` is present, the separate `ui/` SvelteKit dependencies through the guarded root `postinstall` hook. A normal fresh clone gets the Web UI dependencies automatically, while Docker builds that install before copying `ui/` do not fail.
+[`npm run setup`](../scripts/setup.mjs) is the canonical first-run command. It validates Node 24, installs missing root and `ui/` dependencies, rebuilds `isolated-vm` / `better-sqlite3` if they were compiled for another Node version, creates `.env` from [`.env.example`](../.env.example) when missing, and fills the required local-dev secrets automatically.
 
-[`npm run setup`](../scripts/setup.ts) is **optional**: creates `.env` from [`.env.example`](../.env.example) when missing, runs basic checks (Node, ports for full-stack dev, SQLite path), lets you edit common env vars, and **optionally** creates `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
+`npm run setup` is idempotent. Re-run it after switching Node versions or when native modules start complaining about ABI mismatches. Use `npm run setup -- --advanced` only when you want to edit env vars manually or create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
@@ -43,6 +41,8 @@ When `bootstrap.json` is missing, the process still starts with built-in default
 ```bash
 npm run dev
 ```
+
+Open `http://127.0.0.1:3000` for the local UI. During this integrated dev flow, the gateway API listens on `http://127.0.0.1:3001`. The `/ui/` path is for the built static UI used by `npm run build` and Docker, not the default first-run dev URL.
 
 **API process only** (single `HOST` / `PORT`, e.g. for MCP clients hitting `http://127.0.0.1:3000` directly):
 
@@ -170,7 +170,7 @@ Authorization to use a namespace and mode is enforced in policy resolution durin
 
 ## Web UI
 
-If static files exist under `ui/dist` or `ui/build` (or `UI_STATIC_DIR`), the server redirects `/` to `/ui/`. Build the UI once with:
+If static files exist under `ui/dist` or `ui/build` (or `UI_STATIC_DIR`), the server redirects `/` to `/ui/`. That is the built/static deployment path. Build the UI once with:
 
 ```bash
 npm run build:ui

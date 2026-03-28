@@ -4,15 +4,15 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 
 ## Prerequisites
 
-- **Node.js 22 or 24 LTS** (`engines: ">=22 <25"` in `package.json`)
-  - ⚠️ Avoid Node 25 and other odd-numbered releases — `isolated-vm` (code mode) is incompatible
-  - After switching Node versions with `nvm`, rebuild native modules before running tests: `npm rebuild isolated-vm better-sqlite3`
-- **npm 10+** (bundled with Node 22/24)
+- **Node.js 24 LTS** (`engines: "24.x"` in `package.json`, `.nvmrc`, `.node-version`)
+  - Re-run `npm run setup` after switching Node versions; it repairs `isolated-vm` and `better-sqlite3` for the active ABI
+- **npm 10+** (bundled with Node 24)
 - For Docker work: Docker Engine and Compose v2
 
 Fresh-clone note:
 
-- `npm ci` at the repository root also installs `ui/` dependencies via the guarded root `postinstall` hook when `ui/package.json` is present; you do not need to run `npm --prefix ui ci` separately for normal local setup, and Docker-style staged installs still work before `ui/` is copied
+- `npm run setup` is the supported first-run entrypoint; it installs any missing root and `ui/` dependencies, writes `.env` defaults, and repairs native module mismatches automatically
+- Root `npm ci` still installs `ui/` dependencies via the guarded `postinstall` hook when `ui/package.json` is present, while Docker-style staged installs keep working before `ui/` is copied
 
 ## Scripts
 
@@ -23,7 +23,7 @@ Fresh-clone note:
 | `build`           | `npm run build`                                  | Build both UI and gateway for production                                                  |
 | `build:gateway`   | `npm run build:gateway`                          | TypeScript → `dist/` via tsup                                                             |
 | `build:ui`        | `npm run build:ui`                               | SvelteKit UI → `ui/build/`                                                                |
-| `setup`           | `npm run setup`                                  | Interactive setup: creates `.env`, checks Node/ports, optionally creates `bootstrap.json` |
+| `setup`           | `npm run setup`                                  | Canonical local setup: validates Node 24, installs deps, repairs native modules, writes `.env` defaults |
 | `typecheck`       | `npm run typecheck`                              | `tsc --noEmit` — no output files, types only                                              |
 | `lint`            | `npm run lint`                                   | ESLint over `src/`                                                                        |
 | `format`          | `npm run format`                                 | Prettier over entire repo                                                                 |
@@ -107,7 +107,7 @@ Behavior:
 | `config/`  | Bootstrap config files (gitignored `bootstrap.json`, versioned `*.example.json`) |
 | `data/`    | SQLite database files (gitignored)                                               |
 | `docker/`  | `Dockerfile` (multi-stage), `docker-compose.yml`                                 |
-| `scripts/` | Dev helpers: `setup.ts`, `dev-all.mjs`, `dev-gateway.mjs`                        |
+| `scripts/` | Dev helpers: `setup.mjs`, `dev-all.mjs`, `dev-gateway.mjs`                       |
 | `test/`    | Vitest test files (mirrors `src/` structure)                                     |
 | `ui/`      | SvelteKit 2 + TailwindCSS v4 admin UI                                            |
 
@@ -143,7 +143,10 @@ Behavior:
 ### Dev workflow
 
 ```bash
-# Full stack (recommended) — UI at PORT, gateway at PORT+1
+# Prepare the environment (first run or after switching Node)
+npm run setup
+
+# Full stack (recommended) — Vite UI at PORT, gateway at PORT+1
 npm run dev
 
 # UI dev only (hot reload) — run alongside npm run dev:gateway

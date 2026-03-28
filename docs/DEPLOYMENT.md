@@ -10,8 +10,7 @@ The [Dockerfile](../docker/Dockerfile) is multi-stage:
 
 Runtime requirement for `code` mode:
 
-- use **Node 22 or 24 LTS**
-- avoid odd-numbered releases such as **25**
+- use **Node 24 LTS**
 - start Node with `--no-node-snapshot` when `isolated-vm` is enabled
 
 Build from repository root:
@@ -41,7 +40,7 @@ Typical environment:
 | `DATABASE_PATH`   | `/app/data/gateway.db`  | SQLite file when not using `memory`                                                              |
 | `UI_STATIC_DIR`   | `/app/ui/dist`          | Ensures the UI is found in the image layout                                                      |
 | `ADMIN_TOKEN`     | _(any non-empty value)_ | Enables admin protection for `/admin/*` when set (not the login password; use `GATEWAY_ADMIN_*`) |
-| `GATEWAY_ADMIN_USER` | `mcpgateway` or custom | Admin username for `/admin/auth/login`; set an explicit value before publishing |
+| `GATEWAY_ADMIN_USER` | `admin` or custom | Admin username for `/admin/auth/login`; set an explicit value before publishing |
 | `GATEWAY_ADMIN_PASSWORD` | _(non-empty secret)_ | Required when `ADMIN_TOKEN` is set; startup fails fast if omitted |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | `openssl rand -base64 32` | Required for managed downstream bearer/OAuth secrets; malformed values fail fast |
 
@@ -97,7 +96,7 @@ With SQLite, copy the database file while the process is stopped or use a filesy
 
 ## First-time production checklist
 
-- [ ] **Node.js 22 or 24 LTS** in the runtime environment — not Node 25 or odd-numbered releases
+- [ ] **Node.js 24 LTS** in the runtime environment
 - [ ] `NODE_ENV=production` set — prevents admin routes from mounting without an explicit `ADMIN_TOKEN`
 - [ ] `HOST=0.0.0.0` set — container needs to bind on all interfaces; `127.0.0.1` (default) won't work inside Docker
 - [ ] `ADMIN_TOKEN` set to a non-empty, secret value — enables admin route protection

@@ -1,7 +1,7 @@
 # MCPR Gateway
 
 <p align="center">
-  <img src="https://img.shields.io/badge/node-22%20%7C%2024%20LTS-brightgreen" alt="Node.js" />
+  <img src="https://img.shields.io/badge/node-24%20LTS-brightgreen" alt="Node.js" />
   <img src="https://img.shields.io/badge/TypeScript-5-blue" alt="TypeScript" />
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License" />
   <img src="https://img.shields.io/badge/MCP-2025--03--26-purple" alt="MCP Protocol" />
@@ -104,41 +104,30 @@ flowchart LR
 ### 1. Install and configure
 
 ```bash
-node --version   # must be 22.x or 24.x LTS
+node --version   # must be 24.x LTS
 git clone <repo-url> mcpr-gateway && cd mcpr-gateway
-npm ci                    # installs root deps and ui/ deps via postinstall
-npm run setup             # guided security config
+npm run setup             # installs deps, repairs native modules, creates .env defaults
 npm run dev               # UI on PORT, gateway API on PORT+1
 ```
 
-`npm ci` installs both the gateway dependencies and, when `ui/package.json` is present, the separate `ui/` SvelteKit dependencies via the guarded root `postinstall`. In normal fresh-clone local setup that means no extra `npm --prefix ui ci` step, while Docker layer-cached installs that copy only root manifests keep working.
+`npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, creates `.env` from `.env.example`, and fills the required local-dev credentials automatically.
 
-`npm run setup` asks for the security-critical variables and the admin username, and skips anything already configured — safe to re-run.
+`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. Use `npm run setup -- --advanced` only when you want to edit environment values manually or create `config/bootstrap.json`.
 
-> **Manual / scripted alternative** — skip the interactive prompt:
->
-> ```bash
-> cp .env.example .env
-> # Edit .env and set the required security vars:
-> #   ADMIN_TOKEN=<any-non-empty-string>
-> #   GATEWAY_ADMIN_USER=<your-admin-user>
-> #   GATEWAY_ADMIN_PASSWORD=<your-password>
-> #   DOWNSTREAM_AUTH_ENCRYPTION_KEY=$(openssl rand -base64 32)
-> npm run dev
-> ```
+During integrated local dev, open `http://127.0.0.1:3000` for the Vite-served UI. The gateway API listens on `http://127.0.0.1:3001`, and `/ui/` is only the static built UI path used by `npm run build` and Docker.
 
 #### Minimum security variables
 
 | Variable                         | Purpose                                         | Required                                |
 | -------------------------------- | ----------------------------------------------- | --------------------------------------- |
 | `ADMIN_TOKEN`                    | Enables authentication on all `/admin/*` routes | Yes                                     |
-| `GATEWAY_ADMIN_USER`             | Username typed at `/ui/` login                  | Yes for production                      |
-| `GATEWAY_ADMIN_PASSWORD`         | Password typed at `/ui/` login                  | Yes                                     |
+| `GATEWAY_ADMIN_USER`             | Username typed at the admin login               | Yes for production                      |
+| `GATEWAY_ADMIN_PASSWORD`         | Password typed at the admin login               | Yes                                     |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | AES-256 key for downstream credentials at rest  | Required for managed downstream secrets |
 
 Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it.
 
-> For advanced configuration of all env vars run `npm run setup -- --advanced`.
+> `npm run setup` writes secure local defaults automatically. For manual customization of all env vars run `npm run setup -- --advanced`.
 
 ```bash
 # Export variables in your shell (CI/CD), or pass an env file explicitly:

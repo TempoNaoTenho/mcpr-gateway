@@ -2,7 +2,7 @@
 
 ## Runtime requirements
 
-- **Node.js 22 or 24 LTS** — `isolated-vm` is incompatible with Node 25 and odd-numbered releases
+- **Node.js 24 LTS**
 - Gateway must start with `--no-node-snapshot` for `isolated-vm` stability — `npm run dev` and `npm run dev:gateway` set this automatically; if starting `node dist/index.js` directly, pass the flag explicitly
 - The Docker image (`node:24-alpine`) satisfies this requirement out of the box
 
@@ -80,7 +80,7 @@ See [Configuration](../CONFIGURATION.md) for full `code` and `resilience` option
 
 ## Limitations
 
-- Node.js 22 or 24 LTS only — no Node 25 or odd-numbered releases
+- Node.js 24 LTS only
 - Sandbox has **no filesystem or network access** outside the built-in MCP API
 - `maxConcurrentToolCalls` caps parallel execution per `mcp.batch` call
 - Some MCP clients may omit the JSON-RPC `result` payload from what they expose to the model — test with a raw HTTP call to `/mcp/:namespace` when debugging

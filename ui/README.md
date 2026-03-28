@@ -4,7 +4,7 @@ Svelte-based admin interface for MCPR Gateway. It is served by the gateway at **
 
 ## Prerequisites
 
-- Node.js ≥ 20 (same as the root project)
+- Node.js 24 LTS (same as the root project)
 
 ## Commands
 
