@@ -1,6 +1,24 @@
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
+import type { ServerResponse } from 'node:http'
 import type { FastifyInstance } from 'fastify'
+
+const UI_CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self'",
+  "connect-src 'self'",
+  "font-src 'self'",
+  "object-src 'none'",
+  "media-src 'self'",
+  "frame-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "script-src-attr 'none'",
+  'upgrade-insecure-requests',
+].join(';')
 
 function resolveCandidate(path: string): string {
   return path.startsWith('/') ? path : resolve(process.cwd(), path)
@@ -39,6 +57,11 @@ export async function uiRoutes(app: FastifyInstance): Promise<void> {
     // SPA fallback: unknown paths → index.html
     index: 'index.html',
     decorateReply: false,
+    setHeaders: (res: ServerResponse) => {
+      // SvelteKit static output uses an inline bootstrap script and wrapper style attribute.
+      // Scope the relaxed CSP to UI documents instead of weakening the gateway-wide default.
+      res.setHeader('Content-Security-Policy', UI_CONTENT_SECURITY_POLICY)
+    },
   })
 
   // Redirect bare /ui → /ui/
