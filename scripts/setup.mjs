@@ -9,20 +9,23 @@
  * - offers optional advanced editing/bootstrap creation
  */
 
-import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { readDotEnvFile } from './load-dotenv.mjs'
+import {
+  ensureNativeRuntimeReady,
+  inspectNativeModules,
+  runNpm,
+  shouldRebuildNativeModuleFromError,
+} from './native-runtime.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const CONFIG_DIR = join(ROOT, 'config')
 const ENV_PATH = join(ROOT, '.env')
-const NATIVE_MODULES = ['isolated-vm', 'better-sqlite3']
 const SUPPORTED_NODE_MAJOR = 24
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -122,63 +125,6 @@ export function getDependencyActions(input) {
 }
 
 /**
- * @param {unknown} error
- * @returns {boolean}
- */
-export function shouldRebuildNativeModuleFromError(error) {
-  const message = error instanceof Error ? error.message : String(error)
-  return (
-    message.includes('NODE_MODULE_VERSION') ||
-    message.includes('was compiled against a different Node.js version') ||
-    message.includes('Could not locate the bindings file') ||
-    message.includes('Module version mismatch')
-  )
-}
-
-/**
- * @param {(moduleName: string) => void} loader
- * @returns {{ ok: boolean; needsRebuild: boolean; failedModules: string[]; message?: string }}
- */
-export function inspectNativeModules(loader = loadNativeModule) {
-  const failedModules = []
-
-  for (const moduleName of NATIVE_MODULES) {
-    try {
-      loader(moduleName)
-    } catch (error) {
-      if (!shouldRebuildNativeModuleFromError(error)) {
-        return {
-          ok: false,
-          needsRebuild: false,
-          failedModules: [moduleName],
-          message: error instanceof Error ? error.message : String(error),
-        }
-      }
-      failedModules.push(moduleName)
-    }
-  }
-
-  if (failedModules.length > 0) {
-    return {
-      ok: false,
-      needsRebuild: true,
-      failedModules,
-      message: `Native modules need rebuild for Node ${process.versions.node}: ${failedModules.join(', ')}`,
-    }
-  }
-
-  return { ok: true, needsRebuild: false, failedModules: [] }
-}
-
-/**
- * @param {string} moduleName
- */
-function loadNativeModule(moduleName) {
-  const require = createRequire(import.meta.url)
-  require(moduleName)
-}
-
-/**
  * @param {string} root
  * @returns {{ hasRootDeps: boolean; hasUiDeps: boolean }}
  */
@@ -186,26 +132,6 @@ function detectDependencyState(root = ROOT) {
   return {
     hasRootDeps: existsSync(join(root, 'node_modules')),
     hasUiDeps: existsSync(join(root, 'ui', 'node_modules')),
-  }
-}
-
-function getNpmCmd() {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm'
-}
-
-/**
- * @param {string[]} args
- * @param {string} root
- */
-function runNpm(args, root = ROOT) {
-  console.log(`$ npm ${args.join(' ')}`)
-  const result = spawnSync(getNpmCmd(), args, {
-    cwd: root,
-    env: process.env,
-    stdio: 'inherit',
-  })
-  if (result.status !== 0) {
-    throw new Error(`npm ${args.join(' ')} failed with exit code ${result.status ?? 1}`)
   }
 }
 
@@ -453,21 +379,7 @@ export async function main(argv = process.argv.slice(2)) {
     throw new Error('Dependency installation did not complete successfully.')
   }
 
-  const nativeState = inspectNativeModules()
-  if (nativeState.needsRebuild) {
-    console.log(nativeState.message)
-    console.log('Rebuilding native modules for the active Node version...')
-    runNpm(['rebuild', ...NATIVE_MODULES])
-  } else if (!nativeState.ok) {
-    throw new Error(nativeState.message ?? 'Failed to validate native modules.')
-  }
-
-  const nativeStateAfterRepair = inspectNativeModules()
-  if (!nativeStateAfterRepair.ok) {
-    throw new Error(
-      nativeStateAfterRepair.message ?? 'Native modules are still not healthy after dependency preparation.'
-    )
-  }
+  ensureNativeRuntimeReady({ cwd: ROOT })
 
   let vars = readDotEnvFile(ENV_PATH)
 

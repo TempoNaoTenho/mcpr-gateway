@@ -3,14 +3,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import {
-  applyEnvPatches,
-  detectBuildArtifacts,
-  getDependencyActions,
-  inspectNativeModules,
-  shouldRebuildNativeModuleFromError,
-  validateNodeRuntime,
-} from '../../scripts/setup.mjs'
+import { applyEnvPatches, detectBuildArtifacts, getDependencyActions, validateNodeRuntime } from '../../scripts/setup.mjs'
+import { inspectNativeModules, shouldRebuildNativeModuleFromError } from '../../scripts/native-runtime.mjs'
 
 describe('setup helpers', () => {
   it('accepts Node 24 and rejects other runtimes', () => {

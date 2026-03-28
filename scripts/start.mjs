@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyDotEnvFromRoot } from './load-dotenv.mjs'
+import { ensureNativeRuntimeReady } from './native-runtime.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -102,6 +103,15 @@ export function main() {
   const runtime = validateNodeRuntime()
   if (!runtime.ok) {
     fail(`${runtime.message}\n${runtime.remediation}`)
+  }
+
+  try {
+    ensureNativeRuntimeReady({ cwd: ROOT })
+  } catch (error) {
+    fail(
+      `${error instanceof Error ? error.message : String(error)}\n` +
+        'Automatic native rebuild failed. Run `npm run setup` for a full recovery, then retry `npm start`.'
+    )
   }
 
   const missing = validateRequiredStartEnv()
