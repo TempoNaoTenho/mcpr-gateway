@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 import {
   applyEnvPatches,
-  buildAutomaticEnvPatches,
+  detectBuildArtifacts,
   getDependencyActions,
   inspectNativeModules,
   shouldRebuildNativeModuleFromError,
@@ -27,32 +30,20 @@ describe('setup helpers', () => {
     })
   })
 
-  it('generates secure local defaults and replaces the legacy admin username', () => {
-    let counter = 0
-    const fakeRandom = (size: number) => Buffer.alloc(size, ++counter)
+  it('detects when the production build artifacts exist', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mcpr-setup-build-'))
+    mkdirSync(join(root, 'dist'), { recursive: true })
+    mkdirSync(join(root, 'ui', 'build'), { recursive: true })
+    writeFileSync(join(root, 'dist', 'index.js'), 'console.log("gateway")\n')
 
-    const result = buildAutomaticEnvPatches(
-      {
-        GATEWAY_ADMIN_USER: 'mcpgateway',
-      },
-      fakeRandom,
-    )
-
-    expect(result.patches['ADMIN_TOKEN']).toBeTruthy()
-    expect(result.patches['GATEWAY_ADMIN_PASSWORD']).toBeTruthy()
-    expect(result.patches['DOWNSTREAM_AUTH_ENCRYPTION_KEY']).toBeTruthy()
-    expect(result.patches['GATEWAY_ADMIN_USER']).toBe('admin')
-  })
-
-  it('keeps existing env values untouched on rerun', () => {
-    const result = buildAutomaticEnvPatches({
-      ADMIN_TOKEN: 'existing-token',
-      GATEWAY_ADMIN_USER: 'alice',
-      GATEWAY_ADMIN_PASSWORD: 'existing-password',
-      DOWNSTREAM_AUTH_ENCRYPTION_KEY: 'existing-key',
+    expect(detectBuildArtifacts(root)).toEqual({
+      hasGatewayBuild: true,
+      hasUiBuild: true,
+      gatewayEntry: join(root, 'dist', 'index.js'),
+      uiDir: join(root, 'ui', 'build'),
     })
 
-    expect(result.patches).toEqual({})
+    rmSync(root, { recursive: true, force: true })
   })
 
   it('applies env patches without dropping unrelated lines', () => {
@@ -87,5 +78,18 @@ describe('setup helpers', () => {
 
     const healthy = inspectNativeModules(() => {})
     expect(healthy.ok).toBe(true)
+  })
+
+  it('reports missing build artifacts when gateway or UI output is absent', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mcpr-setup-missing-build-'))
+
+    expect(detectBuildArtifacts(root)).toEqual({
+      hasGatewayBuild: false,
+      hasUiBuild: false,
+      gatewayEntry: join(root, 'dist', 'index.js'),
+      uiDir: null,
+    })
+
+    rmSync(root, { recursive: true, force: true })
   })
 })

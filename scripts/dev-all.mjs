@@ -22,12 +22,13 @@ if (!Number.isFinite(port) || port < 1 || port > 65534) {
 const backendPort = port + 1
 const proxyTarget = `http://127.0.0.1:${backendPort}`
 
-const gwEnv = { ...process.env, PORT: String(backendPort), HOST: host }
+const gwEnv = { ...process.env, PORT: String(backendPort), HOST: host, NODE_ENV: 'development' }
 gwEnv['GATEWAY_DEV_UI_MODE'] = 'vite'
 const uiEnv = {
   ...process.env,
   PORT: String(port),
   HOST: host,
+  NODE_ENV: 'development',
   GATEWAY_PROXY_TARGET: proxyTarget,
 }
 

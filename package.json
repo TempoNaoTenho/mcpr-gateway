@@ -12,6 +12,7 @@
   "scripts": {
     "postinstall": "node scripts/postinstall-ui.mjs",
     "setup": "node scripts/setup.mjs",
+    "start": "node scripts/start.mjs",
     "dev": "node scripts/dev-all.mjs",
     "dev:gateway": "node scripts/dev-gateway.mjs",
     "build": "npm run build:ui && npm run build:gateway",
@@ -33,7 +34,7 @@
     "format": "prettier --write .",
     "docker:build": "docker build -f docker/Dockerfile .",
     "docker:up": "docker compose -f docker/docker-compose.yml up --build",
-    "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "build:ui": "npm --prefix ui run build",
     "build:all": "npm run build",
     "dev:all": "npm run dev"
   },

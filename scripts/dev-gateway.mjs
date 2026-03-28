@@ -3,8 +3,10 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { applyDotEnvFromRoot } from './load-dotenv.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+applyDotEnvFromRoot(root)
 const nodeMajor = Number(process.versions.node.split('.')[0] ?? '0')
 
 if (!Number.isFinite(nodeMajor) || nodeMajor !== 24) {
@@ -30,6 +32,7 @@ const child = spawn(tsxBin, ['watch', 'src/index.ts'], {
   cwd: root,
   env: {
     ...process.env,
+    NODE_ENV: 'development',
     NODE_OPTIONS: nextNodeOptions,
   },
   stdio: 'inherit',

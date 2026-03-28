@@ -13,6 +13,27 @@
   <section
     class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
   >
+    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm start</h2>
+    <p>
+      This is the default end-user runtime from the repository root. Run
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">cp .env.example .env</code>,
+      replace the
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">change-me-*</code>
+      placeholders, then use
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run setup</code>
+      followed by
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm start</code>.
+      The gateway serves the built UI under
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/ui/</code>
+      and MCP on the same
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">HOST</code> /
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">PORT</code>.
+    </p>
+  </section>
+
+  <section
+    class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm text-slate-600 dark:text-slate-400"
+  >
     <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Benchmark CLI</h2>
     <p>
       Use

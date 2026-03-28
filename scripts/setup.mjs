@@ -4,7 +4,8 @@
  * - validates Node 24 LTS
  * - installs missing root/ui dependencies
  * - repairs native module ABI mismatches after Node switches
- * - creates/fills .env with secure local defaults
+ * - requires an explicit .env owned by the user
+ * - builds the production UI + gateway artifacts
  * - offers optional advanced editing/bootstrap creation
  */
 
@@ -12,8 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { createServer } from 'node:net'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { readDotEnvFile } from './load-dotenv.mjs'
@@ -22,11 +22,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const CONFIG_DIR = join(ROOT, 'config')
 const ENV_PATH = join(ROOT, '.env')
-const ENV_EXAMPLE_PATH = join(ROOT, '.env.example')
 const NATIVE_MODULES = ['isolated-vm', 'better-sqlite3']
 const SUPPORTED_NODE_MAJOR = 24
-const DEFAULT_ADMIN_USER = 'admin'
-const LEGACY_DEFAULT_ADMIN_USER = 'mcpgateway'
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
@@ -111,50 +108,6 @@ export function applyEnvPatches(content, patches) {
   }
 
   return out.join('\n')
-}
-
-/**
- * @param {Record<string, string>} vars
- * @param {(size: number) => Buffer} randomSource
- * @returns {{
- *   patches: Record<string, string>;
- *   generated: Record<string, string>;
- *   keptExisting: string[];
- * }}
- */
-export function buildAutomaticEnvPatches(vars, randomSource = randomBytes) {
-  /** @type {Record<string, string>} */
-  const patches = {}
-  /** @type {Record<string, string>} */
-  const generated = {}
-  /** @type {string[]} */
-  const keptExisting = []
-
-  const currentUser = (vars['GATEWAY_ADMIN_USER'] ?? '').trim()
-  const ensureValue = (key, value) => {
-    const current = (vars[key] ?? '').trim()
-    if (current !== '') {
-      keptExisting.push(key)
-      return
-    }
-    patches[key] = value
-    generated[key] = value
-  }
-
-  ensureValue('ADMIN_TOKEN', randomSource(24).toString('base64url'))
-  ensureValue('GATEWAY_ADMIN_PASSWORD', randomSource(18).toString('base64url'))
-  ensureValue('DOWNSTREAM_AUTH_ENCRYPTION_KEY', randomSource(32).toString('base64'))
-
-  if (currentUser === '' || currentUser === LEGACY_DEFAULT_ADMIN_USER) {
-    patches['GATEWAY_ADMIN_USER'] = DEFAULT_ADMIN_USER
-    if (currentUser !== DEFAULT_ADMIN_USER) {
-      generated['GATEWAY_ADMIN_USER'] = DEFAULT_ADMIN_USER
-    }
-  } else {
-    keptExisting.push('GATEWAY_ADMIN_USER')
-  }
-
-  return { patches, generated, keptExisting }
 }
 
 /**
@@ -259,15 +212,10 @@ function runNpm(args, root = ROOT) {
 /**
  * @param {string} root
  */
-function ensureEnvFile(root = ROOT) {
-  const envPath = join(root, '.env')
-  const examplePath = join(root, '.env.example')
-  if (existsSync(envPath)) return false
-  if (!existsSync(examplePath)) {
-    throw new Error('Missing .env.example at repo root.')
+function assertEnvFileExists(root = ROOT) {
+  if (!existsSync(join(root, '.env'))) {
+    throw new Error('Missing .env. Copy `.env.example` to `.env`, edit the security variables, then rerun `npm run setup`.')
   }
-  copyFileSync(examplePath, envPath)
-  return true
 }
 
 /**
@@ -282,27 +230,35 @@ function resolveDbPath(vars) {
 }
 
 /**
- * @param {string} host
- * @param {number} port
- * @param {string} label
- * @returns {Promise<void>}
+ * @param {string} root
+ * @param {string | undefined} configuredUiDir
+ * @returns {{ hasGatewayBuild: boolean; hasUiBuild: boolean; gatewayEntry: string; uiDir: string | null }}
  */
-async function checkPort(host, port, label) {
-  try {
-    await new Promise((resolve, reject) => {
-      const server = createServer()
-      server.once('error', reject)
-      server.listen(port, host, () => {
-        server.close((err) => (err ? reject(err) : resolve()))
-      })
-    })
-  } catch (error) {
-    const err = /** @type {NodeJS.ErrnoException} */ (error)
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`  Port ${port} on ${host} is in use - ${label}. Stop the other process or change PORT.`)
-    } else {
-      console.warn(`  Could not verify port ${port}: ${err.message}`)
+export function detectBuildArtifacts(root = ROOT, configuredUiDir) {
+  const gatewayEntry = join(root, 'dist', 'index.js')
+  const uiCandidates = [
+    configuredUiDir,
+    join(root, 'ui', 'dist'),
+    join(root, 'ui', 'build'),
+  ].filter((value) => Boolean(value))
+
+  for (const candidate of uiCandidates) {
+    const resolved = candidate.startsWith('/') ? candidate : resolve(root, candidate)
+    if (existsSync(resolved)) {
+      return {
+        hasGatewayBuild: existsSync(gatewayEntry),
+        hasUiBuild: true,
+        gatewayEntry,
+        uiDir: resolved,
+      }
     }
+  }
+
+  return {
+    hasGatewayBuild: existsSync(gatewayEntry),
+    hasUiBuild: false,
+    gatewayEntry,
+    uiDir: null,
   }
 }
 
@@ -334,50 +290,20 @@ function printStorageSummary(vars) {
 
 /**
  * @param {Record<string, string>} vars
- * @returns {Promise<void>}
  */
-async function checkPortsForDev(vars) {
-  const port = Number(vars['PORT'] ?? process.env['PORT'] ?? 3000)
-  const host = (vars['HOST'] ?? process.env['HOST'] ?? '127.0.0.1').trim() || '127.0.0.1'
-
-  console.log('Checking ports used by full-stack dev (npm run dev)...')
-  if (!Number.isFinite(port) || port < 1 || port > 65534) {
-    console.warn('  PORT in .env is not valid; skipped port checks.')
-    return
-  }
-
-  await checkPort(host, port, 'Vite / UI')
-  await checkPort(host, port + 1, 'API gateway (PORT+1)')
-}
-
-/**
- * @param {Record<string, string>} vars
- * @param {Record<string, string>} generated
- */
-function printNextSteps(vars, generated) {
+function printNextSteps(vars) {
   const host = (vars['HOST'] ?? process.env['HOST'] ?? '127.0.0.1').trim() || '127.0.0.1'
   const port = Number(vars['PORT'] ?? process.env['PORT'] ?? 3000)
-  const uiUrl = `http://${host}:${port}`
-  const apiUrl = `http://${host}:${port + 1}`
-  const adminUser = (vars['GATEWAY_ADMIN_USER'] ?? DEFAULT_ADMIN_USER).trim() || DEFAULT_ADMIN_USER
 
   console.log('')
-  console.log('Local dev is ready.')
-  console.log(`  UI:  ${uiUrl}`)
-  console.log(`  API: ${apiUrl}`)
-  console.log('  `npm run dev` uses Vite on the UI port and the gateway on PORT+1.')
-  console.log('  `/ui/` is the static build path used by `npm run build` and Docker.')
-  console.log('')
-  console.log('Admin login:')
-  console.log(`  Username: ${adminUser}`)
-  if (generated['GATEWAY_ADMIN_PASSWORD']) {
-    console.log(`  Password: ${generated['GATEWAY_ADMIN_PASSWORD']}`)
-  } else {
-    console.log('  Password: unchanged in .env')
-  }
+  console.log('Built installation is ready.')
+  console.log(`  App: http://${host}:${port}`)
+  console.log('  `npm start` serves the built UI and MCP gateway on the same port.')
   console.log('')
   console.log('Next steps:')
-  console.log('  npm run dev')
+  console.log('  1. Confirm the security variables in `.env` are set to your own values.')
+  console.log('  2. npm start')
+  console.log('  3. npm run dev   # optional contributor workflow (Vite UI + gateway)')
   console.log('  npm run setup -- --advanced   # optional custom env/bootstrap editing')
 }
 
@@ -506,11 +432,7 @@ export async function main(argv = process.argv.slice(2)) {
   console.log(runtime.message)
   console.log('')
 
-  const createdEnv = ensureEnvFile(ROOT)
-  if (createdEnv) {
-    console.log('Created .env from .env.example')
-    console.log('')
-  }
+  assertEnvFileExists(ROOT)
 
   let dependencyState = detectDependencyState(ROOT)
   const dependencyActions = getDependencyActions(dependencyState)
@@ -547,32 +469,34 @@ export async function main(argv = process.argv.slice(2)) {
     )
   }
 
-  let envContent = readFileSync(ENV_PATH, 'utf8')
   let vars = readDotEnvFile(ENV_PATH)
-
-  const { patches, generated } = buildAutomaticEnvPatches(vars)
-  if (Object.keys(patches).length > 0) {
-    envContent = applyEnvPatches(envContent, patches)
-    writeFileSync(ENV_PATH, envContent, 'utf8')
-    vars = readDotEnvFile(ENV_PATH)
-    console.log('Updated .env with local defaults for first run.')
-  } else {
-    console.log('.env already contains the required local setup values.')
-  }
 
   console.log('')
   printStorageSummary(vars)
-  console.log('')
-  await checkPortsForDev(vars)
 
   if (isAdvanced) {
     vars = await runAdvancedMode(vars)
   } else {
     console.log('')
-    console.log('Tip: run `npm run setup -- --advanced` to customize env vars or create bootstrap.json.')
+    console.log('Tip: run `npm run setup -- --advanced` to customize `.env` or create `config/bootstrap.json`.')
   }
 
-  printNextSteps(vars, generated)
+  console.log('')
+  console.log('Building production assets...')
+  runNpm(['--prefix', 'ui', 'run', 'build'])
+  runNpm(['run', 'build:gateway'])
+
+  const buildState = detectBuildArtifacts(ROOT, vars['UI_STATIC_DIR'])
+  if (!buildState.hasGatewayBuild || !buildState.hasUiBuild) {
+    throw new Error('Production build artifacts are incomplete. Re-run `npm run setup` and inspect the build output above.')
+  }
+
+  console.log('')
+  console.log('Verified production artifacts:')
+  console.log(`  Gateway bundle: ${buildState.gatewayEntry}`)
+  console.log(`  UI build:       ${buildState.uiDir}`)
+
+  printNextSteps(vars)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
