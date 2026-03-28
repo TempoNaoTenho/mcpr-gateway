@@ -105,10 +105,12 @@ flowchart LR
 
 ```bash
 node --version   # must be 24.x LTS
-git clone <repo-url> mcpr-gateway && cd mcpr-gateway
+git clone https://github.com/TempoNaoTenho/mcpr-gateway.git
 npm run setup             # installs deps, repairs native modules, creates .env defaults
 npm run dev               # UI on PORT, gateway API on PORT+1
 ```
+
+You can either set your own credentials in the .env file first or let the setup script do it for you.
 
 `npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, creates `.env` from `.env.example`, and fills the required local-dev credentials automatically.
 
