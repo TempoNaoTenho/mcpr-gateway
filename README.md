@@ -314,4 +314,4 @@ npm run benchmark -- real --namespaces name_space1, name_space_2, ...
 
 ## 📄 License
 
-MIT — see [package.json](package.json).
+MIT — see [LICENSE](./LICENSE).
