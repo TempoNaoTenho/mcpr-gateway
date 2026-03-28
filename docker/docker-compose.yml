@@ -1,4 +1,7 @@
-# Optional: `npm run setup` for .env + optional bootstrap.json (advanced). Then either:
+# Set required environment variables before starting (see .env.example for all options).
+# Variables are read from the host environment or your CI/CD platform — no .env file needed.
+# Optional: place a bootstrap.json in config/ for advanced server pre-registration.
+#
 #   From repo root:  docker compose -f docker/docker-compose.yml up --build
 #   From docker/:     docker compose up --build
 #
@@ -12,10 +15,8 @@ services:
       dockerfile: docker/Dockerfile
     image: mcpr-gateway:local
     restart: unless-stopped
-    env_file:
-      - ../.env
     ports:
-      - '3000:3000'
+      - '${PORT:-3000}:${PORT:-3000}'
     volumes:
       - ../config:/config:ro
       - ../data:/app/data # SQLite persistence — backup: cp data/gateway.db data/gateway.db.bak
@@ -27,6 +28,12 @@ services:
       LOG_LEVEL: info
       DATABASE_PATH: /app/data/gateway.db
       UI_STATIC_DIR: /app/ui/dist
+      # ── Security (required) ────────────────────────────────────────────────
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to enable admin authentication}
+      GATEWAY_ADMIN_USER: ${GATEWAY_ADMIN_USER:-mcpgateway}
+      GATEWAY_ADMIN_PASSWORD: ${GATEWAY_ADMIN_PASSWORD:?Set GATEWAY_ADMIN_PASSWORD for the admin panel login}
+      # AES-256-GCM key — generate: openssl rand -base64 32
+      DOWNSTREAM_AUTH_ENCRYPTION_KEY: ${DOWNSTREAM_AUTH_ENCRYPTION_KEY}
     healthcheck:
       test:
         [

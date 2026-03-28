@@ -138,11 +138,14 @@ Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with networ
 > For advanced configuration of all env vars run `npm run setup -- --advanced`.
 
 ```bash
-# Or with Docker Compose (loads ../.env, serves UI + MCP on :3000)
+# Export variables in your shell (or CI/CD platform), then:
 docker compose -f docker/docker-compose.yml up --build
+
+# Alternatively, load from a local .env file using the CLI flag:
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
-The published Docker preset expects `.env` to exist and uses `NODE_ENV=production`. If `ADMIN_TOKEN` is set without `GATEWAY_ADMIN_PASSWORD`, or if `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is malformed, the container exits on startup with a clear error.
+The compose file reads `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and `DOWNSTREAM_AUTH_ENCRYPTION_KEY` from the host environment — no `.env` file is required. If `ADMIN_TOKEN` or `GATEWAY_ADMIN_PASSWORD` are missing, `docker compose up` fails immediately with a clear error before the container starts. If `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is malformed, the container exits on startup.
 
 ### 2. Connect an MCP client
 

@@ -27,7 +27,8 @@ npm run docker:build
 
 - `../config` → `/config` (**read-only**)
 - `../data` → `/app/data` for SQLite
-- `../.env` → container environment via `env_file`
+
+Environment variables are read from the host environment or CI/CD platform — no `.env` file is required. Use `docker compose --env-file .env ...` if you prefer loading from a local file.
 
 Typical environment:
 
@@ -44,7 +45,7 @@ Typical environment:
 | `GATEWAY_ADMIN_PASSWORD` | _(non-empty secret)_ | Required when `ADMIN_TOKEN` is set; startup fails fast if omitted |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | `openssl rand -base64 32` | Required for managed downstream bearer/OAuth secrets; malformed values fail fast |
 
-Run from repo root (`npm run setup` prepares `.env`; compose now depends on that file for container env):
+Run from repo root (export required variables first — see [Minimum security variables](../README.md#minimum-security-variables)):
 
 ```bash
 npm run docker:up
@@ -74,7 +75,7 @@ Compose uses `CONFIG_PATH=/config` and a read-only mount. Keep secrets out of gi
 Typical production flow:
 
 1. Copy `config/bootstrap.example.json` to `config/bootstrap.json` (or run `npm run setup`)
-2. Set `ADMIN_TOKEN`, `GATEWAY_ADMIN_USER`, and `GATEWAY_ADMIN_PASSWORD` in `.env` before starting the container
+2. Set `ADMIN_TOKEN`, `GATEWAY_ADMIN_USER`, and `GATEWAY_ADMIN_PASSWORD` in your environment or platform secrets before starting the container
 3. Create or manage client access tokens from the Access Control panel (or use `${...}` interpolation in `bootstrap.json` for bootstrap-only secrets)
 4. Have MCP clients authenticate with `Authorization: Bearer <client-access-token>`
 
@@ -102,7 +103,7 @@ With SQLite, copy the database file while the process is stopped or use a filesy
 - [ ] `ADMIN_TOKEN` set to a non-empty, secret value — enables admin route protection
 - [ ] `GATEWAY_ADMIN_USER` and `GATEWAY_ADMIN_PASSWORD` set — credentials for `/admin/auth/login`
 - [ ] `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set if using managed downstream credentials (base64-encoded 32-byte key)
-- [ ] `docker compose ... config` shows `env_file: ../.env` and port `3000` only — bundled UI and MCP share the same runtime port
+- [ ] `docker compose ... config` renders `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and port correctly — confirms variables are resolved from the host environment
 - [ ] `DATABASE_PATH` mapped to a persistent volume (`/app/data/gateway.db` in Compose default)
 - [ ] Config volume (`/config`) mounted read-only — safe with SQLite-backed deployments
 - [ ] TLS terminated by reverse proxy (nginx, Traefik, Caddy) before the container — gateway speaks HTTP only

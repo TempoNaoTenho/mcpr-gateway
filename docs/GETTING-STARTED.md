@@ -23,7 +23,7 @@ npm run setup
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
-For Docker Compose, the repo-root `.env` is part of the runtime contract: the compose file loads it into the container and assumes `NODE_ENV=production`.
+For Docker Compose, the required variables (`ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, `DOWNSTREAM_AUTH_ENCRYPTION_KEY`) must be present in the host environment or passed via `docker compose --env-file .env ...`. The compose file does not load `.env` automatically.
 
 **Advanced:** copy a bootstrap template manually:
 
