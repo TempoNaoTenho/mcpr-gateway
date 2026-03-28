@@ -138,14 +138,13 @@ Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with networ
 > For advanced configuration of all env vars run `npm run setup -- --advanced`.
 
 ```bash
-# Export variables in your shell (or CI/CD platform), then:
-docker compose -f docker/docker-compose.yml up --build
-
-# Alternatively, load from a local .env file using the CLI flag:
+# Export variables in your shell (CI/CD), or pass an env file explicitly:
 docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
-The compose file reads `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and `DOWNSTREAM_AUTH_ENCRYPTION_KEY` from the host environment — no `.env` file is required. If `ADMIN_TOKEN` or `GATEWAY_ADMIN_PASSWORD` are missing, `docker compose up` fails immediately with a clear error before the container starts. If `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is malformed, the container exits on startup.
+The compose file reads `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and `DOWNSTREAM_AUTH_ENCRYPTION_KEY` for **interpolation** from the shell/CI environment or an explicit env file such as `--env-file .env`. Runtime **`HOST` inside the container is always `0.0.0.0`** in this file — your dev `.env` value `HOST=127.0.0.1` does not apply there. If `ADMIN_TOKEN` or `GATEWAY_ADMIN_PASSWORD` are missing, `docker compose up` fails immediately with a clear error before the container starts. If `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is malformed, the container exits on startup.
+
+If the UI or `/health` fails from the browser, try **`http://127.0.0.1:3000`** instead of `http://localhost:3000` (some systems resolve `localhost` to IPv6 first).
 
 ### 2. Connect an MCP client
 
@@ -180,7 +179,7 @@ export MCPR_GATEWAY_TOKEN=<your-token>
 
 **Any HTTP MCP client**: send `Authorization: Bearer <token>` on every request. After `initialize`, include the `Mcp-Session-Id` header returned by the gateway.
 
-> 💡 Replace `default` in the URL with the namespace configured in `bootstrap.json`. Multiple namespaces can map to different modes and downstream server pools.
+> 💡 Without `bootstrap.json`, the built-in namespace is `default`. Replace it only when you configure custom namespaces.
 
 ---
 

@@ -28,7 +28,7 @@ npm run docker:build
 - `../config` → `/config` (**read-only**)
 - `../data` → `/app/data` for SQLite
 
-Environment variables are read from the host environment or CI/CD platform — no `.env` file is required. Use `docker compose --env-file .env ...` if you prefer loading from a local file.
+Compose **variable interpolation** (`${ADMIN_TOKEN:?}`, `${PORT:-3000}`, etc.) reads from the host environment or an explicit env file. Run it from repo root with `docker compose --env-file .env -f docker/docker-compose.yml ...` or export the variables in your shell/CI first. Runtime `HOST` is set to `0.0.0.0` inside the service definition — a dev-only `HOST=127.0.0.1` in `.env` does not affect the container bind address.
 
 Typical environment:
 
@@ -45,10 +45,10 @@ Typical environment:
 | `GATEWAY_ADMIN_PASSWORD` | _(non-empty secret)_ | Required when `ADMIN_TOKEN` is set; startup fails fast if omitted |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | `openssl rand -base64 32` | Required for managed downstream bearer/OAuth secrets; malformed values fail fast |
 
-Run from repo root (export required variables first — see [Minimum security variables](../README.md#minimum-security-variables)):
+Run from repo root (provide required variables through `.env` or your shell — see [Minimum security variables](../README.md#minimum-security-variables)):
 
 ```bash
-npm run docker:up
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
 For any real deployment, clients should authenticate with persisted client Bearer tokens (issued via the Access Control panel or present under `auth.staticKeys` in bootstrap).
@@ -103,7 +103,7 @@ With SQLite, copy the database file while the process is stopped or use a filesy
 - [ ] `ADMIN_TOKEN` set to a non-empty, secret value — enables admin route protection
 - [ ] `GATEWAY_ADMIN_USER` and `GATEWAY_ADMIN_PASSWORD` set — credentials for `/admin/auth/login`
 - [ ] `DOWNSTREAM_AUTH_ENCRYPTION_KEY` set if using managed downstream credentials (base64-encoded 32-byte key)
-- [ ] `docker compose ... config` renders `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and port correctly — confirms variables are resolved from the host environment
+- [ ] `docker compose --env-file .env -f docker/docker-compose.yml config` (from repo root) renders `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and port correctly — confirms variables are resolved
 - [ ] `DATABASE_PATH` mapped to a persistent volume (`/app/data/gateway.db` in Compose default)
 - [ ] Config volume (`/config`) mounted read-only — safe with SQLite-backed deployments
 - [ ] TLS terminated by reverse proxy (nginx, Traefik, Caddy) before the container — gateway speaks HTTP only

@@ -220,7 +220,7 @@ example:
 
 ```toml
 [mcp_servers.mcpr-gateway]
-url = "http://127.0.0.1:3000/mcp/all"
+url = "http://127.0.0.1:3000/mcp/default"
 bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 ```
 

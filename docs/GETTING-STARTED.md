@@ -23,7 +23,7 @@ npm run setup
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
-For Docker Compose, the required variables (`ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, `DOWNSTREAM_AUTH_ENCRYPTION_KEY`) must be present in the host environment or passed via `docker compose --env-file .env ...`. The compose file does not load `.env` automatically.
+For Docker Compose, the required variables (`ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, `DOWNSTREAM_AUTH_ENCRYPTION_KEY`) must be present in the host environment or passed via `docker compose --env-file .env ...`. Use an explicit env file or export the variables in your shell before `docker compose up`.
 
 **Advanced:** copy a bootstrap template manually:
 
@@ -60,7 +60,7 @@ Full list of process environment variables: [Configuration — Process environme
 **Docker runtime** — bundled UI and MCP share the same port (`PORT`, default `3000`):
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
 ## MCP over HTTP
@@ -106,7 +106,7 @@ for streamable HTTP MCP servers.
 
 ```toml
 [mcp_servers.mcpr-gateway]
-url = "http://127.0.0.1:3000/mcp/all"
+url = "http://127.0.0.1:3000/mcp/default"
 bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 ```
 

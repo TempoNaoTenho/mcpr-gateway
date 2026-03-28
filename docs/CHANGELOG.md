@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- 2026-03-27 - Fixed - `npm run docker:up` and docs now use `docker compose --project-directory .` so repo-root `.env` is loaded for `${ADMIN_TOKEN:?}` / port interpolation (compose file under `docker/` otherwise skips root `.env`); README notes container `HOST=0.0.0.0` vs dev `.env` and `127.0.0.1` vs `localhost` for browsers
 - 2026-03-27 - Fixed - Docker Compose now loads the repo-root `.env`, sets production-safe runtime defaults, exposes the bundled UI and MCP on port 3000, and adds a healthcheck for publish-ready installs
 - 2026-03-27 - Fixed - Docker image now installs Alpine native build prerequisites so production builds can compile `better-sqlite3` and other native modules when no prebuilt binary is available
 - `/admin/namespaces` metrics now estimate MCP `tools/list` token count after initialize, correctly distinguishing between default mode (full catalog) and compat/code modes (two meta-tools)
@@ -66,3 +67,5 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Some MCP clients do not expose the JSON-RPC `result` payload to the model after a successful call
 - stdio transport for gateway **clients** not yet supported (downstream stdio connections are supported)
 - PostgreSQL not yet supported; SQLite and in-memory only
+- 2026-03-27 - Fixed - Docker run documentation now uses the explicit `--env-file .env -f docker/docker-compose.yml` flow instead of the broken `--project-directory .` example, and MCP client examples now point at the built-in `default` namespace used when no bootstrap config exists
+- 2026-03-27 - Fixed - WebUI static responses now override the default CSP to allow the SvelteKit inline bootstrap script and wrapper style only under `/ui/`, fixing blank pages in Docker/production while keeping the stricter global policy for API routes
