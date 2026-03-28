@@ -41,12 +41,12 @@
   >
     <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">npm run dev</h2>
     <p>
-      The admin UI is served by Vite using the same
+      The admin UI is served by Vite at the root URL using the same
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">HOST</code>
       and
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">PORT</code> as in the project
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">.env</code>
-      (for example <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/ui</code> on port 3000). The
+      (for example <code class="text-xs font-mono text-slate-800 dark:text-slate-200">http://127.0.0.1:3000</code>). The
       gateway process listens on
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">PORT + 1</code>. Vite proxies
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/admin</code>,
@@ -54,6 +54,8 @@
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/health</code>, and related API paths to that
       backend, so the browser uses a single origin.
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run dev:all</code> is the same script.
+      The static <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/ui/</code> path is only used after
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run build</code> or in Docker.
     </p>
   </section>
 

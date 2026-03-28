@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "engines": {
-    "node": ">=22 <25"
+    "node": "24.x"
   },
   "type": "module",
   "bin": {
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall-ui.mjs",
-    "setup": "tsx scripts/setup.ts",
+    "setup": "node scripts/setup.mjs",
     "dev": "node scripts/dev-all.mjs",
     "dev:gateway": "node scripts/dev-gateway.mjs",
     "build": "npm run build:ui && npm run build:gateway",

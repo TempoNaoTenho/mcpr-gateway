@@ -209,8 +209,8 @@ async function probeNamespaces(
 
 async function runNativePreflight(): Promise<void> {
   const nodeCheck = validateNodeMajor(process.version)
-  if (!nodeCheck.ok) {
-    throw new Error(`Benchmark commands require Node 22 or 24 LTS. Current version: ${process.version}`)
+  if (!nodeCheck.ok || nodeCheck.major !== 24) {
+    throw new Error(`Benchmark commands require Node 24 LTS. Current version: ${process.version}`)
   }
 
   try {

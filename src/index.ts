@@ -94,9 +94,9 @@ function hasNodeOption(flag: string): boolean {
 function assertSupportedNodeRuntime(): void {
   const nodeVersion = process.versions.node
   const nodeMajor = Number(nodeVersion.split('.')[0] ?? '0')
-  if (!Number.isFinite(nodeMajor) || nodeMajor < 22 || nodeMajor >= 25 || nodeMajor % 2 === 1) {
+  if (!Number.isFinite(nodeMajor) || nodeMajor !== 24) {
     throw new Error(
-      `Unsupported Node.js runtime ${nodeVersion}. Use Node 22 or 24 LTS with isolated-vm.`
+      `Unsupported Node.js runtime ${nodeVersion}. Use Node 24 LTS with isolated-vm, then rerun npm run setup.`
     )
   }
   if (!hasNodeOption('--no-node-snapshot')) {
@@ -224,6 +224,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (dualStack) {
     app.log.warn(
       '[gateway] GATEWAY_DUAL_STACK=1: listening on :: (dual-stack). Ensure client URL matches your setup (e.g. http://127.0.0.1:PORT or http://localhost:PORT). Do not expose on untrusted LANs without a firewall.',
+    )
+  }
+
+  if (process.env['GATEWAY_DEV_UI_MODE'] === 'vite') {
+    app.log.info(
+      `[gateway] Integrated dev mode: Vite UI on http://${host}:${port - 1}, gateway API on http://${host}:${port}`
     )
   }
 

@@ -23,6 +23,7 @@ const backendPort = port + 1
 const proxyTarget = `http://127.0.0.1:${backendPort}`
 
 const gwEnv = { ...process.env, PORT: String(backendPort), HOST: host }
+gwEnv['GATEWAY_DEV_UI_MODE'] = 'vite'
 const uiEnv = {
   ...process.env,
   PORT: String(port),

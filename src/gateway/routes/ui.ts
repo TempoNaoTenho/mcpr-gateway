@@ -38,7 +38,18 @@ function resolveUiDir(): string | null {
   return null
 }
 
+function isViteUiDevMode(): boolean {
+  return process.env['GATEWAY_DEV_UI_MODE'] === 'vite'
+}
+
 export async function uiRoutes(app: FastifyInstance): Promise<void> {
+  if (isViteUiDevMode()) {
+    app.log.info(
+      '[ui] Vite dev UI is active on the main dev port; static /ui serving is skipped in integrated dev.'
+    )
+    return
+  }
+
   const uiDir = resolveUiDir()
   if (!uiDir) {
     app.log.warn('[ui] Built UI not found — skipping static file serving. Run `npm run build:ui` first.')

@@ -5,7 +5,7 @@
   import { auth } from '$lib/auth.js';
   import { ApiError, authConfig } from '$lib/api.js';
 
-  let username = $state('mcpgateway');
+  let username = $state('admin');
   let password = $state('');
   let passwordRequired = $state(true);
   let configReady = $state(false);
