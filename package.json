@@ -10,6 +10,7 @@
     "mcpr-gateway": "./dist/index.js"
   },
   "scripts": {
+    "postinstall": "node scripts/postinstall-ui.mjs",
     "setup": "tsx scripts/setup.ts",
     "dev": "node scripts/dev-all.mjs",
     "dev:gateway": "node scripts/dev-gateway.mjs",

@@ -63,7 +63,7 @@ const ENV_FIELDS: EnvField[] = [
 
 function applyEnvPatches(
   content: string,
-  patches: Record<string, string | null | undefined>,
+  patches: Record<string, string | null | undefined>
 ): string {
   const toApply = new Map<string, string | null>()
   for (const [k, v] of Object.entries(patches)) {
@@ -121,7 +121,7 @@ async function checkPort(host: string, port: number, label: string): Promise<voi
     const err = e as NodeJS.ErrnoException
     if (err.code === 'EADDRINUSE') {
       console.warn(
-        `  Port ${port} on ${host} is in use — ${label}. Stop the other process or change PORT.`,
+        `  Port ${port} on ${host} is in use — ${label}. Stop the other process or change PORT.`
       )
     } else {
       console.warn(`  Could not verify port ${port}: ${err.message}`)
@@ -158,8 +158,10 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  if (!existsSync(join(ROOT, 'node_modules'))) {
-    console.warn('No node_modules found. Run: npm ci')
+  const hasRootDeps = existsSync(join(ROOT, 'node_modules'))
+  const hasUiDeps = existsSync(join(ROOT, 'ui', 'node_modules'))
+  if (!hasRootDeps || !hasUiDeps) {
+    console.warn('Missing dependencies. Run: npm ci')
     console.log('')
   }
 
@@ -203,7 +205,7 @@ async function main(): Promise<void> {
         console.log('SQLite database file already exists:')
         console.log(`  ${db}`)
         console.log(
-          '  (sessions, config versions, audit, downstream auth metadata — do not delete while the gateway runs.)',
+          '  (sessions, config versions, audit, downstream auth metadata — do not delete while the gateway runs.)'
         )
       } else {
         console.log('SQLite will be created on first gateway start:')
@@ -281,7 +283,7 @@ async function main(): Promise<void> {
     console.log('')
     const ans = (
       await ask(
-        '        Press Enter to auto-generate (recommended), or paste your own base64-32-byte key: ',
+        '        Press Enter to auto-generate (recommended), or paste your own base64-32-byte key: '
       )
     ).trim()
     patches[KEY_EK] = ans === '' ? generated : ans
@@ -306,7 +308,9 @@ async function main(): Promise<void> {
   if (isAdvanced) {
     console.log('Advanced configuration')
     console.log('──────────────────────')
-    console.log('Enter new value, or Enter to keep. Secrets: "g" = generate. "-" = remove key line.')
+    console.log(
+      'Enter new value, or Enter to keep. Secrets: "g" = generate. "-" = remove key line.'
+    )
     console.log('')
     const advancedPatches: Record<string, string | null | undefined> = {}
 
@@ -319,7 +323,7 @@ async function main(): Promise<void> {
             ? ' / g=generate base64-32-byte'
             : ''
       const line = await ask(
-        `${field.key} — ${field.hint}\n  Current: ${mask(cur, field.secret)}${gen}\n  > `,
+        `${field.key} — ${field.hint}\n  Current: ${mask(cur, field.secret)}${gen}\n  > `
       )
       const ans = line.trim()
       if (ans === '') continue
@@ -366,7 +370,9 @@ async function main(): Promise<void> {
   console.log('  SQLite stores runtime config after first start. Auth secrets still merge from')
   console.log('  bootstrap.json if that file exists.')
   console.log('')
-  const wantBootstrap = (await ask('Create config/bootstrap.json from bootstrap.example.json? [y/N] '))
+  const wantBootstrap = (
+    await ask('Create config/bootstrap.json from bootstrap.example.json? [y/N] ')
+  )
     .trim()
     .toLowerCase()
 
