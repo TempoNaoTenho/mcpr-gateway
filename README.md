@@ -105,18 +105,18 @@ flowchart LR
 
 ```bash
 node --version   # must be 24.x LTS
-git clone https://github.com/TempoNaoTenho/mcpr-gateway.git
-cd mcpr-gateway
+git clone https://github.com/TempoNaoTenho/mcpr-gateway.git && cd mcpr-gateway
 cp .env.example .env
-npm run setup             # installs deps, repairs native modules, builds UI + gateway
+npm ci
+npm run build
 npm start                 # built UI + MCP gateway on PORT
 ```
 
 Replace the `change-me-*` security placeholders in `.env` with your own values before `npm start`.
 
-`npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, and builds the production UI and gateway artifacts.
+`npm ci`, `npm run build`, and `npm start` are the standard install/build/run contract. The build step requires Node 24 LTS, rebuilds `isolated-vm` and `better-sqlite3` if they were compiled for another Node version, and produces the production UI plus gateway artifacts.
 
-`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. `npm start` loads `.env`, attempts a one-time automatic rebuild of stale `isolated-vm` and `better-sqlite3` binaries when it detects an older Node ABI, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. `npm run dev` applies the same native-module repair before launching the gateway watcher. Use `npm run setup -- --advanced` only when you want guided editing of `.env` or to create `config/bootstrap.json`.
+`.env` is a local convenience, not a deployment requirement. `npm start` first uses variables already present in the process environment, then fills any missing keys from `.env` if that file exists. It attempts a one-time automatic rebuild of stale `isolated-vm` and `better-sqlite3` binaries when it detects an older Node ABI, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. `npm run dev` applies the same native-module repair before launching the gateway watcher. `npm run setup` remains available only as a local convenience helper when you want guided editing of `.env` or to create `config/bootstrap.json`.
 
 Open `http://127.0.0.1:3000` after `npm start`. The root path redirects to the built admin UI under `/ui/`, and MCP clients use the same port. `npm run dev` remains available for contributors; in that mode Vite serves the UI on `PORT` and the gateway API uses `PORT + 1`.
 
@@ -129,7 +129,7 @@ Open `http://127.0.0.1:3000` after `npm start`. The root path redirects to the b
 | `GATEWAY_ADMIN_PASSWORD`         | Password typed at the admin login               | Yes                                     |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | AES-256 key for downstream credentials at rest  | Required for managed downstream secrets |
 
-Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it. The default `npm start` path now fails fast instead of silently accepting missing or placeholder values.
+Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it. The default `npm start` path now fails fast instead of silently accepting missing or placeholder values, whether they come from `.env` or platform-injected environment variables.
 
 ```bash
 # Export variables in your shell (CI/CD), or pass an env file explicitly:
@@ -185,7 +185,7 @@ export MCPR_GATEWAY_TOKEN=<your-token>
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Client auth            | Bearer token per user/service, issued via Admin UI or `auth.staticKeys` in bootstrap                                                                                           |
 | Admin protection       | `ADMIN_TOKEN` enables login; `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD` are the credentials; in `NODE_ENV=production` with no `ADMIN_TOKEN`, admin routes are not mounted |
-| Downstream credentials | AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set (default in `npm run setup`)                                                                              |
+| Downstream credentials | AES-encrypted in SQLite when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is set                                                                                                           |
 | HTTP security headers  | `@fastify/helmet` applied to all responses                                                                                                                                     |
 | CORS                   | Restricted to loopback origins (`localhost`, `127.0.0.1`, `::1`) for MCP endpoints                                                                                             |
 

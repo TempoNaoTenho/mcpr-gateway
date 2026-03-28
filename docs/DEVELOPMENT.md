@@ -5,14 +5,14 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 ## Prerequisites
 
 - **Node.js 24 LTS** (`engines: "24.x"` in `package.json`, `.nvmrc`, `.node-version`)
-  - `npm run setup`, `npm start`, and `npm run dev` auto-rebuild `isolated-vm` and `better-sqlite3` when they detect stale binaries from another Node ABI
+  - `npm run build`, `npm start`, and `npm run dev` auto-rebuild `isolated-vm` and `better-sqlite3` when they detect stale binaries from another Node ABI
 - **npm 10+** (bundled with Node 24)
 - For Docker work: Docker Engine and Compose v2
 
 Fresh-clone note:
 
 - Copy `.env.example` to `.env` before the first run; the built/default runtime expects explicit security values under user control
-- `npm run setup` is the supported first-run entrypoint; it installs any missing root and `ui/` dependencies, repairs native module mismatches automatically, and builds the production assets used by `npm start`
+- The standard project contract is `npm ci`, `npm run build`, `npm start`; `npm run setup` is only an optional local convenience helper
 - Root `npm ci` still installs `ui/` dependencies via the guarded `postinstall` hook when `ui/package.json` is present, while Docker-style staged installs keep working before `ui/` is copied
 
 ## Scripts
@@ -25,7 +25,7 @@ Fresh-clone note:
 | `build`           | `npm run build`                                  | Build both UI and gateway for production                                                  |
 | `build:gateway`   | `npm run build:gateway`                          | TypeScript → `dist/` via tsup                                                             |
 | `build:ui`        | `npm run build:ui`                               | SvelteKit UI → `ui/build/`                                                                |
-| `setup`           | `npm run setup`                                  | Canonical setup: validates Node 24, installs deps, repairs native modules, builds artifacts |
+| `setup`           | `npm run setup`                                  | Optional local helper: installs deps when missing, offers advanced `.env`/bootstrap prompts, builds artifacts |
 | `typecheck`       | `npm run typecheck`                              | `tsc --noEmit` — no output files, types only                                              |
 | `lint`            | `npm run lint`                                   | ESLint over `src/`                                                                        |
 | `format`          | `npm run format`                                 | Prettier over entire repo                                                                 |
@@ -145,11 +145,10 @@ Behavior:
 ### Dev workflow
 
 ```bash
-# Prepare the environment (first run)
-# cp .env.example .env   # once, then replace change-me-* placeholders before npm start
-npm run setup
-
-# Built/default runtime
+# Standard build/runtime
+# cp .env.example .env   # local convenience only; hosted env can inject vars directly
+npm ci
+npm run build
 npm start
 
 # Full stack (recommended) — Vite UI at PORT, gateway at PORT+1
@@ -162,7 +161,7 @@ npm --prefix ui run dev
 npm run build:ui   # output: ui/build/
 ```
 
-If you switch Node versions later, `npm start` and `npm run dev` try a one-time automatic `npm rebuild isolated-vm better-sqlite3` before failing.
+If you switch Node versions later, `npm run build`, `npm start`, and `npm run dev` try a one-time automatic `npm rebuild isolated-vm better-sqlite3` before failing.
 
 ## Tests
 

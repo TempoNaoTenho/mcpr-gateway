@@ -15,15 +15,16 @@ Operational note:
 git clone https://github.com/TempoNaoTenho/mcpr-gateway.git
 cd mcpr-gateway
 cp .env.example .env
-npm run setup
+npm ci
+npm run build
 npm start
 ```
 
-[`npm run setup`](../scripts/setup.mjs) is the canonical first-run command. It validates Node 24, installs missing root and `ui/` dependencies, rebuilds `isolated-vm` / `better-sqlite3` if they were compiled for another Node version, and builds the production UI and gateway artifacts.
+[`npm run build`](../scripts/build.mjs) is the standard build entrypoint. It validates Node 24, rebuilds `isolated-vm` / `better-sqlite3` if they were compiled for another Node version, and produces the production UI and gateway artifacts.
 
-Copy [`.env.example`](../.env.example) to `.env`, then replace every `change-me-*` placeholder before `npm start`. `npm start` loads `.env` automatically and fails fast if any required security value is still empty, malformed, or unchanged from the example file.
+Copy [`.env.example`](../.env.example) to `.env`, then replace every `change-me-*` placeholder before `npm start`. In hosted environments, you can inject the same variables directly from the platform instead of creating `.env`. `npm start` loads `.env` only when it exists and fails fast if any required security value is still empty, malformed, or unchanged from the example file.
 
-`npm run setup` is idempotent. `npm start` and `npm run dev` also try a one-time automatic rebuild of stale `isolated-vm` / `better-sqlite3` binaries when they detect an ABI mismatch from an older Node install. Use `npm run setup -- --advanced` only when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
+`npm start` and `npm run dev` also try a one-time automatic rebuild of stale `isolated-vm` / `better-sqlite3` binaries when they detect an ABI mismatch from an older Node install. `npm run setup` remains an optional local convenience helper when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 

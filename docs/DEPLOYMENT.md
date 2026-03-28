@@ -17,11 +17,12 @@ For a non-Docker local runtime, the repository default is:
 
 ```bash
 cp .env.example .env
-npm run setup
+npm ci
+npm run build
 npm start
 ```
 
-`npm start` loads `.env`, refuses placeholder security values from the example file, and serves the built UI plus MCP gateway on the same port.
+`npm start` reads required variables from the process environment first and fills any missing ones from `.env` when that file exists. It refuses placeholder security values from the example file and serves the built UI plus MCP gateway on the same port.
 
 Build from repository root:
 
@@ -83,7 +84,7 @@ Compose uses `CONFIG_PATH=/config` and a read-only mount. Keep secrets out of gi
 
 Typical production flow:
 
-1. Copy `config/bootstrap.example.json` to `config/bootstrap.json` (or run `npm run setup`)
+1. Copy `config/bootstrap.example.json` to `config/bootstrap.json` (or run `npm run setup -- --advanced`)
 2. Set `ADMIN_TOKEN`, `GATEWAY_ADMIN_USER`, and `GATEWAY_ADMIN_PASSWORD` in your environment or platform secrets before starting the container
 3. Create or manage client access tokens from the Access Control panel (or use `${...}` interpolation in `bootstrap.json` for bootstrap-only secrets)
 4. Have MCP clients authenticate with `Authorization: Bearer <client-access-token>`

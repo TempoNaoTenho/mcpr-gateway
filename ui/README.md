@@ -20,14 +20,16 @@ npm run preview      # Preview production build
 Full-stack local development from the **repository root**:
 
 ```bash
+npm ci
+npm run build
 npm start        # built runtime from the repo root (static UI served by gateway)
-npm run dev          # Vite on PORT + gateway on PORT+1 (see root package.json; `dev:all` is an alias)
+npm run dev      # Vite on PORT + gateway on PORT+1
 ```
 
 ## Integration with the gateway
 
 - The gateway looks for a built UI in `UI_STATIC_DIR`, then `ui/dist`, then **`ui/build`** relative to the process working directory.
-- Root script `npm run build:ui` runs `npm run build` here; `npm run build` at the repo root runs UI then the gateway bundle (`build:all` is an alias).
+- Root script `npm run build:ui` runs `npm run build` here; `npm run build` at the repo root runs UI first and then the gateway bundle.
 - HTTP: [`GET /`](../docs/http-api.md) redirects to `/ui/`; static files are mounted under `/ui/`.
 
 ## API usage
