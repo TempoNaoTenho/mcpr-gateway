@@ -5,7 +5,7 @@
   import { auth } from '$lib/auth.js';
   import { ApiError, authConfig } from '$lib/api.js';
 
-  let username = $state('admin');
+  let username = $state('');
   let password = $state('');
   let passwordRequired = $state(true);
   let configReady = $state(false);
@@ -14,9 +14,8 @@
 
   onMount(async () => {
     try {
-      const cfg = await authConfig();
-      username = cfg.username;
-      passwordRequired = cfg.passwordRequired;
+      const { passwordRequired: requiresPassword } = await authConfig();
+      passwordRequired = requiresPassword;
     } catch {
       // Fallback: assume password required (server unreachable or pre-change gateway).
     } finally {
@@ -26,11 +25,11 @@
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
-    if (passwordRequired && !password.trim()) return;
+    if (!username.trim() || (passwordRequired && !password.trim())) return;
     loading = true;
     error = '';
     try {
-      await auth.login(username, password.trim());
+      await auth.login(username.trim(), password.trim());
       goto(`${base}/dashboard`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -78,10 +77,9 @@
             <input
               id="username"
               type="text"
-              value={username}
+              bind:value={username}
               autocomplete="username"
-              readonly
-              class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+              class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             />
           </div>
 
@@ -94,14 +92,13 @@
                 id="password"
                 type="password"
                 bind:value={password}
-                placeholder="Enter admin password"
                 autocomplete="current-password"
-                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               />
             </div>
           {:else}
             <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              No password is configured on the gateway. Sign in with the username above only.
+              No password is configured on the gateway. Enter the admin username and sign in.
             </p>
           {/if}
 
@@ -111,7 +108,7 @@
 
           <button
             type="submit"
-            disabled={loading || (passwordRequired && !password.trim())}
+            disabled={loading || !username.trim() || (passwordRequired && !password.trim())}
             class="w-full py-2 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 dark:disabled:bg-indigo-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             {#if loading}
