@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-28 - Fixed - `npm start`, `npm run dev`, and `npm run dev:gateway` now auto-rebuild `isolated-vm` and `better-sqlite3` once when they detect stale binaries from another Node ABI, instead of crashing immediately
 - 2026-03-28 - Fixed - The repository default install flow now targets a built end-user runtime: `npm run setup` prepares dependencies and production artifacts, `npm start` loads `.env` and serves the built UI plus gateway on one port, and startup now refuses missing or placeholder security values from `.env.example`
 - 2026-03-28 - Fixed - Root `npm ci` now installs `ui/` dependencies via a guarded `postinstall` that skips when `ui/package.json` is absent, preserving Docker/staged installs while keeping fresh-clone setup automatic; setup still warns when either dependency tree is missing
 - 2026-03-27 - Fixed - `npm run docker:up` and docs now use `docker compose --project-directory .` so repo-root `.env` is loaded for `${ADMIN_TOKEN:?}` / port interpolation (compose file under `docker/` otherwise skips root `.env`); README notes container `HOST=0.0.0.0` vs dev `.env` and `127.0.0.1` vs `localhost` for browsers

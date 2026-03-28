@@ -23,7 +23,7 @@ npm start
 
 Copy [`.env.example`](../.env.example) to `.env`, then replace every `change-me-*` placeholder before `npm start`. `npm start` loads `.env` automatically and fails fast if any required security value is still empty, malformed, or unchanged from the example file.
 
-`npm run setup` is idempotent. Re-run it after switching Node versions or when native modules start complaining about ABI mismatches. Use `npm run setup -- --advanced` only when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
+`npm run setup` is idempotent. `npm start` and `npm run dev` also try a one-time automatic rebuild of stale `isolated-vm` / `better-sqlite3` binaries when they detect an ABI mismatch from an older Node install. Use `npm run setup -- --advanced` only when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 

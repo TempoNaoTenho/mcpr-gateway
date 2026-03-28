@@ -116,7 +116,7 @@ Replace the `change-me-*` security placeholders in `.env` with your own values b
 
 `npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, and builds the production UI and gateway artifacts.
 
-`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. `npm start` loads `.env`, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. Use `npm run setup -- --advanced` only when you want guided editing of `.env` or to create `config/bootstrap.json`.
+`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. `npm start` loads `.env`, attempts a one-time automatic rebuild of stale `isolated-vm` and `better-sqlite3` binaries when it detects an older Node ABI, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. `npm run dev` applies the same native-module repair before launching the gateway watcher. Use `npm run setup -- --advanced` only when you want guided editing of `.env` or to create `config/bootstrap.json`.
 
 Open `http://127.0.0.1:3000` after `npm start`. The root path redirects to the built admin UI under `/ui/`, and MCP clients use the same port. `npm run dev` remains available for contributors; in that mode Vite serves the UI on `PORT` and the gateway API uses `PORT + 1`.
 

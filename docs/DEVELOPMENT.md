@@ -5,7 +5,7 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 ## Prerequisites
 
 - **Node.js 24 LTS** (`engines: "24.x"` in `package.json`, `.nvmrc`, `.node-version`)
-  - Re-run `npm run setup` after switching Node versions; it repairs `isolated-vm` and `better-sqlite3` for the active ABI
+  - `npm run setup`, `npm start`, and `npm run dev` auto-rebuild `isolated-vm` and `better-sqlite3` when they detect stale binaries from another Node ABI
 - **npm 10+** (bundled with Node 24)
 - For Docker work: Docker Engine and Compose v2
 
@@ -145,7 +145,7 @@ Behavior:
 ### Dev workflow
 
 ```bash
-# Prepare the environment (first run or after switching Node)
+# Prepare the environment (first run)
 # cp .env.example .env   # once, then replace change-me-* placeholders before npm start
 npm run setup
 
@@ -161,6 +161,8 @@ npm --prefix ui run dev
 # Production build
 npm run build:ui   # output: ui/build/
 ```
+
+If you switch Node versions later, `npm start` and `npm run dev` try a one-time automatic `npm rebuild isolated-vm better-sqlite3` before failing.
 
 ## Tests
 
