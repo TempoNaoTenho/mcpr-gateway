@@ -129,22 +129,38 @@ function pickFirstExpectedMatch(
   return undefined
 }
 
-function parseSearchResult(raw: unknown): { matches: SearchMatch[]; payload: unknown } {
-  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'matches' in raw) {
-    const matchesRaw = (raw as { matches?: unknown }).matches
-    if (!Array.isArray(matchesRaw)) return { matches: [], payload: raw }
-    const matches: SearchMatch[] = []
-    for (const entry of matchesRaw) {
-      if (!entry || typeof entry !== 'object') continue
-      const name = (entry as { name?: unknown }).name
-      const serverId = (entry as { serverId?: unknown }).serverId
-      if (typeof name === 'string' && typeof serverId === 'string') {
-        matches.push({ name, serverId })
-      }
-    }
-    return { matches, payload: raw }
+function parseSearchMatches(raw: unknown): SearchMatch[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !('matches' in raw)) {
+    return []
   }
-  return { matches: [], payload: raw }
+
+  const matchesRaw = (raw as { matches?: unknown }).matches
+  if (!Array.isArray(matchesRaw)) return []
+
+  const matches: SearchMatch[] = []
+  for (const entry of matchesRaw) {
+    if (!entry || typeof entry !== 'object') continue
+    const name = (entry as { name?: unknown }).name
+    const serverId = (entry as { serverId?: unknown }).serverId
+    if (typeof name === 'string' && typeof serverId === 'string') {
+      matches.push({ name, serverId })
+    }
+  }
+  return matches
+}
+
+function parseGatewaySearchResult(raw: unknown): { matches: SearchMatch[]; payload: unknown } {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'structuredContent' in raw) {
+    return {
+      matches: parseSearchMatches((raw as { structuredContent?: unknown }).structuredContent),
+      payload: raw,
+    }
+  }
+
+  return {
+    matches: parseSearchMatches(raw),
+    payload: raw,
+  }
 }
 
 
@@ -386,7 +402,7 @@ async function evaluateRetrievalStep(
       query: searchQuery,
       limit,
     })
-    const { matches, payload: searchPayload } = parseSearchResult(searchRaw)
+    const { matches, payload: searchPayload } = parseGatewaySearchResult(searchRaw)
     const searchResponseTokens = estimateSerializedTokens(searchPayload)
 
     const gatewayRank = findRank(matches, step)
@@ -551,7 +567,7 @@ async function evaluateE2EStep(
     }
   }
 
-  const { matches, payload: searchPayload } = parseSearchResult(searchRaw)
+  const { matches, payload: searchPayload } = parseGatewaySearchResult(searchRaw)
   const searchResponseTokens = estimateSerializedTokens(searchPayload)
   const match = pickFirstExpectedMatch(matches, step)
 

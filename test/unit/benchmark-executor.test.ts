@@ -231,4 +231,117 @@ describe('benchmark executor', () => {
     expect(result.gateway.error).toContain('Skipped compat gateway flow')
     expect(result.baseline.error).toBe('No baseline tool selected')
   })
+
+  it('accepts gateway_search_tools results wrapped as MCP structuredContent in retrieval flow', async () => {
+    setConfig({
+      ...previousConfig,
+      auth: {
+        ...previousConfig.auth,
+        staticKeys: {
+          ...(previousConfig.auth.staticKeys ?? {}),
+          'bench-token': {
+            userId: 'bench-user',
+            roles: ['user'],
+          },
+        },
+      },
+      namespaces: {
+        ...previousConfig.namespaces,
+        default: {
+          ...previousConfig.namespaces.default,
+          allowedRoles: ['user'],
+          allowedModes: [Mode.Read],
+          gatewayMode: GatewayMode.Compat,
+        },
+      },
+      roles: {
+        ...previousConfig.roles,
+        user: {
+          ...(previousConfig.roles.user ?? { denyModes: [] }),
+          allowNamespaces: ['default'],
+        },
+      },
+    })
+
+    const client = {
+      initialize: async () => ({ sessionId: 's1' }),
+      toolsList: async () => [
+        { name: 'gateway_search_tools', inputSchema: {} },
+        { name: 'gateway_call_tool', inputSchema: {} },
+      ],
+      callTool: async () => ({
+        content: [{ type: 'text', text: 'Matches for "docs search"' }],
+        structuredContent: {
+          query: 'docs search',
+          matches: [{ name: 'docs_search', serverId: 'docs' }],
+        },
+      }),
+    } as any
+
+    const result = await runRetrievalCase(client, makeRegistry(true), makeScenario('default'))
+
+    expect(result.gateway.searchUsed).toBe(true)
+    expect(result.gateway.rank).toBe(1)
+    expect(result.gateway.matchedTool).toBe('docs_search')
+    expect(result.gateway.matchedServerId).toBe('docs')
+  })
+
+  it('accepts gateway_search_tools results wrapped as MCP structuredContent in e2e flow', async () => {
+    setConfig({
+      ...previousConfig,
+      auth: {
+        ...previousConfig.auth,
+        staticKeys: {
+          ...(previousConfig.auth.staticKeys ?? {}),
+          'bench-token': {
+            userId: 'bench-user',
+            roles: ['user'],
+          },
+        },
+      },
+      namespaces: {
+        ...previousConfig.namespaces,
+        default: {
+          ...previousConfig.namespaces.default,
+          allowedRoles: ['user'],
+          allowedModes: [Mode.Read],
+          gatewayMode: GatewayMode.Compat,
+        },
+      },
+      roles: {
+        ...previousConfig.roles,
+        user: {
+          ...(previousConfig.roles.user ?? { denyModes: [] }),
+          allowNamespaces: ['default'],
+        },
+      },
+    })
+
+    const client = {
+      initialize: async () => ({ sessionId: 's1' }),
+      toolsList: async () => [
+        { name: 'gateway_search_tools', inputSchema: {} },
+        { name: 'gateway_call_tool', inputSchema: {} },
+      ],
+      callTool: async (_sessionId: string, name: string) => {
+        if (name === 'gateway_search_tools') {
+          return {
+            content: [{ type: 'text', text: 'Matches for "docs search"' }],
+            structuredContent: {
+              query: 'docs search',
+              matches: [{ name: 'docs_search', serverId: 'docs' }],
+            },
+          }
+        }
+
+        return { ok: true }
+      },
+    } as any
+
+    const result = await runE2ECase(client, makeRegistry(true), makeScenario('default'))
+
+    expect(result.gateway.success).toBe(true)
+    expect(result.gateway.chosenTool).toBe('docs_search')
+    expect(result.gateway.chosenServerId).toBe('docs')
+  })
 })

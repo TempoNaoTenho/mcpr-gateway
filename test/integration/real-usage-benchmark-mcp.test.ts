@@ -45,6 +45,16 @@ const probes: Record<string, SearchProbe> = {
 let fixture: Awaited<ReturnType<typeof createRealUsageBenchmarkFixture>> | undefined
 let runtime: Awaited<ReturnType<typeof createBenchmarkRuntime>> | undefined
 
+function readSearchMatches(payload: unknown): Array<{ name: string; serverId: string }> {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const structuredContent = (payload as { structuredContent?: unknown }).structuredContent
+  if (!structuredContent || typeof structuredContent !== 'object' || Array.isArray(structuredContent)) {
+    return []
+  }
+  const matches = (structuredContent as { matches?: unknown }).matches
+  return Array.isArray(matches) ? (matches as Array<{ name: string; serverId: string }>) : []
+}
+
 beforeAll(async () => {
   fixture = await createRealUsageBenchmarkFixture()
   runtime = await createBenchmarkRuntime(fixture.configDir)
@@ -79,8 +89,7 @@ describe('gateway_search_tools over real MCP flows (real_usage_benchmark fixture
         limit: 10,
       })
 
-      const matches = (searchResult as { matches: Array<{ name: string; serverId: string }> })
-        .matches
+      const matches = readSearchMatches(searchResult)
       const found = matches.some(
         (m) => m.name === probe.expectedTool && m.serverId === probe.expectedServerId
       )

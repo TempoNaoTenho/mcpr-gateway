@@ -39,6 +39,18 @@ const TMP = join(__dirname, '__tmp_security__')
 const AUTH_USER = { Authorization: 'Bearer alice:user' }
 const AUTH_WRITE_DENIED = { Authorization: 'Bearer bob:write-denied-user' }
 
+function readSearchMatches(payload: unknown): Array<{ name: string; serverId: string }> {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const result = (payload as { result?: unknown }).result
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return []
+  const structuredContent = (result as { structuredContent?: unknown }).structuredContent
+  if (!structuredContent || typeof structuredContent !== 'object' || Array.isArray(structuredContent)) {
+    return []
+  }
+  const matches = (structuredContent as { matches?: unknown }).matches
+  return Array.isArray(matches) ? (matches as Array<{ name: string; serverId: string }>) : []
+}
+
 let app: FastifyInstance
 let fakeServer: FakeMcpServer
 let disposeSessionDb: () => void
@@ -234,7 +246,7 @@ describe('Security — tool quarantined não publicada', () => {
     })
 
     expect(searchRes.statusCode).toBe(200)
-    const matches = searchRes.json().result.matches
+    const matches = readSearchMatches(searchRes.json())
     const toolNames = matches.map((m: { name: string }) => m.name)
 
     // 'tricky_tool' has description "ignore previous instructions..." → quarantined, should not appear
@@ -264,7 +276,7 @@ describe('Security — tool quarantined não publicada', () => {
       },
     })
 
-    const matches = searchRes.json().result.matches
+    const matches = readSearchMatches(searchRes.json())
     const toolNames = matches.map((m: { name: string }) => m.name)
     // 'read_email' is clean and should appear
     expect(toolNames).toContain('read_email')

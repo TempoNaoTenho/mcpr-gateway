@@ -244,16 +244,12 @@ describe('sandbox output bugs', () => {
 
   describe('AC3: VM timeout should return proper error', () => {
     it('should return timeout error for infinite loop code', async () => {
-      // This test exposes the race condition bug in sandbox.ts:139-143
-      // The VM timeout and Promise.race timeout don't coordinate properly
-      // If the test hangs, the bug exists (timeout not being respected)
       const session = makeSession()
       const registry = {
         getToolsByNamespace: vi.fn().mockReturnValue([]),
       }
 
-      // Use Promise.race to enforce test timeout since the bug may cause infinite hang
-      const result = await Promise.race([
+      await expect(
         executeCodeMode(
           'while(true) {}',
           session,
@@ -266,29 +262,8 @@ describe('sandbox output bugs', () => {
             artifactStoreTtlSeconds: 300,
           },
           vi.fn()
-        ),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('TEST TIMEOUT: executeCodeMode hung - bug exists')),
-            500
-          )
-        ),
-      ])
-
-      // Should return an error result, not an empty object or crash
-      expect(result).toBeDefined()
-      if (typeof result === 'object' && result !== null) {
-        const r = result as Record<string, unknown>
-        expect(r.backend).toBe('isolated-vm')
-        // Bug: value might be undefined or missing due to race condition
-        // Expected: should have an error property or throw
-        if ('error' in r) {
-          expect(r.error).toContain('timeout')
-        } else if (!('value' in r) || r.value === undefined) {
-          // This is the bug - no error and no value
-          throw new Error('BUG: Timeout returned undefined value instead of error')
-        }
-      }
+        )
+      ).rejects.toThrow('Script execution timed out.')
     })
 
     it('should return timeout error for blocking synchronous code', async () => {
@@ -297,8 +272,7 @@ describe('sandbox output bugs', () => {
         getToolsByNamespace: vi.fn().mockReturnValue([]),
       }
 
-      // Use Promise.race to enforce test timeout
-      const result = await Promise.race([
+      await expect(
         executeCodeMode(
           'const start = Date.now(); while(Date.now() - start < 10000) {}; return "done"',
           session,
@@ -311,28 +285,8 @@ describe('sandbox output bugs', () => {
             artifactStoreTtlSeconds: 300,
           },
           vi.fn()
-        ),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('TEST TIMEOUT: executeCodeMode hung - bug exists')),
-            500
-          )
-        ),
-      ])
-
-      // Should have meaningful error handling, not just silent failure
-      expect(result).toBeDefined()
-      if (typeof result === 'object' && result !== null) {
-        const r = result as Record<string, unknown>
-        if ('error' in r) {
-          expect(typeof r.error === 'string' || r.error instanceof Error).toBe(true)
-        } else {
-          // Bug check: if no error property, must have value
-          if (!('value' in r)) {
-            throw new Error('BUG: Synchronous timeout produced neither value nor error')
-          }
-        }
-      }
+        )
+      ).rejects.toThrow('Script execution timed out.')
     })
   })
 
