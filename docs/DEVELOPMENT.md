@@ -5,7 +5,7 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 ## Prerequisites
 
 - **Node.js 24 LTS** (`engines: "24.x"` in `package.json`, `.nvmrc`, `.node-version`)
-  - `npm run build`, `npm start`, and `npm run dev` auto-rebuild `isolated-vm` and `better-sqlite3` when they detect stale binaries from another Node ABI
+  - `npm run build`, `npm start`, `npm run dev`, `npm test`, `npm run test:coverage`, and `npm run test:watch` auto-rebuild `isolated-vm` and `better-sqlite3` when they detect stale binaries from another Node ABI
 - **npm 10+** (bundled with Node 24)
 - For Docker work: Docker Engine and Compose v2
 
@@ -29,9 +29,9 @@ Fresh-clone note:
 | `typecheck`       | `npm run typecheck`                              | `tsc --noEmit` — no output files, types only                                              |
 | `lint`            | `npm run lint`                                   | ESLint over `src/`                                                                        |
 | `format`          | `npm run format`                                 | Prettier over entire repo                                                                 |
-| `test`            | `npm test`                                       | Typecheck + lint, then Vitest run (no coverage)                                           |
-| `test:coverage`   | `npm run test:coverage`                          | Typecheck + lint, then Vitest with v8 coverage                                            |
-| `test:watch`      | `npm run test:watch`                             | Vitest watch mode — skips pretest hook                                                    |
+| `test`            | `npm test`                                       | Typecheck + lint, native-module preflight, then Vitest run (no coverage)                  |
+| `test:coverage`   | `npm run test:coverage`                          | Typecheck + lint, native-module preflight, then Vitest with v8 coverage                   |
+| `test:watch`      | `npm run test:watch`                             | Vitest watch mode with native-module preflight — skips pretest hook                       |
 | `verify`          | `npm run verify`                                 | Full pre-push suite: `npm ci`, coverage, UI check, production build                       |
 | `benchmark`       | `npm run benchmark -- <command>`                 | Canonical benchmark CLI (`smoke`, `real`, `prepare`)                                      |
 | `benchmark:smoke` | `npm run benchmark:smoke`                        | Quick smoke benchmark (single pass)                                                       |
@@ -40,7 +40,7 @@ Fresh-clone note:
 | `docker:build`    | `npm run docker:build`                           | Build multi-stage Docker image                                                            |
 | `docker:up`       | `npm run docker:up`                              | Build and start via Docker Compose                                                        |
 
-> `pretest` runs `typecheck + lint` automatically before `npm test` and `npm run test:coverage`. Use `test:watch` to skip it during rapid iteration.
+> `pretest` runs `typecheck + lint` automatically before `npm test` and `npm run test:coverage`. All three test commands also inject `--no-node-snapshot` before starting Vitest so `isolated-vm` behaves the same way it does under the runtime entrypoints. Use `test:watch` to skip `pretest` during rapid iteration.
 
 ### Benchmark CLI
 
@@ -161,12 +161,13 @@ npm --prefix ui run dev
 npm run build:ui   # output: ui/build/
 ```
 
-If you switch Node versions later, `npm run build`, `npm start`, and `npm run dev` try a one-time automatic `npm rebuild isolated-vm better-sqlite3` before failing.
+If you switch Node versions later, `npm run build`, `npm start`, `npm run dev`, `npm test`, `npm run test:coverage`, and `npm run test:watch` try a one-time automatic `npm rebuild isolated-vm better-sqlite3` before failing.
 
 ## Tests
 
 - **Framework:** Vitest 3 with v8 coverage provider
 - **Pretest hook:** `typecheck + lint` run automatically before `npm test` and `npm run test:coverage`
+- **Native runtime preflight:** all test commands auto-rebuild stale `isolated-vm` / `better-sqlite3` binaries and inject `--no-node-snapshot` before Vitest starts
 - **Watch mode:** `npm run test:watch` skips the pretest hook for fast iteration
 - **Coverage:** `npm run test:coverage` generates HTML + JSON reports under `coverage/`
 - **Full verify:** `npm run verify` — `npm ci`, full coverage pass, UI type-check, production build

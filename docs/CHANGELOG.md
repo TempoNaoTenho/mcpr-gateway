@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-28 - Fixed - stdio downstream transport now converts `stdin` `EPIPE` / closed-pipe writes into rejected MCP transport errors instead of leaking unhandled exceptions during tests and benchmark flows
+- 2026-03-28 - Fixed - `npm test`, `npm run test:coverage`, and `npm run test:watch` now run the native runtime preflight, auto-rebuild stale `isolated-vm` / `better-sqlite3` binaries, and force `--no-node-snapshot` before starting Vitest
 - 2026-03-28 - Fixed - The standard repository contract is now `npm ci`, `npm run build`, `npm start`; `npm run build` validates Node 24 and rebuilds stale native modules before producing the UI and gateway artifacts
 - 2026-03-28 - Fixed - `npm start` now works in remote/self-hosted environments without a repo-local `.env` file as long as required variables are injected by the platform, while still rejecting missing or placeholder security values
 - 2026-03-28 - Fixed - `npm start`, `npm run dev`, and `npm run dev:gateway` now auto-rebuild `isolated-vm` and `better-sqlite3` once when they detect stale binaries from another Node ABI, instead of crashing immediately
