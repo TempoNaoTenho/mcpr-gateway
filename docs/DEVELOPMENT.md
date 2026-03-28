@@ -11,19 +11,21 @@ Contributor guide for the MCPR Gateway project. Covers setup, scripts, project l
 
 Fresh-clone note:
 
-- `npm run setup` is the supported first-run entrypoint; it installs any missing root and `ui/` dependencies, writes `.env` defaults, and repairs native module mismatches automatically
+- Copy `.env.example` to `.env` before the first run; the built/default runtime expects explicit security values under user control
+- `npm run setup` is the supported first-run entrypoint; it installs any missing root and `ui/` dependencies, repairs native module mismatches automatically, and builds the production assets used by `npm start`
 - Root `npm ci` still installs `ui/` dependencies via the guarded `postinstall` hook when `ui/package.json` is present, while Docker-style staged installs keep working before `ui/` is copied
 
 ## Scripts
 
 | Script            | Command                                          | Purpose                                                                                   |
 | ----------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `dev`             | `npm run dev`                                    | Full-stack dev: Vite UI on `PORT`, gateway on `PORT+1` (recommended)                      |
+| `start`           | `npm start`                                      | Start the built gateway + built UI on one port (default user/runtime path)               |
+| `dev`             | `npm run dev`                                    | Full-stack dev: Vite UI on `PORT`, gateway on `PORT+1`                                   |
 | `dev:gateway`     | `npm run dev:gateway`                            | Gateway API only on `PORT`; run UI with `npm --prefix ui run dev` separately              |
 | `build`           | `npm run build`                                  | Build both UI and gateway for production                                                  |
 | `build:gateway`   | `npm run build:gateway`                          | TypeScript → `dist/` via tsup                                                             |
 | `build:ui`        | `npm run build:ui`                               | SvelteKit UI → `ui/build/`                                                                |
-| `setup`           | `npm run setup`                                  | Canonical local setup: validates Node 24, installs deps, repairs native modules, writes `.env` defaults |
+| `setup`           | `npm run setup`                                  | Canonical setup: validates Node 24, installs deps, repairs native modules, builds artifacts |
 | `typecheck`       | `npm run typecheck`                              | `tsc --noEmit` — no output files, types only                                              |
 | `lint`            | `npm run lint`                                   | ESLint over `src/`                                                                        |
 | `format`          | `npm run format`                                 | Prettier over entire repo                                                                 |
@@ -144,7 +146,11 @@ Behavior:
 
 ```bash
 # Prepare the environment (first run or after switching Node)
+# cp .env.example .env   # once, then replace change-me-* placeholders before npm start
 npm run setup
+
+# Built/default runtime
+npm start
 
 # Full stack (recommended) — Vite UI at PORT, gateway at PORT+1
 npm run dev

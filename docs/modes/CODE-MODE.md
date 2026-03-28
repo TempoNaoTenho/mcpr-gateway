@@ -3,7 +3,7 @@
 ## Runtime requirements
 
 - **Node.js 24 LTS**
-- Gateway must start with `--no-node-snapshot` for `isolated-vm` stability — `npm run dev` and `npm run dev:gateway` set this automatically; if starting `node dist/index.js` directly, pass the flag explicitly
+- Gateway must start with `--no-node-snapshot` for `isolated-vm` stability — `npm start`, `npm run dev`, and `npm run dev:gateway` set this automatically; if starting `node dist/index.js` directly, pass the flag explicitly
 - The Docker image (`node:24-alpine`) satisfies this requirement out of the box
 
 ## When to use Code Mode

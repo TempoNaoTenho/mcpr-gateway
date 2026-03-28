@@ -12,14 +12,18 @@ Operational note:
 ## Install and configure
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/TempoNaoTenho/mcpr-gateway.git
 cd mcpr-gateway
+cp .env.example .env
 npm run setup
+npm start
 ```
 
-[`npm run setup`](../scripts/setup.mjs) is the canonical first-run command. It validates Node 24, installs missing root and `ui/` dependencies, rebuilds `isolated-vm` / `better-sqlite3` if they were compiled for another Node version, creates `.env` from [`.env.example`](../.env.example) when missing, and fills the required local-dev secrets automatically.
+[`npm run setup`](../scripts/setup.mjs) is the canonical first-run command. It validates Node 24, installs missing root and `ui/` dependencies, rebuilds `isolated-vm` / `better-sqlite3` if they were compiled for another Node version, and builds the production UI and gateway artifacts.
 
-`npm run setup` is idempotent. Re-run it after switching Node versions or when native modules start complaining about ABI mismatches. Use `npm run setup -- --advanced` only when you want to edit env vars manually or create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
+Copy [`.env.example`](../.env.example) to `.env`, then replace every `change-me-*` placeholder before `npm start`. `npm start` loads `.env` automatically and fails fast if any required security value is still empty, malformed, or unchanged from the example file.
+
+`npm run setup` is idempotent. Re-run it after switching Node versions or when native modules start complaining about ABI mismatches. Use `npm run setup -- --advanced` only when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
 
@@ -36,13 +40,21 @@ When `bootstrap.json` is missing, the process still starts with built-in default
 
 ## Run the gateway
 
-**Full-stack local dev (default)** — Vite on `PORT`, API on `PORT + 1`:
+**Default built runtime** — static UI + MCP gateway on one port:
+
+```bash
+npm start
+```
+
+Open `http://127.0.0.1:3000`. The built admin UI is served by the gateway under `/ui/`, and MCP clients use the same `PORT`.
+
+**Full-stack local dev** — Vite on `PORT`, API on `PORT + 1`:
 
 ```bash
 npm run dev
 ```
 
-Open `http://127.0.0.1:3000` for the local UI. During this integrated dev flow, the gateway API listens on `http://127.0.0.1:3001`. The `/ui/` path is for the built static UI used by `npm run build` and Docker, not the default first-run dev URL.
+Open `http://127.0.0.1:3000` for the local UI. During this integrated dev flow, the gateway API listens on `http://127.0.0.1:3001`. The `/ui/` path is the static built UI path used by `npm start`, `npm run build`, and Docker.
 
 **API process only** (single `HOST` / `PORT`, e.g. for MCP clients hitting `http://127.0.0.1:3000` directly):
 
@@ -55,7 +67,7 @@ For `code` mode stability, the gateway must run with `--no-node-snapshot`. The b
 Defaults:
 
 - **Host:** `127.0.0.1` — loopback only; set `HOST=0.0.0.0` for Docker or LAN exposure
-- **Port:** `3000` (`PORT`) — with `npm run dev`, the **UI** uses this port and the **gateway** uses `PORT + 1`
+- **Port:** `3000` (`PORT`) — with `npm start`, the **UI** and **gateway** share this port; with `npm run dev`, the **UI** uses this port and the **gateway** uses `PORT + 1`
 
 Full list of process environment variables: [Configuration — Process environment](CONFIGURATION.md#process-environment).
 

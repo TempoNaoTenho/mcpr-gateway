@@ -13,6 +13,16 @@ Runtime requirement for `code` mode:
 - use **Node 24 LTS**
 - start Node with `--no-node-snapshot` when `isolated-vm` is enabled
 
+For a non-Docker local runtime, the repository default is:
+
+```bash
+cp .env.example .env
+npm run setup
+npm start
+```
+
+`npm start` loads `.env`, refuses placeholder security values from the example file, and serves the built UI plus MCP gateway on the same port.
+
 Build from repository root:
 
 ```bash

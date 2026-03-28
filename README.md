@@ -106,17 +106,19 @@ flowchart LR
 ```bash
 node --version   # must be 24.x LTS
 git clone https://github.com/TempoNaoTenho/mcpr-gateway.git
-npm run setup             # installs deps, repairs native modules, creates .env defaults
-npm run dev               # UI on PORT, gateway API on PORT+1
+cd mcpr-gateway
+cp .env.example .env
+npm run setup             # installs deps, repairs native modules, builds UI + gateway
+npm start                 # built UI + MCP gateway on PORT
 ```
 
-You can either set your own credentials in the .env file first or let the setup script do it for you.
+Replace the `change-me-*` security placeholders in `.env` with your own values before `npm start`.
 
-`npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, creates `.env` from `.env.example`, and fills the required local-dev credentials automatically.
+`npm run setup` is the canonical first-run command. It requires Node 24 LTS, installs the root and `ui/` dependencies when missing, rebuilds `isolated-vm` and `better-sqlite3` when you switched Node versions, and builds the production UI and gateway artifacts.
 
-`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. Use `npm run setup -- --advanced` only when you want to edit environment values manually or create `config/bootstrap.json`.
+`npm run setup` is idempotent and safe to re-run after dependency changes or a Node switch. `npm start` loads `.env`, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. Use `npm run setup -- --advanced` only when you want guided editing of `.env` or to create `config/bootstrap.json`.
 
-During integrated local dev, open `http://127.0.0.1:3000` for the Vite-served UI. The gateway API listens on `http://127.0.0.1:3001`, and `/ui/` is only the static built UI path used by `npm run build` and Docker.
+Open `http://127.0.0.1:3000` after `npm start`. The root path redirects to the built admin UI under `/ui/`, and MCP clients use the same port. `npm run dev` remains available for contributors; in that mode Vite serves the UI on `PORT` and the gateway API uses `PORT + 1`.
 
 #### Minimum security variables
 
@@ -127,9 +129,7 @@ During integrated local dev, open `http://127.0.0.1:3000` for the Vite-served UI
 | `GATEWAY_ADMIN_PASSWORD`         | Password typed at the admin login               | Yes                                     |
 | `DOWNSTREAM_AUTH_ENCRYPTION_KEY` | AES-256 key for downstream credentials at rest  | Required for managed downstream secrets |
 
-Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it.
-
-> `npm run setup` writes secure local defaults automatically. For manual customization of all env vars run `npm run setup -- --advanced`.
+Without `ADMIN_TOKEN`, the admin panel is **unprotected** — anyone with network access can reach it. The default `npm start` path now fails fast instead of silently accepting missing or placeholder values.
 
 ```bash
 # Export variables in your shell (CI/CD), or pass an env file explicitly:

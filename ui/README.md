@@ -20,6 +20,7 @@ npm run preview      # Preview production build
 Full-stack local development from the **repository root**:
 
 ```bash
+npm start        # built runtime from the repo root (static UI served by gateway)
 npm run dev          # Vite on PORT + gateway on PORT+1 (see root package.json; `dev:all` is an alias)
 ```
 
