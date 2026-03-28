@@ -1,12 +1,3 @@
-# Set required environment variables before starting (see .env.example for all options).
-# Variables are read from the host environment or your CI/CD platform — no .env file needed.
-# Optional: place a bootstrap.json in config/ for advanced server pre-registration.
-#
-#   From repo root:  docker compose --project-directory . -f docker/docker-compose.yml up --build
-#                    (loads repo-root .env for ${ADMIN_TOKEN:?} / PORT interpolation; HOST in .env is ignored — image sets HOST=0.0.0.0)
-#   From docker/:     docker compose --project-directory .. -f docker-compose.yml up --build
-#
-# Paths below are relative to this file (docker/): ../ = repository root.
 name: mcpr-gateway
 
 services:
