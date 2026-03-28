@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+
+- 2026-03-28 - Fixed - Root `npm ci` now installs `ui/` dependencies via a guarded `postinstall` that skips when `ui/package.json` is absent, preserving Docker/staged installs while keeping fresh-clone setup automatic; setup still warns when either dependency tree is missing
 - 2026-03-27 - Fixed - `npm run docker:up` and docs now use `docker compose --project-directory .` so repo-root `.env` is loaded for `${ADMIN_TOKEN:?}` / port interpolation (compose file under `docker/` otherwise skips root `.env`); README notes container `HOST=0.0.0.0` vs dev `.env` and `127.0.0.1` vs `localhost` for browsers
 - 2026-03-27 - Fixed - Docker Compose now loads the repo-root `.env`, sets production-safe runtime defaults, exposes the bundled UI and MCP on port 3000, and adds a healthcheck for publish-ready installs
 - 2026-03-27 - Fixed - Benchmark and integration tests now read `gateway_search_tools` matches from MCP `structuredContent`, matching the current `tools/call` contract
@@ -19,12 +21,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 2026-03-27 - Fixed - Benchmark real-run output now deduplicates requested modes and reports metrics scoped per namespace instead of repeating global aggregates
 
 ### Added
+
 - `initializeInstructionsTokens` and `firstTurnEstimatedTokens` fields in `/admin/namespaces` metrics response
 - `catalogMetrics` in metrics response: per-downstream catalog token totals and per-tool overrides
 - Exported `buildGatewayInstructions` for use outside the MCP initialize handler, enabling parity between runtime and admin estimates
 - 2026-03-27 - Added - Canonical benchmark CLI via `npm run benchmark -- <smoke|real|prepare>` with repo-root `.env` loading, namespace filters, mode comparison, and preflight checks for Node/native SQLite readiness
 
 ### Changed
+
 - 2026-03-27 - Changed - Startup now fails fast when `ADMIN_TOKEN` is set without `GATEWAY_ADMIN_PASSWORD`, and when `DOWNSTREAM_AUTH_ENCRYPTION_KEY` is present but not a valid base64 32-byte key
 - 2026-03-27 - Changed - Docker and security docs now distinguish dev `PORT + 1` behavior from the single-port Docker runtime and require explicit admin credentials for production
 - 2026-03-27 - Changed - Benchmark dataset preparation now accepts namespace, server, and tool filters so real benchmarks can target user-defined catalogs instead of hardcoded names only
@@ -34,6 +38,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [0.1.0] — 2026-03-26
 
 ### Changed
+
 - Project renamed from **MCP Session Gateway** to **MCPR Gateway**
 - npm package and CLI binary updated to `mcpr-gateway`
 - Client token environment variable standardized to `MCPR_GATEWAY_TOKEN`
@@ -41,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Documentation restructured: files moved to `docs/`, filenames converted to CAPSLOCK format
 
 ### Added
+
 - **Three operating modes** per namespace: Code, Compat, Default
 - **HTTP-Streamable transport** — `GET /mcp/:namespace` (SSE) + `POST /mcp/:namespace` (JSON-RPC)
 - **Session management** — SQLite-backed (default) or in-memory; configurable TTL (default 30 min)
@@ -60,12 +66,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Config version history** — SQLite stores all admin config snapshots with rollback support
 
 ### Runtime
+
 - **Node.js 22 or 24 LTS** required (`engines: ">=22 <25"`)
 - Node 25 and odd-numbered releases explicitly unsupported (isolated-vm incompatibility)
 - Docker runtime pinned to `node:24-alpine`
 - `--no-node-snapshot` required for `isolated-vm`; set automatically by dev scripts and Docker entrypoint
 
 ### Known caveats
+
 - MCP/JSON-RPC tool failures return HTTP 200 with `error` object in body — always inspect the JSON-RPC payload, not the HTTP status
 - Some MCP clients do not expose the JSON-RPC `result` payload to the model after a successful call
 - stdio transport for gateway **clients** not yet supported (downstream stdio connections are supported)

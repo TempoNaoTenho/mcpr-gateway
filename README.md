@@ -106,9 +106,12 @@ flowchart LR
 ```bash
 node --version   # must be 22.x or 24.x LTS
 git clone <repo-url> mcpr-gateway && cd mcpr-gateway
-npm ci && npm run setup   # install deps, then guided security config
+npm ci                    # installs root deps and ui/ deps via postinstall
+npm run setup             # guided security config
 npm run dev               # UI on PORT, gateway API on PORT+1
 ```
+
+`npm ci` installs both the gateway dependencies and, when `ui/package.json` is present, the separate `ui/` SvelteKit dependencies via the guarded root `postinstall`. In normal fresh-clone local setup that means no extra `npm --prefix ui ci` step, while Docker layer-cached installs that copy only root manifests keep working.
 
 `npm run setup` asks for the security-critical variables and the admin username, and skips anything already configured — safe to re-run.
 

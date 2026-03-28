@@ -19,6 +19,8 @@ npm ci
 npm run setup
 ```
 
+`npm ci` installs the root gateway dependencies and, when `ui/package.json` is present, the separate `ui/` SvelteKit dependencies through the guarded root `postinstall` hook. A normal fresh clone gets the Web UI dependencies automatically, while Docker builds that install before copying `ui/` do not fail.
+
 [`npm run setup`](../scripts/setup.ts) is **optional**: creates `.env` from [`.env.example`](../.env.example) when missing, runs basic checks (Node, ports for full-stack dev, SQLite path), lets you edit common env vars, and **optionally** creates `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
 For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
@@ -178,10 +180,10 @@ See [Development](DEVELOPMENT.md#web-ui) for day-to-day UI work (`npm run dev` r
 
 ## Next steps
 
-| Guide | What's in it |
-| ----- | ------------ |
+| Guide                             | What's in it                                                     |
+| --------------------------------- | ---------------------------------------------------------------- |
 | [Configuration](CONFIGURATION.md) | All `bootstrap.json` sections, env interpolation, two-tier model |
-| [HTTP API](reference/HTTP-API.md) | Health, admin, debug routes — full endpoint reference |
-| [Deployment](DEPLOYMENT.md) | Docker Compose, persistence, admin protection, TLS |
-| [Development](DEVELOPMENT.md) | Scripts, project layout, test strategy, UI workflow |
-| [Architecture](ARCHITECTURE.md) | Components, request flow, session lifecycle |
+| [HTTP API](reference/HTTP-API.md) | Health, admin, debug routes — full endpoint reference            |
+| [Deployment](DEPLOYMENT.md)       | Docker Compose, persistence, admin protection, TLS               |
+| [Development](DEVELOPMENT.md)     | Scripts, project layout, test strategy, UI workflow              |
+| [Architecture](ARCHITECTURE.md)   | Components, request flow, session lifecycle                      |
