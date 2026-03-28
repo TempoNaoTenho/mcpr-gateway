@@ -111,9 +111,9 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await app.close()
-  registry.stop()
-  disposeSessionDb()
+  await app?.close()
+  registry?.stop()
+  disposeSessionDb?.()
   rmSync(TMP, { recursive: true, force: true })
 })
 

@@ -29,12 +29,26 @@ function createChild() {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter
     stderr: EventEmitter
-    stdin: { write: ReturnType<typeof vi.fn> }
+    stdin: EventEmitter & {
+      write: ReturnType<typeof vi.fn>
+      destroyed?: boolean
+      writableEnded?: boolean
+    }
     kill: ReturnType<typeof vi.fn>
   }
   child.stdout = new EventEmitter()
   child.stderr = new EventEmitter()
-  child.stdin = { write: vi.fn() }
+  child.stdin = new EventEmitter() as EventEmitter & {
+    write: ReturnType<typeof vi.fn>
+    destroyed?: boolean
+    writableEnded?: boolean
+  }
+  child.stdin.write = vi.fn((_: string, callback?: (error?: Error | null) => void) => {
+    callback?.(null)
+    return true
+  })
+  child.stdin.destroyed = false
+  child.stdin.writableEnded = false
   child.kill = vi.fn()
   return child
 }
@@ -77,5 +91,24 @@ describe('stdio transport', () => {
     const error = await handled
     expect(error).toBeInstanceOf(Error)
     expect((error as Error).message).toContain('timed out after 2000ms')
+  })
+
+  it('turns stdin EPIPE into a rejected tools/call error instead of an unhandled exception', async () => {
+    const child = createChild()
+    child.stdin.write.mockImplementationOnce((_: string, callback?: (error?: Error | null) => void) => {
+      const error = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })
+      queueMicrotask(() => {
+        callback?.(error)
+        child.stdin.emit('error', error)
+      })
+      return false
+    })
+    spawnMock.mockReturnValue(child)
+
+    const error = await callToolStdio(makeServer(), 'echo', {}).catch((err) => err)
+
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain('closed stdin before tools/call')
+    expect((error as Error).message).toContain('write EPIPE')
   })
 })

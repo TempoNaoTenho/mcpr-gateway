@@ -153,10 +153,10 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await app.close()
-  registry.stop()
-  disposeSessionDb()
-  await fakeServer.close()
+  await app?.close()
+  registry?.stop()
+  disposeSessionDb?.()
+  await fakeServer?.close()
   rmSync(TMP, { recursive: true, force: true })
 })
 

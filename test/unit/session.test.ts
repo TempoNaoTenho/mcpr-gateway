@@ -25,8 +25,8 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 }
 
 describe('SqliteSessionRepository', () => {
-  let store: SqliteSessionRepository
-  let closeDb: () => void
+  let store: SqliteSessionRepository | undefined
+  let closeDb: (() => void) | undefined
 
   beforeEach(() => {
     const created = createTempSqliteSessionStore()
@@ -35,8 +35,8 @@ describe('SqliteSessionRepository', () => {
   })
 
   afterEach(() => {
-    store.stop()
-    closeDb()
+    store?.stop()
+    closeDb?.()
     vi.useRealTimers()
   })
 
@@ -91,8 +91,8 @@ describe('SqliteSessionRepository', () => {
 })
 
 describe('SqliteSessionRepository — TTL', () => {
-  let store: SqliteSessionRepository
-  let closeDb: () => void
+  let store: SqliteSessionRepository | undefined
+  let closeDb: (() => void) | undefined
 
   beforeEach(() => {
     const created = createTempSqliteSessionStore()
@@ -102,8 +102,8 @@ describe('SqliteSessionRepository — TTL', () => {
   })
 
   afterEach(() => {
-    store.stop()
-    closeDb()
+    store?.stop()
+    closeDb?.()
     vi.useRealTimers()
   })
 

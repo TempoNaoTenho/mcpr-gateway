@@ -94,6 +94,7 @@ export function startToolsListStdioSession(
     rejectCompletion = reject
     child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     const processChild = child
+    const processStdin = processChild.stdin
 
     const finish = (callback: () => void): void => {
       if (finished) return
@@ -129,23 +130,42 @@ export function startToolsListStdioSession(
       finish(() => reject(buildTimeoutError(server, timeoutMs, stderrTail)))
     }, timeoutMs)
 
-    function sendMessage(msg: Record<string, unknown>): void {
-      processChild.stdin!.write(JSON.stringify(msg) + '\n')
+    function sendMessage(msg: Record<string, unknown>): Promise<void> {
+      if (!processStdin || processStdin.destroyed || processStdin.writableEnded) {
+        return Promise.reject(
+          buildStdioWriteError(server, 'tools/list', new Error('stdin is not writable'), stderrTail)
+        )
+      }
+
+      return new Promise((res, rej) => {
+        processStdin.write(JSON.stringify(msg) + '\n', (error) => {
+          if (error) {
+            rej(buildStdioWriteError(server, 'tools/list', error, stderrTail))
+            return
+          }
+          res()
+        })
+      })
     }
 
     function sendRequest(
       method: string,
       params: Record<string, unknown> = {}
     ): Promise<Record<string, unknown>> {
-      return new Promise((res) => {
+      return new Promise((res, rej) => {
         const id = nextId++
         pendingMessages.set(id, res)
-        sendMessage({ jsonrpc: '2.0', id, method, params })
+        void sendMessage({ jsonrpc: '2.0', id, method, params }).catch((error) => {
+          pendingMessages.delete(id)
+          rej(error)
+        })
       })
     }
 
     function sendNotification(method: string, params: Record<string, unknown> = {}): void {
-      sendMessage({ jsonrpc: '2.0', method, params })
+      void sendMessage({ jsonrpc: '2.0', method, params }).catch((error) => {
+        finish(() => reject(error))
+      })
     }
 
     function processLine(line: string): void {
@@ -180,6 +200,10 @@ export function startToolsListStdioSession(
 
     processChild.on('error', (err) => {
       finish(() => reject(buildSpawnError(command, err, stderrTail)))
+    })
+
+    processStdin?.on('error', (err: Error) => {
+      finish(() => reject(buildStdioWriteError(server, 'tools/list', err, stderrTail)))
     })
 
     processChild.on('close', (code) => {
@@ -265,6 +289,20 @@ function buildSpawnError(command: string, err: Error, stderrTail: string): Error
   return new Error(message)
 }
 
+function buildStdioWriteError(
+  server: DownstreamServer,
+  operation: 'tools/list' | 'tools/call',
+  err: Error,
+  stderrTail: string
+): Error {
+  const summary = summarizeStderr(stderrTail)
+  let message = `[registry/stdio] Server ${server.id} closed stdin before ${operation}: ${err.message}`
+  if (summary) {
+    message += `; stderr: ${summary}`
+  }
+  return new Error(message)
+}
+
 export async function callToolStdio(
   server: DownstreamServer,
   toolName: string,
@@ -278,11 +316,26 @@ export async function callToolStdio(
   return new Promise<{ result?: unknown; error?: unknown }>((resolve, reject) => {
     const child = spawn(command, spawnArgs, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     let stderrTail = ''
+    let settled = false
+
+    function rejectOnce(error: Error): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      reject(error)
+    }
+
+    function resolveOnce(value: { result?: unknown; error?: unknown }): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(value)
+    }
 
     const timer = setTimeout(() => {
       clearTimeout(timer)
       child.kill()
-      reject(buildTimeoutError(server, timeoutMs, stderrTail))
+      rejectOnce(buildTimeoutError(server, timeoutMs, stderrTail))
     }, timeoutMs)
 
     let buffer = ''
@@ -291,23 +344,42 @@ export async function callToolStdio(
     const pendingMessages: Map<number, (msg: Record<string, unknown>) => void> = new Map()
     let nextId = 1
 
-    function sendMessage(msg: Record<string, unknown>): void {
-      child.stdin.write(JSON.stringify(msg) + '\n')
+    function sendMessage(msg: Record<string, unknown>): Promise<void> {
+      if (!child.stdin || child.stdin.destroyed || child.stdin.writableEnded) {
+        return Promise.reject(
+          buildStdioWriteError(server, 'tools/call', new Error('stdin is not writable'), stderrTail)
+        )
+      }
+
+      return new Promise((res, rej) => {
+        child.stdin.write(JSON.stringify(msg) + '\n', (error) => {
+          if (error) {
+            rej(buildStdioWriteError(server, 'tools/call', error, stderrTail))
+            return
+          }
+          res()
+        })
+      })
     }
 
     function sendRequest(
       method: string,
       params: Record<string, unknown> = {}
     ): Promise<Record<string, unknown>> {
-      return new Promise((res) => {
+      return new Promise((res, rej) => {
         const id = nextId++
         pendingMessages.set(id, res)
-        sendMessage({ jsonrpc: '2.0', id, method, params })
+        void sendMessage({ jsonrpc: '2.0', id, method, params }).catch((error) => {
+          pendingMessages.delete(id)
+          rej(error)
+        })
       })
     }
 
     function sendNotification(method: string, params: Record<string, unknown> = {}): void {
-      sendMessage({ jsonrpc: '2.0', method, params })
+      void sendMessage({ jsonrpc: '2.0', method, params }).catch((error) => {
+        rejectOnce(error)
+      })
     }
 
     function processLine(line: string): void {
@@ -340,14 +412,16 @@ export async function callToolStdio(
     })
 
     child.on('error', (err) => {
-      clearTimeout(timer)
-      reject(buildSpawnError(command, err, stderrTail))
+      rejectOnce(buildSpawnError(command, err, stderrTail))
+    })
+
+    child.stdin.on('error', (err: Error) => {
+      rejectOnce(buildStdioWriteError(server, 'tools/call', err, stderrTail))
     })
 
     child.on('close', (code) => {
-      clearTimeout(timer)
       if (!callResponseReceived) {
-        reject(buildExitError(server, code, 'tools/call', stderrTail))
+        rejectOnce(buildExitError(server, code, 'tools/call', stderrTail))
       }
     })
 
@@ -373,16 +447,14 @@ export async function callToolStdio(
         })
 
         callResponseReceived = true
-        clearTimeout(timer)
         child.kill()
 
         const result = (callResp['result'] as Record<string, unknown>) ?? undefined
         const error = callResp['error'] ?? undefined
-        resolve({ result, error })
+        resolveOnce({ result, error })
       } catch (err) {
-        clearTimeout(timer)
         child.kill()
-        reject(err)
+        rejectOnce(err instanceof Error ? err : new Error(String(err)))
       }
     }
 
