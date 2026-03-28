@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance } from 'fastify'
@@ -669,6 +670,16 @@ function revokeAdminSession(sessionId: string | undefined): void {
   adminSessions.delete(sessionId)
 }
 
+function timingSafeStrEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8')
+  const bufB = Buffer.from(b, 'utf-8')
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA)
+    return false
+  }
+  return timingSafeEqual(bufA, bufB)
+}
+
 function getGatewayAdminUser(): string {
   return getGatewayAdminUserFromEnv(process.env)
 }
@@ -806,11 +817,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         return reply.status(503).send({ error: 'Admin authentication is misconfigured' })
       }
 
-      if (username !== expectedUser) {
-        return reply.status(401).send({ error: 'Invalid credentials' })
-      }
-
-      if (password !== adminPasswordEnv) {
+      if (!timingSafeStrEqual(username ?? '', expectedUser) || !timingSafeStrEqual(password, adminPasswordEnv)) {
         return reply.status(401).send({ error: 'Invalid credentials' })
       }
 
