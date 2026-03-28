@@ -110,7 +110,7 @@ export function ensureNativeRuntimeReady(input) {
   if (!afterRepair.ok) {
     throw new Error(
       afterRepair.message ??
-        'Native modules are still not healthy after automatic rebuild. Run `npm run setup` for a full recovery.'
+        'Native modules are still not healthy after automatic rebuild. Run `npm ci` under Node 24 and rebuild the project artifacts.'
     )
   }
 

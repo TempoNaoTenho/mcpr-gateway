@@ -20,9 +20,12 @@
       replace the
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">change-me-*</code>
       placeholders, then use
-      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run setup</code>
-      followed by
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm ci</code>,
+      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run build</code>,
+      and
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm start</code>.
+      In hosted environments, you can inject the same variables directly from the platform and skip the
+      local <code class="text-xs font-mono text-slate-800 dark:text-slate-200">.env</code> file.
       The gateway serves the built UI under
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/ui/</code>
       and MCP on the same
@@ -74,7 +77,6 @@
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/mcp</code>,
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/health</code>, and related API paths to that
       backend, so the browser uses a single origin.
-      <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run dev:all</code> is the same script.
       The static <code class="text-xs font-mono text-slate-800 dark:text-slate-200">/ui/</code> path is only used after
       <code class="text-xs font-mono text-slate-800 dark:text-slate-200">npm run build</code> or in Docker.
     </p>

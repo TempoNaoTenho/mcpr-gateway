@@ -96,7 +96,7 @@ function assertSupportedNodeRuntime(): void {
   const nodeMajor = Number(nodeVersion.split('.')[0] ?? '0')
   if (!Number.isFinite(nodeMajor) || nodeMajor !== 24) {
     throw new Error(
-      `Unsupported Node.js runtime ${nodeVersion}. Use Node 24 LTS with isolated-vm, then rerun npm run setup.`
+      `Unsupported Node.js runtime ${nodeVersion}. Use Node 24 LTS with isolated-vm, then rerun npm run build.`
     )
   }
   if (!hasNodeOption('--no-node-snapshot')) {

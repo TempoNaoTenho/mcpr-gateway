@@ -15,7 +15,7 @@
     "start": "node scripts/start.mjs",
     "dev": "node scripts/dev-all.mjs",
     "dev:gateway": "node scripts/dev-gateway.mjs",
-    "build": "npm run build:ui && npm run build:gateway",
+    "build": "node scripts/build.mjs",
     "build:gateway": "tsup --config tsup.config.ts",
     "typecheck": "tsc --noEmit",
     "check:gate": "npm run typecheck && npm run lint",
@@ -34,9 +34,7 @@
     "format": "prettier --write .",
     "docker:build": "docker build -f docker/Dockerfile .",
     "docker:up": "docker compose -f docker/docker-compose.yml up --build",
-    "build:ui": "npm --prefix ui run build",
-    "build:all": "npm run build",
-    "dev:all": "npm run dev"
+    "build:ui": "npm --prefix ui run build"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

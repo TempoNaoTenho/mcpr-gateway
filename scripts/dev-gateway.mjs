@@ -12,7 +12,7 @@ const nodeMajor = Number(process.versions.node.split('.')[0] ?? '0')
 
 if (!Number.isFinite(nodeMajor) || nodeMajor !== 24) {
   console.error(
-    `dev:gateway requires Node 24 LTS for isolated-vm stability. Current runtime: ${process.versions.node}. Run \`nvm use\` and rerun \`npm run setup\`.`
+    `dev:gateway requires Node 24 LTS for isolated-vm stability. Current runtime: ${process.versions.node}. Run \`nvm use\` and rerun \`npm run dev\`.`
   )
   process.exit(1)
 }
@@ -22,7 +22,7 @@ try {
 } catch (error) {
   console.error(
     `${error instanceof Error ? error.message : String(error)}\n` +
-      'Automatic native rebuild failed. Run `npm run setup` for a full recovery, then rerun `npm run dev`.'
+      'Automatic native rebuild failed. Run `npm ci` under Node 24, then retry `npm run dev`.'
   )
   process.exit(1)
 }

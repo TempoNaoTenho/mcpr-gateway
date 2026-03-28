@@ -44,6 +44,17 @@ describe('start script helpers', () => {
     expect(hasValidDownstreamKey(env['DOWNSTREAM_AUTH_ENCRYPTION_KEY'])).toBe(true)
   })
 
+  it('accepts shell-injected env without relying on a .env file', () => {
+    const env = {
+      ADMIN_TOKEN: 'token-from-platform',
+      GATEWAY_ADMIN_USER: 'remote-admin',
+      GATEWAY_ADMIN_PASSWORD: 'remote-password',
+      DOWNSTREAM_AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    } as NodeJS.ProcessEnv
+
+    expect(validateRequiredStartEnv(env)).toEqual([])
+  })
+
   it('rejects malformed downstream keys even when present', () => {
     const env = {
       ADMIN_TOKEN: 'real-admin-token',

@@ -32,7 +32,7 @@ export function validateNodeRuntime(version = process.versions.node) {
     ok: false,
     message: `Node.js 24 LTS is required for MCPR Gateway. Current runtime: ${version}.`,
     remediation:
-      'Run `nvm use` (this repo ships `.nvmrc` = 24), then rerun `npm run setup` and `npm start`.',
+      'Run `nvm use` (this repo ships `.nvmrc` = 24), then rerun `npm run build` and `npm start`.',
   }
 }
 
@@ -94,10 +94,6 @@ function fail(message) {
 }
 
 export function main() {
-  if (!existsSync(join(ROOT, '.env'))) {
-    fail('Missing .env. Copy `.env.example` to `.env`, replace the security placeholders, then run `npm start`.')
-  }
-
   applyDotEnvFromRoot(ROOT)
 
   const runtime = validateNodeRuntime()
@@ -110,21 +106,21 @@ export function main() {
   } catch (error) {
     fail(
       `${error instanceof Error ? error.message : String(error)}\n` +
-        'Automatic native rebuild failed. Run `npm run setup` for a full recovery, then retry `npm start`.'
+        'Automatic native rebuild failed. Run `npm ci` under Node 24, then `npm run build`, and retry `npm start`.'
     )
   }
 
   const missing = validateRequiredStartEnv()
   if (missing.length > 0) {
     fail(
-      `Missing or placeholder security values in .env: ${missing.join(', ')}.\n` +
-        'Set your own values in `.env` before running `npm start`.'
+      `Missing or placeholder security values: ${missing.join(', ')}.\n` +
+        'Set them in your process environment or `.env` before running `npm start`.'
     )
   }
 
   const buildState = detectBuiltRuntime()
   if (!buildState.hasGatewayBuild || !buildState.hasUiBuild) {
-    fail('Built artifacts are missing. Run `npm run setup` before `npm start`.')
+    fail('Built artifacts are missing. Run `npm run build` before `npm start`.')
   }
 
   const child = spawn(process.execPath, ['--no-node-snapshot', buildState.gatewayEntry], {
