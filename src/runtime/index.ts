@@ -72,6 +72,13 @@ function normalizeCodeModeError(error: unknown, maxResultSizeBytes: number): Err
     return new Error(message, { cause: error instanceof Error ? error : undefined })
   }
 
+  if (message.includes('Invalid regular expression:')) {
+    return new Error(
+      'The script contains an invalid regular expression, so gateway_run_code rejected it before execution. When generating code dynamically, prefer JSON.stringify(...) for literals and simpler string parsing over hand-escaped regex.',
+      { cause: error instanceof Error ? error : undefined }
+    )
+  }
+
   if (message.includes("Cannot read properties of undefined (reading 'handle')")) {
     return new Error(
       'The script tried to use a missing tool entry (for example tools[1].handle). Check tools.length first, increase k, or relax the search filters before building the call or batch.',
