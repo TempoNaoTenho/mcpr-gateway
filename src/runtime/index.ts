@@ -8,6 +8,7 @@ import { HandleRegistry } from './handle-registry.js'
 import { buildGatewayHelp } from './help.js'
 import { McpRuntimeApi, type RuntimeToolExecutor } from './mcp-api.js'
 import { count, flatten, grep, groupBy, items, limit, pick, summarize, text } from './result-api.js'
+import type { RuntimeExecutionTelemetry } from './runtime-telemetry.js'
 import {
   executeInSandbox,
   type SandboxDiagnosticEvent,
@@ -106,7 +107,9 @@ function normalizeCodeModeError(error: unknown, maxResultSizeBytes: number): Err
   return error instanceof Error ? error : new Error(message)
 }
 
-export type CodeModeDiagnostics = SandboxDiagnostics
+export type CodeModeDiagnostics = SandboxDiagnostics & {
+  runtimeTelemetry?: RuntimeExecutionTelemetry
+}
 export type { SandboxDiagnosticEvent }
 
 export async function executeCodeMode(
@@ -125,7 +128,13 @@ export async function executeCodeMode(
     ;(session as unknown as { handleRegistry: HandleRegistry }).handleRegistry = handles
   }
   const catalog = new CatalogRuntimeApi(session, registry, handles)
-  const mcp = new McpRuntimeApi(handles, executeTool, config.maxToolCallsPerExecution)
+  const mcp = new McpRuntimeApi(
+    handles,
+    executeTool,
+    config.maxToolCallsPerExecution,
+    config.maxConcurrentToolCalls,
+    (query, options) => catalog.searchOne(query, options)
+  )
 
   const sandboxResult = await executeInSandbox(
     {
@@ -136,9 +145,12 @@ export async function executeCodeMode(
     },
     {
       catalogSearch: (query, options) => catalog.search(query, options),
+      catalogSearchOne: (query, options) => catalog.searchOne(query, options),
+      catalogServers: () => catalog.servers(),
       catalogList: (filters) => catalog.list(filters),
       catalogDescribe: (handle, options) => catalog.describe(handle, options),
-      mcpCall: (handle, args) => mcp.call(handle, args),
+      mcpCall: (handle, args) => mcp.call(handle as string | { handle: string }, args),
+      mcpCallMatch: (query, args, options) => mcp.callMatch(query, args, options),
       mcpBatch: (calls) => mcp.batch(calls),
       resultPick: pick,
       resultLimit: limit,
@@ -164,6 +176,7 @@ export async function executeCodeMode(
   const finalResult = {
     backend: sandboxResult.backend,
     value: sandboxResult.value,
+    telemetry: (diagnostics as { runtimeTelemetry?: RuntimeExecutionTelemetry }).runtimeTelemetry,
   }
 
   if (byteSizeOf(finalResult) <= config.maxResultSizeBytes) {

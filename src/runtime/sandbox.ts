@@ -2,9 +2,16 @@ export type SandboxBackend = 'isolated-vm'
 
 export type SandboxHostApi = {
   catalogSearch: (query: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
+  catalogSearchOne: (query: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
+  catalogServers: () => Promise<unknown> | unknown
   catalogList: (filters?: Record<string, unknown>) => Promise<unknown> | unknown
   catalogDescribe: (handle: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
-  mcpCall: (handle: string, args?: Record<string, unknown>) => Promise<unknown> | unknown
+  mcpCall: (handle: unknown, args?: Record<string, unknown>) => Promise<unknown> | unknown
+  mcpCallMatch: (
+    query: string,
+    args?: Record<string, unknown>,
+    options?: Record<string, unknown>
+  ) => Promise<unknown> | unknown
   mcpBatch: (
     calls: Array<{ handle: string; args?: Record<string, unknown> }>
   ) => Promise<unknown> | unknown
@@ -36,9 +43,12 @@ export type SandboxExecutionResult = {
 
 export type SandboxBridgeOperation =
   | 'catalog.search'
+  | 'catalog.searchOne'
+  | 'catalog.servers'
   | 'catalog.list'
   | 'catalog.describe'
   | 'mcp.call'
+  | 'mcp.callMatch'
   | 'mcp.batch'
   | 'artifacts.save'
   | 'artifacts.list'
@@ -207,6 +217,14 @@ globalThis.catalog = Object.freeze({
     globalThis.__catalogSearch.applySyncPromise(undefined, [query, options], {
       arguments: { copy: true },
     }),
+  searchOne: (query, options) =>
+    globalThis.__catalogSearchOne.applySyncPromise(undefined, [query, options], {
+      arguments: { copy: true },
+    }),
+  servers: () =>
+    globalThis.__catalogServers.applySyncPromise(undefined, [], {
+      arguments: { copy: true },
+    }),
   list: (filters) =>
     globalThis.__catalogList.applySyncPromise(undefined, [filters], {
       arguments: { copy: true },
@@ -220,6 +238,10 @@ globalThis.catalog = Object.freeze({
 globalThis.mcp = Object.freeze({
   call: (handle, args) =>
     globalThis.__mcpCall.applySyncPromise(undefined, [handle, args], {
+      arguments: { copy: true },
+    }),
+  callMatch: (query, args, options) =>
+    globalThis.__mcpCallMatch.applySyncPromise(undefined, [query, args, options], {
       arguments: { copy: true },
     }),
   batch: (calls) =>
@@ -421,6 +443,42 @@ async function executeWithIsolatedVm(
       )
     )
     jail.setSync(
+      '__catalogSearchOne',
+      new ivm.Reference(
+        async (query: string, runtimeOptions?: Record<string, unknown>) =>
+          externalizeBridgeValue(
+            ivm,
+            normalizeBridgeValue(
+              await trackBridgedPromise(
+                pendingBridged,
+                'catalog.searchOne',
+                hostApi.catalogSearchOne(query, runtimeOptions),
+                diagnostics,
+                options.operationTimeoutMs,
+              )
+            ).value
+          )
+      )
+    )
+    jail.setSync(
+      '__catalogServers',
+      new ivm.Reference(
+        async () =>
+          externalizeBridgeValue(
+            ivm,
+            normalizeBridgeValue(
+              await trackBridgedPromise(
+                pendingBridged,
+                'catalog.servers',
+                hostApi.catalogServers(),
+                diagnostics,
+                options.operationTimeoutMs,
+              )
+            ).value
+          )
+      )
+    )
+    jail.setSync(
       '__catalogList',
       new ivm.Reference(
         async (filters?: Record<string, unknown>) =>
@@ -459,7 +517,7 @@ async function executeWithIsolatedVm(
     jail.setSync(
       '__mcpCall',
       new ivm.Reference(
-        async (handle: string, args?: Record<string, unknown>) =>
+        async (handle: unknown, args?: Record<string, unknown>) =>
           externalizeBridgeValue(
             ivm,
             normalizeBridgeValue(
@@ -467,6 +525,28 @@ async function executeWithIsolatedVm(
                 pendingBridged,
                 'mcp.call',
                 hostApi.mcpCall(handle, args),
+                diagnostics,
+                options.operationTimeoutMs,
+              )
+            ).value
+          )
+      )
+    )
+    jail.setSync(
+      '__mcpCallMatch',
+      new ivm.Reference(
+        async (
+          query: string,
+          args?: Record<string, unknown>,
+          runtimeOptions?: Record<string, unknown>
+        ) =>
+          externalizeBridgeValue(
+            ivm,
+            normalizeBridgeValue(
+              await trackBridgedPromise(
+                pendingBridged,
+                'mcp.callMatch',
+                hostApi.mcpCallMatch(query, args, runtimeOptions),
                 diagnostics,
                 options.operationTimeoutMs,
               )

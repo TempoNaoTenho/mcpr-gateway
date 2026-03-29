@@ -152,6 +152,11 @@ describe('DownstreamServerSchema', () => {
     expect(result.namespaces).toEqual(['tools'])
   })
 
+  it('normalizes empty namespaces to default (aligns with config loader)', () => {
+    const result = DownstreamServerSchema.parse({ ...valid, namespaces: [] })
+    expect(result.namespaces).toEqual(['default'])
+  })
+
   it('accepts legacy http transport', () => {
     const result = DownstreamServerSchema.parse({ ...valid, transport: 'http' })
     expect(result.transport).toBe('http')

@@ -361,5 +361,64 @@ describe('sandbox output bugs', () => {
         )
       ).rejects.toThrow('Bridge operation mcp.call timed out')
     })
+
+    it('supports catalog.searchOne() and mcp.callMatch() helpers', async () => {
+      const session = makeSession()
+      const registry = {
+        getServer: vi.fn(async () => ({
+          id: 'github-main',
+          namespaces: ['github'],
+          transport: 'http',
+          url: 'https://example.com/mcp',
+          enabled: true,
+          trustLevel: 'internal',
+        })),
+        getToolsByNamespace: vi.fn().mockReturnValue([
+          {
+            server: {
+              id: 'github-main',
+              namespaces: ['github'],
+              transport: 'http',
+              url: 'https://example.com/mcp',
+              enabled: true,
+              trustLevel: 'internal',
+            },
+            records: [
+              {
+                name: 'search_docs',
+                description: 'Search documentation',
+                inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+                serverId: 'github-main',
+                namespace: 'github',
+                retrievedAt: new Date().toISOString(),
+                sanitized: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      const result = (await executeCodeMode(
+        `
+        const tool = await catalog.searchOne("search documentation", { serverId: "github-main", detail: "signature" })
+        const out = await mcp.callMatch("search documentation", { query: "quickstart" }, { serverId: "github-main", requiredArgs: ["query"] })
+        return { tool, out }
+        `,
+        session,
+        registry as never,
+        {
+          memoryLimitMb: 128,
+          executionTimeoutMs: 5_000,
+          maxToolCallsPerExecution: 10,
+          maxResultSizeBytes: 8_192,
+          artifactStoreTtlSeconds: 300,
+          maxConcurrentToolCalls: 5,
+        },
+        vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }] }))
+      )) as { value: { tool: Record<string, unknown>; out: unknown }; telemetry: { toolCalls: unknown[] } }
+
+      expect(result.value.tool.name).toBe('search_docs')
+      expect(result.value.out).toEqual({ content: [{ type: 'text', text: 'ok' }] })
+    })
   })
 })

@@ -147,4 +147,43 @@ describe('McpRuntimeApi.batch() parallel execution', () => {
     expect(result).toEqual([])
     expect(executeTool).not.toHaveBeenCalled()
   })
+
+  it('accepts a catalog result object directly in mcp.call()', async () => {
+    const executeTool = vi.fn(async ({ name }: { name: string }) => `result-${name}`)
+
+    const registry = makeRegistry()
+    const handles = registry.entries()
+    const api = new McpRuntimeApi(registry, executeTool, 10, 5)
+
+    const result = await api.call({ handle: handles[0]!.handle }, { query: 'docs' })
+
+    expect(result).toBe('result-toolA')
+    expect(executeTool).toHaveBeenCalledWith({
+      serverId: 's1',
+      name: 'toolA',
+      args: { query: 'docs' },
+    })
+  })
+
+  it('searches and executes the best match with callMatch()', async () => {
+    const executeTool = vi.fn(async ({ name }: { name: string }) => `result-${name}`)
+
+    const registry = makeRegistry()
+    const api = new McpRuntimeApi(
+      registry,
+      executeTool,
+      10,
+      5,
+      () => ({ handle: registry.entries()[1]!.handle, name: 'toolB' })
+    )
+
+    const result = await api.callMatch('tool b', { query: 'docs' })
+
+    expect(result).toBe('result-toolB')
+    expect(executeTool).toHaveBeenCalledWith({
+      serverId: 's2',
+      name: 'toolB',
+      args: { query: 'docs' },
+    })
+  })
 })

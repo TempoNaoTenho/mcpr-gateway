@@ -24,6 +24,7 @@ const NamespacePolicySchema = z.object({
   candidatePoolSize: z.number().int().positive(),
   allowedModes: z.array(z.nativeEnum(Mode)),
   gatewayMode: z.nativeEnum(GatewayMode).default(GatewayMode.Compat),
+  telemetryEnabled: z.boolean().default(false),
   disabledTools: z.array(DisabledToolRefSchema).default([]),
 })
 

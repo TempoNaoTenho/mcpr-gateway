@@ -32,6 +32,7 @@
     candidatePoolSize: number;
     allowedModes: string[];
     gatewayMode: 'compat' | 'code' | 'default';
+    telemetryEnabled: boolean;
     selectedServerIds: string[];
     disabledTools: { serverId: string; name: string }[];
   } | null>(null);
@@ -71,6 +72,7 @@
           candidatePoolSize: ns.candidatePoolSize,
           allowedModes: [...ns.allowedModes],
           gatewayMode: ns.gatewayMode,
+          telemetryEnabled: ns.telemetryEnabled ?? false,
           selectedServerIds: ns.servers.map((server) => server.id),
           disabledTools: [...(nsPolicy?.disabledTools ?? [])],
         }
@@ -119,6 +121,7 @@
             candidatePoolSize: Number(draft.candidatePoolSize),
             allowedModes: draft.allowedModes,
             gatewayMode: draft.gatewayMode,
+            telemetryEnabled: draft.telemetryEnabled,
             disabledTools: draft.disabledTools,
           },
         },
@@ -135,7 +138,9 @@
           const nextNamespaces = nextAssigned.has(server.id)
             ? [...new Set([...server.namespaces, selectedNamespaceKey])]
             : server.namespaces.filter((namespace) => namespace !== selectedNamespaceKey);
-          return updateConfigServer(server.id, { namespaces: nextNamespaces });
+          const effectiveNamespaces =
+            nextNamespaces.length > 0 ? nextNamespaces : ['default'];
+          return updateConfigServer(server.id, { namespaces: effectiveNamespaces });
         }),
       );
 
@@ -258,7 +263,7 @@
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
             <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Tools on tools/list
-              <InfoTooltip text="Count of tools returned to the MCP client on tools/list after initialize (gateway mode affects this: default exposes downstream tools; compat and code expose two meta-tools each)." />
+              <InfoTooltip text="Count of tools returned to the MCP client on tools/list after initialize (gateway mode affects this: default exposes downstream tools; compat exposes search/call/server discovery tools; code exposes gateway_run_code and gateway_help)." />
             </div>
             <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{selectedNamespace.metrics.toolCount}</p>
           </div>
@@ -394,6 +399,26 @@
                 />
                 code
               </label>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+              Telemetry estimates
+              <InfoTooltip text="Opt-in per namespace. When enabled, the gateway estimates latency, payload size, and token usage for tool calls. Code and compat can return this telemetry to the client; default mode mainly uses it in logs and admin-side metrics." />
+            </div>
+            <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-3">
+              <div class="space-y-1">
+                <p class="text-sm font-medium text-slate-900 dark:text-white">Enable telemetry estimates</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Disabled by default. When off, the gateway skips token estimation entirely for this namespace.</p>
+              </div>
+              <Switch
+                checked={draft.telemetryEnabled}
+                ariaLabel={`Enable telemetry estimates for namespace ${selectedNamespace.key}`}
+                onchange={(next) => {
+                  if (draft) draft.telemetryEnabled = next;
+                }}
+              />
             </div>
           </div>
 

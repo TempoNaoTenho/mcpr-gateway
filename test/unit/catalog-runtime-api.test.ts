@@ -105,6 +105,29 @@ beforeEach(() => {
 })
 
 describe('CatalogRuntimeApi', () => {
+  it('lists unique server IDs in sorted order', () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: () => [
+        {
+          server: makeServer('fastmcp'),
+          records: [makeToolRecord('search_fast_mcp', 'Search FastMCP docs', 'fastmcp')],
+        },
+        {
+          server: makeServer('context7'),
+          records: [makeToolRecord('query-docs', 'Query docs', 'context7')],
+        },
+        {
+          server: makeServer('fastmcp'),
+          records: [makeToolRecord('read_fastmcp_doc', 'Read FastMCP docs', 'fastmcp')],
+        },
+      ],
+    }
+
+    const api = new CatalogRuntimeApi(session, registry as never, new HandleRegistry())
+    expect(api.servers()).toEqual([{ serverId: 'context7' }, { serverId: 'fastmcp' }])
+  })
+
   it('accepts limit as a compatibility alias for search', () => {
     const session = makeSession()
     const registry = {
@@ -172,6 +195,27 @@ describe('CatalogRuntimeApi', () => {
     expect(summary[0]).toHaveProperty('summary')
     expect(summary[0]).not.toHaveProperty('description')
     expect(full[0]).toHaveProperty('description', 'Search documentation')
+  })
+
+  it('returns the best match from searchOne', () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: () => [
+        {
+          server: makeServer('github-main'),
+          records: [
+            makeToolRecord('search_docs', 'Search documentation'),
+            makeToolRecord('search_issues', 'Search issues'),
+          ],
+        },
+      ],
+    }
+
+    const api = new CatalogRuntimeApi(session, registry as never, new HandleRegistry())
+    const result = api.searchOne('documentation', { detail: 'summary' }) as Record<string, unknown>
+
+    expect(result.name).toBe('search_docs')
+    expect(result).toHaveProperty('handle')
   })
 
   it('filters search results by serverId and requiredArgs', () => {

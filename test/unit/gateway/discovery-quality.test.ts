@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { executeGatewaySearch } from '../../../src/gateway/discovery.js'
+import { executeGatewayListServers, executeGatewaySearch } from '../../../src/gateway/discovery.js'
 import { initConfig } from '../../../src/config/index.js'
 import type { SessionState } from '../../../src/types/session.js'
 import type { IRegistryAdapter } from '../../../src/types/interfaces.js'
@@ -262,5 +262,101 @@ describe('executeGatewaySearch quality signals', () => {
     }
 
     expect(body.matches.length).toBeLessThanOrEqual(3)
+  })
+
+  it('filters search results by exact serverId when provided', async () => {
+    const multiServerRegistry = {
+      getToolsByNamespace: vi.fn().mockReturnValue([
+        {
+          server: {
+            id: 'fastmcp',
+            transport: 'stdio',
+            command: 'npx',
+            args: ['fastmcp'],
+            enabled: true,
+            trustLevel: SourceTrustLevel.Verified,
+            namespaces: ['default'],
+          },
+          records: [
+            {
+              ...makeToolRecord('search_fast_mcp', 'Search FastMCP docs'),
+              serverId: 'fastmcp',
+            },
+          ],
+        },
+        {
+          server: {
+            id: 'context7',
+            transport: 'stdio',
+            command: 'npx',
+            args: ['context7'],
+            enabled: true,
+            trustLevel: SourceTrustLevel.Verified,
+            namespaces: ['default'],
+          },
+          records: [
+            {
+              ...makeToolRecord('query_docs', 'Query shared docs'),
+              serverId: 'context7',
+            },
+          ],
+        },
+      ]),
+    } as unknown as IRegistryAdapter
+
+    const result = await executeGatewaySearch(
+      session,
+      { query: 'docs', serverId: 'fastmcp', limit: 5 },
+      multiServerRegistry
+    )
+    const { result: body } = result as {
+      result: { query: string; serverId?: string; matches: Array<Record<string, unknown>> }
+    }
+
+    expect(body.serverId).toBe('fastmcp')
+    expect(body.matches).toEqual([
+      expect.objectContaining({
+        name: 'search_fast_mcp',
+        serverId: 'fastmcp',
+      }),
+    ])
+  })
+
+  it('lists connected downstream servers in sorted order', async () => {
+    const multiServerRegistry = {
+      getToolsByNamespace: vi.fn().mockReturnValue([
+        {
+          server: {
+            id: 'context7',
+            transport: 'stdio',
+            command: 'npx',
+            args: ['context7'],
+            enabled: true,
+            trustLevel: SourceTrustLevel.Verified,
+            namespaces: ['default'],
+          },
+          records: [],
+        },
+        {
+          server: {
+            id: 'fastmcp',
+            transport: 'stdio',
+            command: 'npx',
+            args: ['fastmcp'],
+            enabled: true,
+            trustLevel: SourceTrustLevel.Verified,
+            namespaces: ['default'],
+          },
+          records: [],
+        },
+      ]),
+    } as unknown as IRegistryAdapter
+
+    const result = await executeGatewayListServers(session, multiServerRegistry)
+    expect(result).toEqual({
+      result: {
+        servers: [{ serverId: 'context7' }, { serverId: 'fastmcp' }],
+      },
+    })
   })
 })

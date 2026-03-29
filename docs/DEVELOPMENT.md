@@ -181,7 +181,7 @@ The `isolated-vm` sandbox lives in `src/runtime/`:
 | File                | Purpose                                                                                |
 | ------------------- | -------------------------------------------------------------------------------------- |
 | `sandbox.ts`        | `isolated-vm` isolate lifecycle — creation, script compilation, timeout enforcement    |
-| `catalog-api.ts`    | `catalog.search()` and `catalog.describe()` — tool discovery API                       |
+| `catalog-api.ts`    | `catalog.servers()`, `catalog.search()`, and `catalog.describe()` — tool discovery API |
 | `mcp-api.ts`        | `mcp.call()` and `mcp.batch()` — downstream tool execution                             |
 | `result-api.ts`     | `result.text()`, `result.items()`, `result.limit()`, `result.pick()`, `result.count()` |
 | `artifact-store.ts` | `artifacts.save()` and `artifacts.list()` — session-scoped artifact storage            |

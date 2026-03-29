@@ -2164,8 +2164,9 @@ describe('adminRoutes', () => {
     expect(body.namespaces).toEqual([
       expect.objectContaining({
         key: 'gmail',
+        telemetryEnabled: false,
         metrics: expect.objectContaining({
-          toolCount: 2,
+          toolCount: 4,
           customizedTools: 0,
           serverCount: 1,
           totalTokens: expect.any(Number),
@@ -2249,6 +2250,39 @@ describe('adminRoutes', () => {
     expect(gmailNs?.metrics.totalTokens).toBe(gmailNs?.catalogMetrics.totalTokens)
     expect(gmailNs?.metrics.initializeInstructionsTokens).toBe(0)
     expect(gmailNs?.metrics.firstTurnEstimatedTokens).toBe(gmailNs?.metrics.totalTokens)
+
+    await app.close()
+  })
+
+  it('includes telemetryEnabled in namespace summaries', async () => {
+    const base = createDefaultAdminConfig(['gmail'])
+    const { configRepo, configManager } = createAdminHarness({
+      ...base,
+      namespaces: {
+        ...base.namespaces,
+        gmail: {
+          ...base.namespaces.gmail,
+          telemetryEnabled: true,
+        },
+      },
+    })
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, { configRepo, configManager })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/namespaces',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as { namespaces: Array<{ key: string; telemetryEnabled: boolean }> }
+    expect(body.namespaces).toContainEqual(
+      expect.objectContaining({
+        key: 'gmail',
+        telemetryEnabled: true,
+      }),
+    )
 
     await app.close()
   })

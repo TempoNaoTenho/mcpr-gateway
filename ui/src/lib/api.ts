@@ -485,6 +485,7 @@ export interface NamespaceSummary {
   gatewayMode: 'compat' | 'code' | 'default'
   bootstrapWindowSize: number
   candidatePoolSize: number
+  telemetryEnabled: boolean
   servers: Array<{
     id: string
     transport: string
@@ -675,6 +676,7 @@ export interface PoliciesConfig {
       candidatePoolSize: number
       allowedModes: string[]
       gatewayMode: 'compat' | 'code' | 'default'
+      telemetryEnabled?: boolean
       disabledTools?: { serverId: string; name: string }[]
     }
   >

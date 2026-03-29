@@ -10,6 +10,9 @@ export interface RequestLogFields {
   toolName?: string
   downstreamServer?: string
   latencyMs: number
+  requestTokensEstimate?: number
+  responseTokensEstimate?: number
+  totalTokensEstimate?: number
   outcomeClass?: OutcomeClass
   /** Human-readable or JSON-serialized error detail for debugging */
   errorMessage?: string

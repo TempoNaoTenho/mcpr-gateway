@@ -297,8 +297,10 @@ describe('POST /mcp/gmail — tools/list', () => {
     expect(res.statusCode).toBe(200)
     const toolNames = res.json().result.tools.map((t: { name: string }) => t.name)
     expect(toolNames).toContain('gateway_search_tools')
+    expect(toolNames).toContain('gateway_search_and_call_tool')
     expect(toolNames).toContain('gateway_call_tool')
-    expect(toolNames).toHaveLength(2)
+    expect(toolNames).toContain('gateway_list_servers')
+    expect(toolNames).toHaveLength(4)
   })
 
   it('returns 404 SESSION_NOT_FOUND without Mcp-Session-Id', async () => {

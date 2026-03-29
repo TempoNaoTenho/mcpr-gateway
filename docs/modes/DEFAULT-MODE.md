@@ -64,7 +64,7 @@ No extra selector-specific config is required. The global `selector.publication`
 
 ## See Also
 
-- [Compat Mode](COMPAT-MODE.md) — two meta-tools for large catalogs; BM25-backed discovery
+- [Compat Mode](COMPAT-MODE.md) — compact gateway discovery for large catalogs; BM25-backed search
 - [Code Mode](CODE-MODE.md) — JS sandbox with programmatic tool discovery and batch execution
 - [Configuration](../CONFIGURATION.md) — namespace config, selector publication, resilience
 - [Getting Started](../GETTING-STARTED.md#mcp-over-http) — namespace URL paths (`/mcp/:namespace`)

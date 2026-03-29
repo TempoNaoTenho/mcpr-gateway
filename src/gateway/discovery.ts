@@ -15,6 +15,8 @@ import { GATEWAY_SERVER_ID } from './gateway-constants.js'
 
 export const GATEWAY_SEARCH_TOOL_NAME = 'gateway_search_tools'
 export const GATEWAY_CALL_TOOL_NAME = 'gateway_call_tool'
+export const GATEWAY_SEARCH_AND_CALL_TOOL_NAME = 'gateway_search_and_call_tool'
+export const GATEWAY_LIST_SERVERS_TOOL_NAME = 'gateway_list_servers'
 export const GATEWAY_RUN_CODE_TOOL_NAME = 'gateway_run_code'
 export const GATEWAY_HELP_TOOL_NAME = 'gateway_help'
 export { GATEWAY_SERVER_ID }
@@ -29,6 +31,8 @@ export const GATEWAY_DISCOVERY_SERVER_ID = GATEWAY_SERVER_ID
 const GATEWAY_TOOL_NAMES = new Set([
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
 ])
@@ -48,6 +52,7 @@ function buildGatewaySearchTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_SEARCH_TOOL_NAME,
     description: `Find tools by keyword across all connected servers. Returns matches ranked by relevance, each with a name and serverId.
+      If you already know the target server, pass serverId to keep results smaller.
       Use gateway_call_tool with the exact returned name+serverId to execute a match. Do not guess aliases or historical tool names.
       Tips: use 2–3 distinctive words ("github list issues"); if no matches, try fewer words ("github issues").`,
     inputSchema: {
@@ -57,6 +62,11 @@ function buildGatewaySearchTool(namespace: string): VisibleTool {
           type: 'string',
           description:
             'Terms matched against tool name, description, and tags; prefer short, distinctive tokens (e.g product or integration name).',
+        },
+        serverId: {
+          type: 'string',
+          description:
+            'Optional exact downstream server ID filter. Use gateway_list_servers first if you need to confirm available server IDs.',
         },
         limit: {
           type: 'integer',
@@ -73,6 +83,23 @@ function buildGatewaySearchTool(namespace: string): VisibleTool {
     namespace,
     riskLevel: ToolRiskLevel.Low,
     tags: ['search', 'discovery'],
+  }
+}
+
+function buildGatewayListServersTool(namespace: string): VisibleTool {
+  return {
+    name: GATEWAY_LIST_SERVERS_TOOL_NAME,
+    description:
+      'List connected downstream server IDs available in this namespace. Use this only when the target integration is unclear and you need an exact serverId before searching or calling tools.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+    serverId: GATEWAY_SERVER_ID,
+    namespace,
+    riskLevel: ToolRiskLevel.Low,
+    tags: ['discovery'],
   }
 }
 
@@ -104,11 +131,56 @@ function buildGatewayCallTool(namespace: string): VisibleTool {
   }
 }
 
+function buildGatewaySearchAndCallTool(namespace: string): VisibleTool {
+  return {
+    name: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+    description:
+      'Search for a downstream tool and execute the best match in one step. Useful in compat mode when you want fewer round trips than gateway_search_tools + gateway_call_tool.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query used to find the tool to execute.',
+        },
+        serverId: {
+          type: 'string',
+          description: 'Optional exact downstream server ID filter.',
+        },
+        arguments: {
+          type: 'object',
+          description: 'Arguments to pass to the selected downstream tool.',
+          default: {},
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 10,
+          description: 'How many ranked matches to inspect before selecting matchIndex.',
+        },
+        matchIndex: {
+          type: 'integer',
+          minimum: 0,
+          maximum: 9,
+          description: 'Which ranked match to execute (default 0 = top match).',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    serverId: GATEWAY_SERVER_ID,
+    namespace,
+    riskLevel: ToolRiskLevel.Low,
+    tags: ['search', 'execution', 'proxy'],
+  }
+}
+
 function buildGatewayRunCodeTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_RUN_CODE_TOOL_NAME,
     description: `Execute JavaScript in the gateway sandbox to orchestrate multiple tools in one call.
       Workflow:
+        catalog.servers()                               — list exact downstream server IDs when you need to confirm available integrations
         catalog.search(q, { k | limit, serverId, requiredArgs }) / catalog.list({ serverId, requiredArgs }) — discover tools, returns session-scoped handles
         catalog.describe(handle, { detail: "signature" }) — inspect required args and short field metadata before execution
         mcp.call(handle, args) / mcp.batch([...])  — execute one or many tools with handles from this execution
@@ -121,7 +193,7 @@ function buildGatewayRunCodeTool(namespace: string): VisibleTool {
         code: {
           type: 'string',
           description:
-            'JavaScript to execute. Available globals: catalog, mcp, result, artifacts. `result` is reserved and should not be redeclared. Simple expressions like `1 + 1` work without `return`. For multi-line statements, use `return` for the final value. `catalog.search()` accepts `k`, compatibility alias `limit` (prefer `k`), and optional filters such as `serverId` and `requiredArgs`. `catalog.describe(..., { detail: "signature" })` exposes required fields plus short property metadata. Prefer `result.items()` or `result.text()` when tools return content blocks. Prefer `catalog.describe()` before `mcp.batch()` when mixing tools. Always await async calls and return serializable JSON-friendly data.',
+            'JavaScript to execute. Available globals: catalog, mcp, result, artifacts. `result` is reserved and should not be redeclared. Simple expressions like `1 + 1` work without `return`. For multi-line statements, use `return` for the final value. `catalog.servers()` lists exact downstream server IDs. `catalog.search()` accepts `k`, compatibility alias `limit` (prefer `k`), and optional filters such as `serverId` and `requiredArgs`. `catalog.describe(..., { detail: "signature" })` exposes required fields plus short property metadata. Prefer `result.items()` or `result.text()` when tools return content blocks. Prefer `catalog.describe()` before `mcp.batch()` when mixing tools. Always await async calls and return serializable JSON-friendly data.',
         },
       },
       required: ['code'],
@@ -158,11 +230,16 @@ function buildGatewayHelpTool(namespace: string): VisibleTool {
 }
 
 /**
- * Returns the gateway tool window — only the two meta-tools.
+ * Returns the gateway tool window for compat mode.
  * Always active, no config toggle required.
  */
 export function buildGatewayToolWindow(namespace: string): VisibleTool[] {
-  return [buildGatewaySearchTool(namespace), buildGatewayCallTool(namespace)]
+  return [
+    buildGatewaySearchTool(namespace),
+    buildGatewaySearchAndCallTool(namespace),
+    buildGatewayCallTool(namespace),
+    buildGatewayListServersTool(namespace),
+  ]
 }
 
 export function buildCodeModeToolWindow(namespace: string): VisibleTool[] {
@@ -185,6 +262,7 @@ export function buildGatewayToolWindowForMode(
 
 type SearchArgs = {
   query?: string
+  serverId?: string
   limit?: number
 }
 
@@ -193,6 +271,7 @@ function parseSearchArgs(args: unknown): Required<SearchArgs> {
     args && typeof args === 'object' && !Array.isArray(args) ? (args as SearchArgs) : {}
   return {
     query: typeof parsed.query === 'string' ? parsed.query.trim() : '',
+    serverId: typeof parsed.serverId === 'string' ? parsed.serverId.trim() : '',
     limit: Math.max(1, Math.min(10, typeof parsed.limit === 'number' ? parsed.limit : 5)),
   }
 }
@@ -212,6 +291,7 @@ export async function executeGatewaySearch(
   const searchable = toolcards
     .filter((tc) => !tc.quarantined)
     .filter((tc) => !disabledKeys.has(toolCandidateKey(tc.serverId, tc.name)))
+    .filter((tc) => parsed.serverId.length === 0 || tc.serverId === parsed.serverId)
 
   const matches = rankToolsWithBm25(searchable, parsed.query)
     .filter((entry) => entry.score > 0)
@@ -225,6 +305,7 @@ export async function executeGatewaySearch(
   return {
     result: {
       query: parsed.query,
+      ...(parsed.serverId.length > 0 ? { serverId: parsed.serverId } : {}),
       matches: matches.map(({ toolcard, score, matchedTerms }) => ({
         name: toolcard.name,
         serverId: toolcard.serverId,
@@ -232,6 +313,25 @@ export async function executeGatewaySearch(
         score,
         matchedTerms,
       })),
+    },
+  }
+}
+
+export async function executeGatewayListServers(
+  session: SessionState,
+  registry: IRegistryAdapter
+): Promise<{ result: unknown }> {
+  const serverGroups = registry.getToolsByNamespace?.(session.namespace) ?? []
+  const serverIds = [...new Set(
+    serverGroups
+      .filter(({ server }) => server.enabled)
+      .map(({ server }) => server.id.trim())
+      .filter((id) => id.length > 0)
+  )].sort((a, b) => a.localeCompare(b))
+
+  return {
+    result: {
+      servers: serverIds.map((serverId) => ({ serverId })),
     },
   }
 }
@@ -248,6 +348,14 @@ export type GatewayCallArgs = {
 
 export type GatewayRunCodeArgs = {
   code: string
+}
+
+export type GatewaySearchAndCallArgs = {
+  query: string
+  serverId?: string
+  arguments: Record<string, unknown>
+  limit: number
+  matchIndex: number
 }
 
 export function parseGatewayCallArgs(args: unknown): GatewayCallArgs | { error: string } {
@@ -281,4 +389,28 @@ export function parseGatewayRunCodeArgs(args: unknown): GatewayRunCodeArgs | { e
     return { error: 'Missing required field: code' }
   }
   return { code: obj.code }
+}
+
+export function parseGatewaySearchAndCallArgs(
+  args: unknown
+): GatewaySearchAndCallArgs | { error: string } {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return { error: 'Arguments must be an object with query' }
+  }
+  const obj = args as Record<string, unknown>
+  if (typeof obj.query !== 'string' || obj.query.trim().length === 0) {
+    return { error: 'Missing required field: query' }
+  }
+  const toolArgs = obj.arguments ?? {}
+  if (typeof toolArgs !== 'object' || Array.isArray(toolArgs)) {
+    return { error: 'Field arguments must be an object' }
+  }
+  const rawMatchIndex = typeof obj.matchIndex === 'number' ? obj.matchIndex : 0
+  return {
+    query: obj.query.trim(),
+    serverId: typeof obj.serverId === 'string' && obj.serverId.trim().length > 0 ? obj.serverId.trim() : undefined,
+    arguments: toolArgs as Record<string, unknown>,
+    limit: Math.max(1, Math.min(10, typeof obj.limit === 'number' ? obj.limit : 5)),
+    matchIndex: Math.max(0, Math.min(9, rawMatchIndex)),
+  }
 }

@@ -20,7 +20,9 @@ import type { ToolRecord } from '../../src/types/tools.js'
 import type { DownstreamServer } from '../../src/types/server.js'
 import {
   GATEWAY_SEARCH_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
 } from '../../src/gateway/discovery.js'
@@ -183,11 +185,13 @@ describe('handleInitialize', () => {
     )
 
     const session = await store.get(response.id)
-    // toolWindow now contains only the two gateway meta-tools
-    expect(session?.toolWindow).toHaveLength(2)
+    // toolWindow now contains only gateway compat tools
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
     expect(session?.lastSelectorDecision?.selected).toEqual([])
   })
@@ -215,11 +219,13 @@ describe('handleInitialize', () => {
     )
 
     const session = await store.get(response.id)
-    // toolWindow now contains only the two gateway meta-tools regardless of downstream tools
-    expect(session?.toolWindow).toHaveLength(2)
+    // toolWindow now contains only gateway compat tools regardless of downstream tools
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
     // lastSelectorDecision still reflects the bootstrap window computation
     expect(session?.lastSelectorDecision?.selected).toHaveLength(4)
@@ -314,15 +320,17 @@ describe('handleInitialize', () => {
     expect(session?.initialIntentText).toBe(
       'Read API docs SDK reference for FastMCP Need product documentation'
     )
-    // toolWindow now has only gateway meta-tools; intent text is stored for future use
-    expect(session?.toolWindow).toHaveLength(2)
+    // toolWindow now has only gateway compat tools; intent text is stored for future use
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
   })
 
-  it('always includes gateway_search_tools and gateway_call_tool', async () => {
+  it('always includes compat gateway discovery tools', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {
       store.stop()
@@ -340,8 +348,10 @@ describe('handleInitialize', () => {
     const session = await store.get(response.id)
     const toolNames = session?.toolWindow.map((tool) => tool.name) ?? []
     expect(toolNames).toContain(GATEWAY_SEARCH_TOOL_NAME)
+    expect(toolNames).toContain(GATEWAY_SEARCH_AND_CALL_TOOL_NAME)
     expect(toolNames).toContain(GATEWAY_CALL_TOOL_NAME)
-    expect(session?.toolWindow).toHaveLength(2)
+    expect(toolNames).toContain(GATEWAY_LIST_SERVERS_TOOL_NAME)
+    expect(session?.toolWindow).toHaveLength(4)
   })
 
   it('publishes gateway_run_code and gateway_help when the namespace uses code mode', async () => {
@@ -456,11 +466,13 @@ describe('handleInitialize', () => {
     )
 
     const session = await store.get(response.id)
-    // toolWindow now contains only gateway meta-tools
-    expect(session?.toolWindow).toHaveLength(2)
+    // toolWindow now contains only gateway compat tools
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
     // bootstrap window (via lastSelectorDecision) should have filtered out offline tools
     const selected = session?.lastSelectorDecision?.selected ?? []
@@ -486,7 +498,9 @@ describe('handleInitialize', () => {
     const result = (response.result as { result: { instructions?: string } }).result
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).toContain('gateway_search_and_call_tool')
     expect(result.instructions).toContain('gateway_call_tool')
+    expect(result.instructions).toContain('gateway_list_servers')
     expect(result.instructions).toContain('exact name and serverId returned by the search result')
     expect(result.instructions).toContain('"gmail-server"')
   })
@@ -512,6 +526,8 @@ describe('handleInitialize', () => {
     const result = (response.result as { result: { instructions?: string } }).result
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).toContain('gateway_search_and_call_tool')
+    expect(result.instructions).toContain('gateway_list_servers')
     expect(result.instructions).not.toContain('Available servers')
   })
 
@@ -545,6 +561,7 @@ describe('handleInitialize', () => {
       const result = (response.result as { result: { instructions?: string } }).result
       expect(result.instructions).toBeDefined()
       expect(result.instructions).toContain('gateway_run_code')
+      expect(result.instructions).toContain('catalog.servers')
       expect(result.instructions).toContain('catalog.search')
       expect(result.instructions).toContain('mcp.call')
     } finally {
@@ -657,11 +674,13 @@ describe('handleInitialize', () => {
 
       const session = await store.get(response.id)
       expect(session?.namespace).toBe('all')
-      // toolWindow now contains only gateway meta-tools
-      expect(session?.toolWindow).toHaveLength(2)
+      // toolWindow now contains only gateway compat tools
+      expect(session?.toolWindow).toHaveLength(4)
       expect(session?.toolWindow.map((t) => t.name)).toEqual([
         GATEWAY_SEARCH_TOOL_NAME,
+        GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
         GATEWAY_CALL_TOOL_NAME,
+        GATEWAY_LIST_SERVERS_TOOL_NAME,
       ])
       // bootstrap window should contain the downstream tool
       const selected = session?.lastSelectorDecision?.selected ?? []

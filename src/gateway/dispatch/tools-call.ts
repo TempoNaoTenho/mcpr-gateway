@@ -7,7 +7,9 @@ import { logRequest, logRequestWarn } from '../../observability/structured-log.j
 import {
   isGatewayInternalTool,
   GATEWAY_SEARCH_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
 } from '../discovery.js'
@@ -113,6 +115,50 @@ function normalizeInternalToolResult(toolName: string, value: unknown): CallTool
       matches.length > 0
         ? [`Matches for "${query}":`, ...matches].join('\n')
         : `No matching tools found for "${query}".`
+
+    return {
+      content: [{ type: 'text', text }],
+      structuredContent: value,
+    }
+  }
+
+  if (
+    toolName === GATEWAY_SEARCH_AND_CALL_TOOL_NAME &&
+    isRecord(value) &&
+    isRecord(value['match']) &&
+    'result' in value
+  ) {
+    const match = value['match'] as Record<string, unknown>
+    const name = typeof match['name'] === 'string' ? match['name'] : '<unknown>'
+    const serverId = typeof match['serverId'] === 'string' ? match['serverId'] : '<unknown>'
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Selected match: ${name} (${serverId})\n${stringifyForToolText(value['result'])}`,
+        },
+      ],
+      structuredContent: value,
+    }
+  }
+
+  if (
+    toolName === GATEWAY_LIST_SERVERS_TOOL_NAME &&
+    isRecord(value) &&
+    Array.isArray(value['servers'])
+  ) {
+    const servers = value['servers']
+      .filter(isRecord)
+      .map((server) =>
+        typeof server['serverId'] === 'string' && server['serverId'].trim().length > 0
+          ? `- ${server['serverId'].trim()}`
+          : '- <unknown>'
+      )
+
+    const text =
+      servers.length > 0
+        ? ['Available downstream servers:', ...servers].join('\n')
+        : 'No downstream servers are currently available in this namespace.'
 
     return {
       content: [{ type: 'text', text }],
@@ -253,6 +299,9 @@ export async function handleToolsCall(
           downstreamServer: outcome.serverId,
           latencyMs,
           outcomeClass: OutcomeClass.Success,
+          requestTokensEstimate: outcome.telemetry?.requestTokensEstimate,
+          responseTokensEstimate: outcome.telemetry?.responseTokensEstimate,
+          totalTokensEstimate: outcome.telemetry?.totalTokensEstimate,
         },
         'tool executed'
       )
@@ -303,6 +352,7 @@ export async function handleToolsCall(
             GatewayErrorCode.TOOL_NOT_VISIBLE,
             `Tool '${toolName}' is not in the current session tool window. ` +
               'In compat mode, first call gateway_search_tools with a query to discover available tools, ' +
+              'or use gateway_search_and_call_tool to search and execute the best match in one step, ' +
               `then call gateway_call_tool with the exact tool name and serverId returned by the search result. ` +
               'Do not call downstream tools directly.'
           )
@@ -353,6 +403,9 @@ export async function handleToolsCall(
           downstreamServer: outcome.serverId || undefined,
           latencyMs,
           outcomeClass: OutcomeClass.ToolError,
+          requestTokensEstimate: outcome.telemetry?.requestTokensEstimate,
+          responseTokensEstimate: outcome.telemetry?.responseTokensEstimate,
+          totalTokensEstimate: outcome.telemetry?.totalTokensEstimate,
           errorMessage: downstreamRpcMessage,
         },
         'tool error: downstream reported failure',

@@ -174,6 +174,7 @@ function createDefaultNamespacePolicy(roleNames: string[]) {
     candidatePoolSize: 16,
     allowedModes: [Mode.Read, Mode.Write],
     gatewayMode: GatewayMode.Compat,
+    telemetryEnabled: false,
     disabledTools: [] as { serverId: string; name: string }[],
   }
 }
@@ -1745,6 +1746,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
               gatewayMode: policy.gatewayMode,
               bootstrapWindowSize: policy.bootstrapWindowSize,
               candidatePoolSize: policy.candidatePoolSize,
+              telemetryEnabled: policy.telemetryEnabled ?? false,
               servers: servers.map((server) => ({
                 id: server.id,
                 transport: server.transport,

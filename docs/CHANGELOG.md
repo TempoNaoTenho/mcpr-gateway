@@ -9,10 +9,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- 2026-03-29 - Changed - Namespace policies now expose `telemetryEnabled` as an opt-in flag, the Namespaces UI can toggle it per namespace, and router/code/compat telemetry is omitted entirely when the flag is off.
+- 2026-03-29 - Added - Compat mode now exposes `gateway_search_and_call_tool` for one-step search+execute, code mode adds `catalog.searchOne()` plus `mcp.callMatch()`, and gateway responses now include estimated per-call telemetry (`latencyMs`, bytes, token estimate, and code-mode tool-call traces); docs and tests were updated accordingly.
+- 2026-03-29 - Added - Compat mode now exposes `gateway_list_servers`, `gateway_search_tools` accepts optional `serverId`, and code mode adds `catalog.servers()` so agents can confirm exact downstream server IDs without loading full mixed tool results; docs, UI copy, and tests were updated accordingly.
 - 2026-03-28 - Added - Inbound OAuth for MCP clients: `auth.mode` `static_key` | `oauth` | `hybrid`, RFC 9728 `/.well-known/oauth-protected-resource` metadata, `401` + `WWW-Authenticate` challenges, JWT validation via `jose` + JWKS discovery, optional browser Origin allowlist/CORS helper fields on inbound OAuth config, extra MCP `Content-Type` parsing and `415` on unsupported media types; WebUI config section; docs and Vitest coverage (unit + integration).
 
 ### Fixed
 
+- 2026-03-29 - Fixed - Admin saves that would leave a downstream server with `namespaces: []` (e.g. unassigning the last namespace on the Namespaces page) no longer fail Zod validation; empty lists normalize to `['default']`, matching `config/loader` behavior, and the Namespaces UI sends `['default']` in that case
+- 2026-03-29 - Fixed - With `NODE_ENV=production`, OAuth `publicBaseUrl` may use `http://` only for loopback hosts (`localhost`, `127.0.0.1`, `::1`, IPv4-mapped 127.0.0.1) so default/local URLs work; other hosts still require `https://`; `docs/CONFIGURATION.md` and `test/unit/oauth-schemas.test.ts` describe and cover this
 - 2026-03-29 - Fixed - `test/unit/health.test.ts` now initializes config before `app.ready()`; the exported gateway `app` only loads config when run as the process entrypoint, while `oauth-metadata` registers an `onReady` hook that calls `getConfig()`
 - 2026-03-29 - Fixed - `GET /mcp/:namespace` now enforces inbound OAuth and returns `401` + `WWW-Authenticate` for unauthenticated SSE requests instead of opening an anonymous stream
 - 2026-03-29 - Fixed - Embedded inbound OAuth now includes `https://claude.com` in the default browser-origin allowlist, logs now distinguish rejected browser origins from OAuth `401` initialize challenges, and docs/UI now clarify that `allowedBrowserOrigins` is not an OAuth callback allowlist

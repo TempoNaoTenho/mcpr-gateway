@@ -174,6 +174,21 @@ export class CatalogRuntimeApi {
     return ranked.map(({ toolcard }) => this.formatTool(toolcard, detail))
   }
 
+  searchOne(
+    query: string,
+    options: CatalogSearchOptions = {}
+  ): Record<string, unknown> | null {
+    const [match] = this.search(query, { ...options, k: 1 }) as Array<Record<string, unknown>>
+    return match ?? null
+  }
+
+  servers(): unknown[] {
+    const serverIds = [...new Set(this.toolcards.map((tool) => tool.serverId))]
+      .filter((serverId) => typeof serverId === 'string' && serverId.length > 0)
+      .sort((left, right) => left.localeCompare(right))
+    return serverIds.map((serverId) => ({ serverId }))
+  }
+
   list(filters: CatalogListFilters = {}): unknown[] {
     const detail = filters.detail ?? 'summary'
     const visible = this.toolcards.filter((tool) =>

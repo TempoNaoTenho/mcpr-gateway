@@ -77,21 +77,23 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 
 `bootstrap.json` may be a minimal bootstrap object or a full config object. These top-level sections are recognized:
 
-| Section        | Purpose                                                                                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `servers`      | Downstream MCP servers (stdio or HTTP). Optional in the file; the WebUI can manage them later. See [`DownstreamServerSchema`](../src/types/server.ts).                                                                   |
-| `auth`         | Inbound client auth section. It can be seeded from `bootstrap.json`, but normal operation may manage it from the WebUI/runtime config. See [`AuthConfigSchema`](../src/config/schemas.ts). |
-| `namespaces`   | Per-namespace tool window sizes and allowed modes/roles.                                                                                                                                                                 |
-| `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                                             |
-| `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication).                  |
-| `session`      | Session TTL, cleanup interval, and handle TTL (`handleTtlSeconds`).                                                                                                                                                      |
-| `code`         | Code mode execution config, including `maxConcurrentToolCalls` to limit parallel batch execution.                                                                                                                        |
-| `triggers`     | When to refresh the tool window after tool calls.                                                                                                                                                                        |
-| `resilience`   | Timeouts, rate limits, circuit breaker.                                                                                                                                                                                  |
-| `debug`        | Whether debug HTTP routes may be registered.                                                                                                                                                                             |
-| `starterPacks` | Cold-start preferences per namespace (keys must match `namespaces`).                                                                                                                                                     |
+| Section        | Purpose                                                                                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `servers`      | Downstream MCP servers (stdio or HTTP). Optional in the file; the WebUI can manage them later. See [`DownstreamServerSchema`](../src/types/server.ts).                                                  |
+| `auth`         | Inbound client auth section. It can be seeded from `bootstrap.json`, but normal operation may manage it from the WebUI/runtime config. See [`AuthConfigSchema`](../src/config/schemas.ts).              |
+| `namespaces`   | Per-namespace tool window sizes, allowed modes/roles, gateway mode, and optional telemetry estimates.                                                                                                  |
+| `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                            |
+| `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication). |
+| `session`      | Session TTL, cleanup interval, and handle TTL (`handleTtlSeconds`).                                                                                                                                     |
+| `code`         | Code mode execution config, including `maxConcurrentToolCalls` to limit parallel batch execution.                                                                                                       |
+| `triggers`     | When to refresh the tool window after tool calls.                                                                                                                                                       |
+| `resilience`   | Timeouts, rate limits, circuit breaker.                                                                                                                                                                 |
+| `debug`        | Whether debug HTTP routes may be registered.                                                                                                                                                            |
+| `starterPacks` | Cold-start preferences per namespace (keys must match `namespaces`).                                                                                                                                    |
 
 The authoritative Zod schemas live in [`src/config/schemas.ts`](../src/config/schemas.ts). The on-disk schema accepts omitted sections and fills defaults at load time.
+
+Each namespace policy also supports `telemetryEnabled` (default `false`). When enabled, the gateway estimates request/response bytes, latency, and token usage for tool calls in that namespace. In `code` and `compat` modes this can also appear in returned gateway telemetry fields; in `default` mode it is primarily used for router outcomes, logs, and admin-side reporting.
 
 ### Session and Code execution options
 
@@ -234,13 +236,13 @@ Cookie: admin_session=<value-from-set-cookie>
 
 Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/config/schemas.ts) and [`oauth-schemas.ts`](../src/config/oauth-schemas.ts)):
 
-| `mode`       | Behavior |
-| ------------ | -------- |
-| `static_key` | Map `Authorization: Bearer <token>` against `auth.staticKeys` (bootstrap and/or admin). Unknown/missing token → `anonymous`. |
+| `mode`       | Behavior                                                                                                                                                                                                         |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static_key` | Map `Authorization: Bearer <token>` against `auth.staticKeys` (bootstrap and/or admin). Unknown/missing token → `anonymous`.                                                                                     |
 | `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces and SSE connects → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
-| `hybrid`     | Try static keys first; if no match and OAuth applies to the namespace, validate JWT as in `oauth`. |
+| `hybrid`     | Try static keys first; if no match and OAuth applies to the namespace, validate JWT as in `oauth`.                                                                                                               |
 
-**JWT / OAuth:** `oauth.publicBaseUrl` must be the HTTPS origin clients use to reach the gateway in production. The gateway validates `aud` against `publicBaseUrl + /mcp/{namespace}` unless an issuer entry sets a custom `audience`. Issuer `issuer` URLs must match the JWT `iss` claim. Optional `jwksUri`; otherwise JWKS URL is discovered (OpenID discovery, OAuth authorization-server metadata, then `/.well-known/jwks.json`). Role strings are read from the claim named by `rolesClaim` (default `roles`).
+**JWT / OAuth:** `oauth.publicBaseUrl` must use HTTPS when `NODE_ENV=production` for any non-loopback host. For local runs with production mode, `http://` is accepted only for loopback: `localhost`, `127.0.0.1`, IPv6 `::1`, and IPv4-mapped loopback (`::ffff:127.0.0.1`, including the compressed form some runtimes use). The gateway validates `aud` against `publicBaseUrl + /mcp/{namespace}` unless an issuer entry sets a custom `audience`. Issuer `issuer` URLs must match the JWT `iss` claim. Optional `jwksUri`; otherwise JWKS URL is discovered (OpenID discovery, OAuth authorization-server metadata, then `/.well-known/jwks.json`). Role strings are read from the claim named by `rolesClaim` (default `roles`).
 
 **Metadata:** Clients can fetch protected-resource metadata at:
 
