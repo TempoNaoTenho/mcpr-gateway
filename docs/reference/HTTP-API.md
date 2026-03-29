@@ -126,7 +126,7 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 | `DELETE` | `/admin/config/servers/:id`       | Remove server                                                                                                                                                                                             |
 | `GET`    | `/admin/config/policies`          | Namespaces, roles, selector, session, triggers, resilience, debug, starter packs, `codeMode`, `allowedOAuthProviders`; auth token state is returned for display but managed by dedicated auth endpoints |
 | `PUT`    | `/admin/config/policies`          | Update policy sections only; does not overwrite bearer tokens or other auth state                                                                                                                         |
-| `GET`    | `/admin/namespaces`               | Namespace list for admin UI: `metrics` (MCP `tools/list` token estimates, plus compat/code `initializeInstructionsTokens` and `firstTurnEstimatedTokens`), `catalogMetrics` (downstream catalog), `tools` |
+| `GET`    | `/admin/namespaces`               | Namespace list for admin UI: mode, `telemetryEnabled`, `metrics` (MCP `tools/list` token estimates, plus compat/code `initializeInstructionsTokens` and `firstTurnEstimatedTokens`), `catalogMetrics` (downstream catalog), `tools` |
 
 Implementation: [`src/gateway/routes/admin.ts`](../src/gateway/routes/admin.ts).
 

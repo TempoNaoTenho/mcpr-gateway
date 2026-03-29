@@ -81,7 +81,7 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `servers`      | Downstream MCP servers (stdio or HTTP). Optional in the file; the WebUI can manage them later. See [`DownstreamServerSchema`](../src/types/server.ts).                                                  |
 | `auth`         | Inbound client auth section. It can be seeded from `bootstrap.json`, but normal operation may manage it from the WebUI/runtime config. See [`AuthConfigSchema`](../src/config/schemas.ts).              |
-| `namespaces`   | Per-namespace tool window sizes and allowed modes/roles.                                                                                                                                                |
+| `namespaces`   | Per-namespace tool window sizes, allowed modes/roles, gateway mode, and optional telemetry estimates.                                                                                                  |
 | `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                            |
 | `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication). |
 | `session`      | Session TTL, cleanup interval, and handle TTL (`handleTtlSeconds`).                                                                                                                                     |
@@ -92,6 +92,8 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 | `starterPacks` | Cold-start preferences per namespace (keys must match `namespaces`).                                                                                                                                    |
 
 The authoritative Zod schemas live in [`src/config/schemas.ts`](../src/config/schemas.ts). The on-disk schema accepts omitted sections and fills defaults at load time.
+
+Each namespace policy also supports `telemetryEnabled` (default `false`). When enabled, the gateway estimates request/response bytes, latency, and token usage for tool calls in that namespace. In `code` and `compat` modes this can also appear in returned gateway telemetry fields; in `default` mode it is primarily used for router outcomes, logs, and admin-side reporting.
 
 ### Session and Code execution options
 

@@ -81,7 +81,7 @@ return { saved, count: result.count(filtered), sample: text }
 - `result.limit()` expects an array; `result.items()` and `result.text()` unwrap MCP `content[]` arrays
 - For `mcp.batch`, only combine handles that accept compatible arg shapes; use `catalog.describe` when unsure and verify the search returned enough tools before indexing
 - For large or rich payloads, prefer `result.pick`, `result.limit`, `artifacts.save`, or `JSON.parse(JSON.stringify(value))` to avoid serialization issues
-- `gateway_run_code` responses now include estimated telemetry (`latencyMs`, byte size, token estimate, and per-tool-call traces) in `structuredContent.telemetry`
+- When the namespace enables telemetry estimates, `gateway_run_code` responses include estimated telemetry (`latencyMs`, byte size, token estimate, and per-tool-call traces) in `structuredContent.telemetry`
 
 ## Configuration
 

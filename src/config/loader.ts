@@ -163,6 +163,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
           bootstrapWindowSize: 4,
           candidatePoolSize: 16,
           allowedModes: [Mode.Read, Mode.Write],
+          telemetryEnabled: false,
         },
       ])
     ),

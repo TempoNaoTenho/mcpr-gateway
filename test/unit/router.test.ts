@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExecutionRouter } from '../../src/router/router.js'
 import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.js'
-import { Mode, OutcomeClass, SessionStatus, ToolRiskLevel } from '../../src/types/enums.js'
+import { GatewayMode, Mode, OutcomeClass, SessionStatus, ToolRiskLevel } from '../../src/types/enums.js'
 import { SessionIdSchema } from '../../src/types/identity.js'
 import { SourceTrustLevel } from '../../src/types/enums.js'
 import type { SessionState } from '../../src/types/session.js'
@@ -15,6 +15,14 @@ import {
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
+import { setConfig } from '../../src/config/index.js'
+import {
+  defaultDebug,
+  defaultResilience,
+  defaultSelector,
+  defaultSession,
+  defaultTriggers,
+} from '../fixtures/bootstrap-json.js'
 
 function makeTool(name: string, serverId: string): VisibleTool {
   return {
@@ -59,6 +67,44 @@ function makeServer(id: string): DownstreamServer {
 
 describe('ExecutionRouter', () => {
   let disposeStore: (() => void) | undefined
+  beforeEach(() => {
+    setConfig({
+      servers: [],
+      auth: { mode: 'static_key' },
+      namespaces: {
+        gmail: {
+          allowedRoles: ['user'],
+          bootstrapWindowSize: 4,
+          candidatePoolSize: 16,
+          allowedModes: [Mode.Read, Mode.Write],
+          gatewayMode: GatewayMode.Compat,
+          telemetryEnabled: false,
+          disabledTools: [],
+        },
+      },
+      roles: {
+        user: {
+          allowNamespaces: ['gmail'],
+        },
+      },
+      selector: defaultSelector,
+      session: defaultSession,
+      triggers: defaultTriggers,
+      resilience: defaultResilience,
+      debug: defaultDebug,
+      starterPacks: {},
+      allowedOAuthProviders: [],
+      codeMode: {
+        memoryLimitMb: 128,
+        executionTimeoutMs: 10_000,
+        maxToolCallsPerExecution: 20,
+        maxResultSizeBytes: 1_048_576,
+        artifactStoreTtlSeconds: 300,
+        maxConcurrentToolCalls: 5,
+      },
+    })
+  })
+
   afterEach(() => {
     disposeStore?.()
     disposeStore = undefined
@@ -184,6 +230,93 @@ describe('ExecutionRouter', () => {
       servers: [{ serverId: 'docs' }, { serverId: 'gmail-primary' }],
     })
     expect(registry.getServer).not.toHaveBeenCalled()
+  })
+
+  it('omits telemetry when the namespace toggle is disabled', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const session = makeSession([makeTool(GATEWAY_LIST_SERVERS_TOOL_NAME, GATEWAY_SERVER_ID)])
+    await store.set(session.id, session)
+
+    const registry = {
+      getServer: vi.fn(),
+      getToolsByNamespace: vi.fn(() => [
+        { server: makeServer('gmail-primary'), records: [makeTool('read_email', 'gmail-primary')] },
+      ]),
+    }
+
+    const router = new ExecutionRouter(registry as never, store)
+    const outcome = await router.route(GATEWAY_LIST_SERVERS_TOOL_NAME, {}, session.id)
+
+    expect(outcome.outcome).toBe(OutcomeClass.Success)
+    expect(outcome.telemetry).toBeUndefined()
+  })
+
+  it('returns telemetry when the namespace toggle is enabled', async () => {
+    setConfig({
+      servers: [],
+      auth: { mode: 'static_key' },
+      namespaces: {
+        gmail: {
+          allowedRoles: ['user'],
+          bootstrapWindowSize: 4,
+          candidatePoolSize: 16,
+          allowedModes: [Mode.Read, Mode.Write],
+          gatewayMode: GatewayMode.Compat,
+          telemetryEnabled: true,
+          disabledTools: [],
+        },
+      },
+      roles: {
+        user: {
+          allowNamespaces: ['gmail'],
+        },
+      },
+      selector: defaultSelector,
+      session: defaultSession,
+      triggers: defaultTriggers,
+      resilience: defaultResilience,
+      debug: defaultDebug,
+      starterPacks: {},
+      allowedOAuthProviders: [],
+      codeMode: {
+        memoryLimitMb: 128,
+        executionTimeoutMs: 10_000,
+        maxToolCallsPerExecution: 20,
+        maxResultSizeBytes: 1_048_576,
+        artifactStoreTtlSeconds: 300,
+        maxConcurrentToolCalls: 5,
+      },
+    })
+
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const session = makeSession([makeTool(GATEWAY_LIST_SERVERS_TOOL_NAME, GATEWAY_SERVER_ID)])
+    await store.set(session.id, session)
+
+    const registry = {
+      getServer: vi.fn(),
+      getToolsByNamespace: vi.fn(() => [
+        { server: makeServer('gmail-primary'), records: [makeTool('read_email', 'gmail-primary')] },
+      ]),
+    }
+
+    const router = new ExecutionRouter(registry as never, store)
+    const outcome = await router.route(GATEWAY_LIST_SERVERS_TOOL_NAME, {}, session.id)
+
+    expect(outcome.outcome).toBe(OutcomeClass.Success)
+    expect(outcome.telemetry).toEqual(
+      expect.objectContaining({
+        latencyMs: expect.any(Number),
+        totalTokensEstimate: expect.any(Number),
+      }),
+    )
   })
 
   it('rejects gateway meta-tools when they are not visible in the session window', async () => {

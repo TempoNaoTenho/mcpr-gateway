@@ -50,7 +50,7 @@ gateway_search_and_call_tool({
   query: string,
   match: { name: string, serverId: string, description?: string },
   result: unknown,
-  telemetry: {
+  telemetry?: {
     search: { latencyMs: number, totalTokensEstimate: number, ... },
     call: { toolName: string, serverId: string, latencyMs: number, totalTokensEstimate: number, ... },
     totalLatencyMs: number,
@@ -59,7 +59,7 @@ gateway_search_and_call_tool({
 }
 ```
 
-Use this when "best ranked match is good enough". If the task needs explicit tool review or retry logic, keep the two-step `gateway_search_tools` → `gateway_call_tool` flow.
+Use this when "best ranked match is good enough". If the task needs explicit tool review or retry logic, keep the two-step `gateway_search_tools` → `gateway_call_tool` flow. The `telemetry` block is only included when the namespace enables telemetry estimates.
 
 ### `gateway_list_servers`
 

@@ -52,6 +52,7 @@ function validGatewayBase() {
         bootstrapWindowSize: 4,
         candidatePoolSize: 16,
         allowedModes: ['read' as const],
+        telemetryEnabled: false,
       },
     },
     roles: {
@@ -305,6 +306,40 @@ describe('loadConfig — valid config', () => {
     writeValidConfig()
     const config = loadConfig(TMP)
     expect(config.namespaces['test'].disabledTools).toEqual([])
+  })
+
+  it('defaults telemetryEnabled to false when omitted from namespace policy', () => {
+    const base = validGatewayBase()
+    writeGatewayJson(TMP, {
+      ...base,
+      namespaces: {
+        test: {
+          allowedRoles: ['user'],
+          bootstrapWindowSize: 4,
+          candidatePoolSize: 16,
+          allowedModes: ['read'],
+        },
+      },
+    })
+
+    const config = loadConfig(TMP)
+    expect(config.namespaces['test'].telemetryEnabled).toBe(false)
+  })
+
+  it('loads telemetryEnabled when present on namespace policy', () => {
+    const base = validGatewayBase()
+    writeGatewayJson(TMP, {
+      ...base,
+      namespaces: {
+        test: {
+          ...base.namespaces.test,
+          telemetryEnabled: true,
+        },
+      },
+    })
+
+    const config = loadConfig(TMP)
+    expect(config.namespaces['test'].telemetryEnabled).toBe(true)
   })
 
   it('loads disabledTools when present on namespace policy', () => {

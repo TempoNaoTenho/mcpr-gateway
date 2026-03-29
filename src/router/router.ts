@@ -87,6 +87,10 @@ function isToolVisible(
   return toolWindow.some((tool) => tool.name === toolName && tool.serverId === serverId)
 }
 
+function isTelemetryEnabledForNamespace(namespace: string): boolean {
+  return getConfig().namespaces[namespace]?.telemetryEnabled === true
+}
+
 export class ExecutionRouter implements IExecutionRouter {
   constructor(
     private readonly registry: IRegistryAdapter,
@@ -191,7 +195,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result,
-        telemetry: buildToolCallTelemetry(args, result, 0),
+        ...(isTelemetryEnabledForNamespace(session.namespace)
+          ? { telemetry: buildToolCallTelemetry(args, result, 0) }
+          : {}),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -223,7 +229,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result,
-        telemetry: buildToolCallTelemetry(args, result, 0),
+        ...(isTelemetryEnabledForNamespace(session.namespace)
+          ? { telemetry: buildToolCallTelemetry(args, result, 0) }
+          : {}),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -263,7 +271,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result: executeCodeModeHelp(topic, gatewayMode),
-        telemetry: buildToolCallTelemetry(args, executeCodeModeHelp(topic, gatewayMode), 0),
+        ...(isTelemetryEnabledForNamespace(session.namespace)
+          ? { telemetry: buildToolCallTelemetry(args, executeCodeModeHelp(topic, gatewayMode), 0) }
+          : {}),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -394,6 +404,7 @@ export class ExecutionRouter implements IExecutionRouter {
     rateLimiter: RateLimiter | undefined
   ): Promise<ExecutionOutcome> {
     const parsed = parseGatewaySearchAndCallArgs(args)
+    const telemetryEnabled = isTelemetryEnabledForNamespace(session.namespace)
     if ('error' in parsed) {
       return {
         toolName: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
@@ -401,7 +412,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.ToolError,
         error: parsed.error,
-        telemetry: buildToolCallTelemetry(args, { error: parsed.error }, 0),
+        ...(telemetryEnabled
+          ? { telemetry: buildToolCallTelemetry(args, { error: parsed.error }, 0) }
+          : {}),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -440,7 +453,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.ToolError,
         error,
-        telemetry: buildToolCallTelemetry(args, { error, result }, searchLatencyMs),
+        ...(telemetryEnabled
+          ? { telemetry: buildToolCallTelemetry(args, { error, result }, searchLatencyMs) }
+          : {}),
         durationMs: searchLatencyMs,
         timestamp: new Date().toISOString(),
       }
@@ -455,7 +470,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.ToolError,
         error,
-        telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs),
+        ...(telemetryEnabled
+          ? { telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs) }
+          : {}),
         durationMs: searchLatencyMs,
         timestamp: new Date().toISOString(),
       }
@@ -470,7 +487,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.UnavailableDownstream,
         error,
-        telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs),
+        ...(telemetryEnabled
+          ? { telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs) }
+          : {}),
         durationMs: searchLatencyMs,
         timestamp: new Date().toISOString(),
       }
@@ -498,19 +517,23 @@ export class ExecutionRouter implements IExecutionRouter {
         description: typeof match.description === 'string' ? match.description : undefined,
       },
       result: callOutcome.result,
-      telemetry: {
-        search: searchTelemetry,
-        call: {
-          toolName: match.name,
-          serverId: match.serverId,
-          outcome: callOutcome.outcome,
-          ...(callOutcome.telemetry ??
-            buildToolCallTelemetry(parsed.arguments, callOutcome.result, callOutcome.durationMs)),
-        },
-        totalLatencyMs: searchLatencyMs + callOutcome.durationMs,
-        totalTokensEstimate:
-          searchTelemetry.totalTokensEstimate + (callOutcome.telemetry?.totalTokensEstimate ?? 0),
-      },
+      ...(telemetryEnabled
+        ? {
+            telemetry: {
+              search: searchTelemetry,
+              call: {
+                toolName: match.name,
+                serverId: match.serverId,
+                outcome: callOutcome.outcome,
+                ...(callOutcome.telemetry ??
+                  buildToolCallTelemetry(parsed.arguments, callOutcome.result, callOutcome.durationMs)),
+              },
+              totalLatencyMs: searchLatencyMs + callOutcome.durationMs,
+              totalTokensEstimate:
+                searchTelemetry.totalTokensEstimate + (callOutcome.telemetry?.totalTokensEstimate ?? 0),
+            },
+          }
+        : {}),
     }
 
     return {
@@ -519,7 +542,15 @@ export class ExecutionRouter implements IExecutionRouter {
       sessionId,
       outcome: OutcomeClass.Success,
       result: combinedResult,
-      telemetry: buildToolCallTelemetry(args, combinedResult, searchLatencyMs + callOutcome.durationMs),
+      ...(telemetryEnabled
+        ? {
+            telemetry: buildToolCallTelemetry(
+              args,
+              combinedResult,
+              searchLatencyMs + callOutcome.durationMs
+            ),
+          }
+        : {}),
       durationMs: searchLatencyMs + callOutcome.durationMs,
       timestamp: new Date().toISOString(),
     }
@@ -618,6 +649,7 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     try {
+      const telemetryEnabled = isTelemetryEnabledForNamespace(session.namespace)
       const toolCalls: ToolCallTrace[] = []
       const result = await executeCodeMode(
         parsed.code,
@@ -637,21 +669,23 @@ export class ExecutionRouter implements IExecutionRouter {
             sessionId,
             rateLimiter
           )
-          const telemetry =
-            outcome.telemetry ??
-            buildToolCallTelemetry(
-              toolArgs,
-              outcome.outcome === OutcomeClass.Success
-                ? outcome.result
-                : { error: outcome.error ?? outcome.outcome },
-              outcome.durationMs
-            )
-          toolCalls.push({
-            toolName: name,
-            serverId,
-            outcome: outcome.outcome,
-            ...telemetry,
-          })
+          if (telemetryEnabled) {
+            const telemetry =
+              outcome.telemetry ??
+              buildToolCallTelemetry(
+                toolArgs,
+                outcome.outcome === OutcomeClass.Success
+                  ? outcome.result
+                  : { error: outcome.error ?? outcome.outcome },
+                outcome.durationMs
+              )
+            toolCalls.push({
+              toolName: name,
+              serverId,
+              outcome: outcome.outcome,
+              ...telemetry,
+            })
+          }
           if (outcome.outcome !== OutcomeClass.Success) {
             throw new Error(outcome.error ?? outcome.outcome)
           }
@@ -661,14 +695,18 @@ export class ExecutionRouter implements IExecutionRouter {
       )
 
       const durationMs = Date.now() - startTime
-      const runtimeTelemetry: ToolCallTelemetry & { toolCalls: ToolCallTrace[] } = {
-        ...buildToolCallTelemetry({ code: parsed.code }, result, durationMs),
-        toolCalls,
-      }
-      const enrichedResult =
-        result && typeof result === 'object' && !Array.isArray(result)
+      const runtimeTelemetry: (ToolCallTelemetry & { toolCalls: ToolCallTrace[] }) | undefined =
+        telemetryEnabled
+          ? {
+              ...buildToolCallTelemetry({ code: parsed.code }, result, durationMs),
+              toolCalls,
+            }
+          : undefined
+      const enrichedResult = runtimeTelemetry
+        ? result && typeof result === 'object' && !Array.isArray(result)
           ? { ...(result as Record<string, unknown>), telemetry: runtimeTelemetry }
           : { value: result, telemetry: runtimeTelemetry }
+        : result
       this.log?.info(
         {
           sessionId,
@@ -677,8 +715,12 @@ export class ExecutionRouter implements IExecutionRouter {
           toolName: GATEWAY_RUN_CODE_TOOL_NAME,
           latencyMs: durationMs,
           resultBytes: codeBytes(JSON.stringify(enrichedResult) ?? 'null'),
-          totalTokensEstimate: runtimeTelemetry.totalTokensEstimate,
-          toolCallCount: toolCalls.length,
+          ...(runtimeTelemetry
+            ? {
+                totalTokensEstimate: runtimeTelemetry.totalTokensEstimate,
+                toolCallCount: toolCalls.length,
+              }
+            : {}),
           storedAsArtifact:
             !!enrichedResult &&
             typeof enrichedResult === 'object' &&
@@ -693,7 +735,7 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result: enrichedResult,
-        telemetry: runtimeTelemetry,
+        ...(runtimeTelemetry ? { telemetry: runtimeTelemetry } : {}),
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -716,7 +758,15 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.ToolError,
         error: error instanceof Error ? error.message : String(error),
-        telemetry: buildToolCallTelemetry({ code: parsed.code }, { error: error instanceof Error ? error.message : String(error) }, durationMs),
+        ...(isTelemetryEnabledForNamespace(session.namespace)
+          ? {
+              telemetry: buildToolCallTelemetry(
+                { code: parsed.code },
+                { error: error instanceof Error ? error.message : String(error) },
+                durationMs
+              ),
+            }
+          : {}),
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -735,6 +785,7 @@ export class ExecutionRouter implements IExecutionRouter {
     sessionId: SessionId,
     rateLimiter: RateLimiter | undefined
   ): Promise<ExecutionOutcome> {
+    const telemetryEnabled = isTelemetryEnabledForNamespace(session.namespace)
     // Health check — fail-closed
     if (this.healthMonitor) {
       const healthState = this.healthMonitor.getState(server.id)
@@ -854,7 +905,9 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: outcomeClass,
         error: errMsg,
-        telemetry: buildToolCallTelemetry(args, { error: errMsg }, durationMs),
+        ...(telemetryEnabled
+          ? { telemetry: buildToolCallTelemetry(args, { error: errMsg }, durationMs) }
+          : {}),
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -876,11 +929,15 @@ export class ExecutionRouter implements IExecutionRouter {
       serverId: server.id,
       sessionId,
       outcome: outcomeClass,
-      telemetry: buildToolCallTelemetry(
-        args,
-        outcomeClass === OutcomeClass.Success ? callResult.result : { error: downstreamErr },
-        durationMs
-      ),
+      ...(telemetryEnabled
+        ? {
+            telemetry: buildToolCallTelemetry(
+              args,
+              outcomeClass === OutcomeClass.Success ? callResult.result : { error: downstreamErr },
+              durationMs
+            ),
+          }
+        : {}),
       durationMs,
       timestamp: new Date().toISOString(),
       ...(outcomeClass === OutcomeClass.Success

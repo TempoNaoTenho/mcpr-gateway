@@ -104,11 +104,11 @@
 
 ## Operating Modes
 
-| Mode        | Tool Window                                                | Best For                               |
-| ----------- | ---------------------------------------------------------- | -------------------------------------- |
-| **Code**    | 2 tools: `gateway_run_code` + `gateway_help`               | Auto orchestration in a JS sandbox     |
-| **Compat**  | 2 meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large tool sets, minimal context usage |
-| **Default** | All enabled downstream tools, filtered by namespace        | Full transparency, small tool sets     |
+| Mode        | Tool Window                                         | Best For                               |
+| ----------- | --------------------------------------------------- | -------------------------------------- |
+| **Code**    | 2 tools only                                        | Auto orchestration in a JS sandbox     |
+| **Compat**  | 4 meta-tools                                        | Large tool sets, minimal context usage |
+| **Default** | All enabled downstream tools, filtered by namespace | Full transparency, small tool sets     |
 
 **Go to [Benchmarking](#-benchmarking) for current token-usage comparison details.**
 
@@ -378,18 +378,18 @@ npm run benchmark -- real --namespaces name_space1, name_space_2, ...
 
 `~10 common dev mcp servers` with `~30 tools total` (context7, tavily, etc)
 
-| Mode    | Retrieval recall@3 | MRR | E2E Success | Avg Tokens Loaded in Context |
-| ------- | ------------------ | --- | ----------- | ---------------------------- |
-| code    | 1                  | 1   | 1           | 703.2                        |
-| default | 1                  | 1   | 1           | 9138.2                       |
+| Mode    | Retrieval recall@3 | MRR | E2E Success | Avg Tokens Loaded in Context | Reduction % |
+| ------- | ------------------ | --- | ----------- | ---------------------------- | ----------- |
+| code    | 1                  | 1   | 1           | 703.2                        | ~92%        |
+| default | 1                  | 1   | 1           | 9138.2                       | 0%          |
 
 **Scenario: real-usage on MCP Client**
 
-| Mode                 | Total full execution tokens (approx.) | Approx. wall time                                                                                |
-| -------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| mcpr-gateway-code    | ~15,600                               | ~16 s (sandbox reported 13,875 ms inside the main run)                                           |
-| mcpr-gateway-compat  | ~32,000–38,000                        | ~35–50 s (many steps; gateway_search_tools answers are very large, often repeating long schemas) |
-| mcpr-gateway-default | ~14,500–15,500                        | ~20–30 s (six direct tool calls, no compat search preamble)                                      |
+| Mode    | Tool invocations | Σ totalTokensEstimate | Σ HTTP responseTime (ms) |
+| ------- | ---------------- | --------------------- | ------------------------ |
+| code    | 3                | 2309                  | 11051.31                 |
+| compat  | 7                | 4470                  | 6707.00                  |
+| default | 4                | 3338                  | 9369.15                  |
 
 ### 📝 To-do
 

@@ -65,9 +65,17 @@ export const DownstreamServerSchema = z.preprocess(
   (data) => {
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       const d = data as Record<string, unknown>
-      if (typeof d['namespace'] === 'string' && !Array.isArray(d['namespaces'])) {
-        const { namespace, ...rest } = d
-        return { ...rest, namespaces: [namespace] }
+      const legacyNs = typeof d['namespace'] === 'string' ? d['namespace'] : undefined
+      const rawNs = d['namespaces']
+      const nsMissingOrEmpty =
+        !Array.isArray(rawNs) || (Array.isArray(rawNs) && rawNs.length === 0)
+      if (legacyNs !== undefined && nsMissingOrEmpty) {
+        const rest = { ...d }
+        delete rest['namespace']
+        return { ...rest, namespaces: [legacyNs] }
+      }
+      if (Array.isArray(rawNs) && rawNs.length === 0) {
+        return { ...d, namespaces: ['default'] }
       }
     }
     return data
