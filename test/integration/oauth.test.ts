@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +19,7 @@ import {
   defaultTriggers,
 } from '../fixtures/bootstrap-json.js'
 import type { FastifyInstance } from 'fastify'
+import { resetInboundIssuerMetadataCache } from '../../src/auth/oauth-issuer-metadata.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_oauth_integration__')
@@ -48,6 +49,12 @@ let app: FastifyInstance
 let disposeSessionBackend: () => void
 let registry: DownstreamRegistry
 let oauthConfigSnapshot: ReturnType<typeof initConfig>
+
+afterEach(() => {
+  resetInboundIssuerMetadataCache()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 beforeAll(async () => {
   mkdirSync(TMP, { recursive: true })
@@ -95,6 +102,82 @@ afterAll(async () => {
 })
 
 describe('RFC 9728 metadata (oauth mode)', () => {
+  it('exposes authorization-server and openid metadata aliases used by remote MCP clients', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL) => {
+        const value = String(url)
+        if (value === 'https://issuer.oauth.test/.well-known/oauth-authorization-server') {
+          return new Response(
+            JSON.stringify({
+              issuer: 'https://issuer.oauth.test',
+              authorization_endpoint: 'https://issuer.oauth.test/oauth2/authorize',
+              token_endpoint: 'https://issuer.oauth.test/oauth2/token',
+              jwks_uri: 'https://issuer.oauth.test/oauth2/jwks',
+              response_types_supported: ['code'],
+            }),
+            { status: 200 },
+          )
+        }
+        if (value === 'https://issuer.oauth.test/.well-known/openid-configuration') {
+          return new Response(
+            JSON.stringify({
+              issuer: 'https://issuer.oauth.test',
+              authorization_endpoint: 'https://issuer.oauth.test/oauth2/authorize',
+              token_endpoint: 'https://issuer.oauth.test/oauth2/token',
+              jwks_uri: 'https://issuer.oauth.test/oauth2/jwks',
+              response_types_supported: ['code'],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response('not found', { status: 404 })
+      }),
+    )
+
+    const authServerRes = await app.inject({
+      method: 'GET',
+      url: '/.well-known/oauth-authorization-server/mcp/gmail',
+    })
+    expect(authServerRes.statusCode).toBe(200)
+    expect(authServerRes.json()).toMatchObject({
+      issuer: 'https://issuer.oauth.test',
+      authorization_endpoint: 'https://issuer.oauth.test/oauth2/authorize',
+      token_endpoint: 'https://issuer.oauth.test/oauth2/token',
+      resource: 'https://gw.oauth.test/mcp/gmail',
+      scopes_supported: ['openid'],
+    })
+
+    const authServerAltRes = await app.inject({
+      method: 'GET',
+      url: '/mcp/gmail/.well-known/oauth-authorization-server',
+    })
+    expect(authServerAltRes.statusCode).toBe(200)
+
+    const openIdNsRes = await app.inject({
+      method: 'GET',
+      url: '/.well-known/openid-configuration/mcp/gmail',
+    })
+    expect(openIdNsRes.statusCode).toBe(200)
+    expect(openIdNsRes.json()).toMatchObject({
+      issuer: 'https://issuer.oauth.test',
+      resource: 'https://gw.oauth.test/mcp/gmail',
+    })
+
+    const openIdAltRes = await app.inject({
+      method: 'GET',
+      url: '/mcp/gmail/.well-known/openid-configuration',
+    })
+    expect(openIdAltRes.statusCode).toBe(200)
+
+    const openIdGlobalRes = await app.inject({
+      method: 'GET',
+      url: '/.well-known/openid-configuration',
+    })
+    expect(openIdGlobalRes.statusCode).toBe(200)
+    expect(openIdGlobalRes.json().resource).toBeUndefined()
+  })
+
   it('returns protected resource JSON for a valid namespace', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -227,5 +310,24 @@ describe('metadata disabled for static_key', () => {
       url: '/.well-known/oauth-protected-resource/mcp/gmail',
     })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 404 for authorization-server and openid metadata aliases when inbound OAuth is off', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unexpected', { status: 200 })),
+    )
+
+    const authServerRes = await staticApp.inject({
+      method: 'GET',
+      url: '/.well-known/oauth-authorization-server/mcp/gmail',
+    })
+    expect(authServerRes.statusCode).toBe(404)
+
+    const openIdRes = await staticApp.inject({
+      method: 'GET',
+      url: '/mcp/gmail/.well-known/openid-configuration',
+    })
+    expect(openIdRes.statusCode).toBe(404)
   })
 })
