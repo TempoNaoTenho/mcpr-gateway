@@ -51,16 +51,19 @@ export class RuntimeConfigManager {
 
   async initialize(): Promise<void> {
     if (!this.options.configRepo) {
+      console.info('[runtime-config] using file/default config only (no config repository)')
       await this.applyResolvedConfig(this.effective, false)
       return
     }
 
     const persisted = await this.options.configRepo.getActive()
     if (persisted) {
+      console.info('[runtime-config] loaded persisted admin config from repository')
       await this.applyResolvedConfig(mergeWithAdminConfig(this.bootstrap, persisted), false)
       return
     }
 
+    console.info('[runtime-config] no persisted admin config found; seeding repository from current effective config')
     await this.options.configRepo.save(this.getAdminConfig(), {
       source: 'file_bootstrap',
       createdBy: 'system',
