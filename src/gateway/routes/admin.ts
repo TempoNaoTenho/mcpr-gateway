@@ -354,6 +354,50 @@ function buildAuthSummary(effectiveAuth: {
   }
 }
 
+function mergeInboundAuthPolicy(
+  current: AdminConfig['auth'],
+  requested: unknown,
+): AdminConfig['auth'] {
+  if (!isRecord(requested) || typeof requested['mode'] !== 'string') {
+    return current
+  }
+
+  const currentStaticKeys = getStaticKeysForAuth(current)
+  const hasStaticKeys = Boolean(currentStaticKeys && Object.keys(currentStaticKeys).length > 0)
+
+  if (requested['mode'] === 'static_key') {
+    return {
+      mode: 'static_key',
+      staticKeys: currentStaticKeys,
+    }
+  }
+
+  if (requested['mode'] === 'oauth') {
+    const parsed = AuthConfigSchema.parse(requested)
+    if (parsed.mode !== 'oauth') return current
+    if (hasStaticKeys) {
+      return {
+        mode: 'hybrid',
+        oauth: parsed.oauth,
+        staticKeys: currentStaticKeys,
+      }
+    }
+    return parsed
+  }
+
+  if (requested['mode'] === 'hybrid') {
+    const parsed = AuthConfigSchema.parse(requested)
+    if (parsed.mode !== 'hybrid') return current
+    return {
+      mode: 'hybrid',
+      oauth: parsed.oauth,
+      staticKeys: currentStaticKeys,
+    }
+  }
+
+  return current
+}
+
 function validateDownstreamAuthCapabilities(
   server: DownstreamServer
 ): AdminConfigValidationIssue[] {
@@ -1927,10 +1971,11 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
     app.put('/admin/config/policies', async (request, reply) => {
       const current = configManager.getAdminConfig()
       const body = request.body as Record<string, unknown>
-      const { auth: _ignoredAuth, ...policyFields } = body
+      const { auth: nextAuth, ...policyFields } = body
       const version = await configManager.saveAdminConfig(
         buildValidatedAdminConfig(configManager, {
           ...current,
+          auth: mergeInboundAuthPolicy(current.auth, nextAuth),
           ...policyFields,
         }),
         {

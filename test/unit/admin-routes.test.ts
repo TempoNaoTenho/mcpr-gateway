@@ -964,6 +964,88 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
+  it('persists inbound OAuth policy changes from PUT /admin/config/policies', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness()
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: 'https://gw.example.com',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+            allowedBrowserOrigins: ['https://chatgpt.com'],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'oauth',
+      oauth: {
+        publicBaseUrl: 'https://gw.example.com',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+        allowedBrowserOrigins: ['https://chatgpt.com'],
+      },
+    })
+
+    await app.close()
+  })
+
+  it('promotes oauth policy saves to hybrid when bearer tokens already exist', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness({
+      auth: {
+        mode: 'static_key',
+        staticKeys: {
+          existing: { userId: 'svc', roles: ['user'] },
+        },
+      },
+    })
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: 'https://gw.example.com',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'hybrid',
+      oauth: {
+        publicBaseUrl: 'https://gw.example.com',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+      },
+      staticKeys: {
+        existing: { userId: 'svc', roles: ['user'] },
+      },
+    })
+
+    await app.close()
+  })
+
   it('drops missing namespace profile references while keeping valid ones', async () => {
     const { configRepo, configManager, getCurrent } = createAdminHarness({
       roles: {

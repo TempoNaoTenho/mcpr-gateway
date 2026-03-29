@@ -233,7 +233,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-4">
           <h2 class="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">
             MCP client auth (inbound)
-            <InfoTooltip text="How browser and CLI clients authenticate to MCP HTTP routes. static_key: map Bearer tokens to roles (manage tokens under Access Control). oauth / hybrid: validate JWTs from external issuers (resource server); hybrid tries static keys first. publicBaseUrl must match what clients use; JWT audience checked is publicBaseUrl plus /mcp/ plus the namespace segment." />
+            <InfoTooltip text="How browser and CLI clients authenticate to MCP HTTP routes. static_key: map Bearer tokens to roles (manage tokens under Access Control). hybrid is the recommended compatibility mode: it keeps static Bearer tokens working and also validates JWTs from external issuers. oauth enforces JWT-only clients. publicBaseUrl must match what clients use; JWT audience checked is publicBaseUrl plus /mcp/ plus the namespace segment." />
           </h2>
           <label class="block text-sm space-y-1 max-w-md">
             <span class="text-slate-600 dark:text-slate-300">Mode</span>
@@ -242,9 +242,9 @@
               value={policies.auth.mode}
               onchange={(e) => setClientAuthMode(e.currentTarget.value as PoliciesAuthConfig['mode'])}
             >
-              <option value="static_key">static_key (Bearer token map)</option>
-              <option value="oauth">oauth (JWT / external IdP)</option>
-              <option value="hybrid">hybrid (static keys, then JWT)</option>
+              <option value="static_key">static_key (Bearer token map only)</option>
+              <option value="hybrid">hybrid (recommended: static keys, then JWT)</option>
+              <option value="oauth">oauth (JWT / external IdP only)</option>
             </select>
           </label>
 
