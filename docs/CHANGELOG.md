@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-29 - Fixed - Internal MCP tool responses now surface compatibility telemetry aliases (`tokenEstimate`, `toolCount`, `durationMs`) inside `structuredContent`, and code mode now rewrites invalid-regex sandbox syntax failures with recovery guidance; code-mode docs/help were updated accordingly
 - 2026-03-29 - Fixed - Admin saves that would leave a downstream server with `namespaces: []` (e.g. unassigning the last namespace on the Namespaces page) no longer fail Zod validation; empty lists normalize to `['default']`, matching `config/loader` behavior, and the Namespaces UI sends `['default']` in that case
 - 2026-03-29 - Fixed - With `NODE_ENV=production`, OAuth `publicBaseUrl` may use `http://` only for loopback hosts (`localhost`, `127.0.0.1`, `::1`, IPv4-mapped 127.0.0.1) so default/local URLs work; other hosts still require `https://`; `docs/CONFIGURATION.md` and `test/unit/oauth-schemas.test.ts` describe and cover this
 - 2026-03-29 - Fixed - `test/unit/health.test.ts` now initializes config before `app.ready()`; the exported gateway `app` only loads config when run as the process entrypoint, while `oauth-metadata` registers an `onReady` hook that calls `getConfig()`
