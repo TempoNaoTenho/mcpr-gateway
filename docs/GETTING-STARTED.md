@@ -26,7 +26,7 @@ Copy [`.env.example`](../.env.example) to `.env`, then replace every `change-me-
 
 `npm start` and `npm run dev` also try a one-time automatic rebuild of stale `isolated-vm` / `better-sqlite3` binaries when they detect an ABI mismatch from an older Node install. `npm run setup` remains an optional local convenience helper when you want guided editing of env vars or to create `config/bootstrap.json` (advanced / GitOps). You do **not** need `bootstrap.json` for the default flow: the gateway starts without it using built-in defaults and **no downstream servers** (see [Configuration](CONFIGURATION.md#missing-file)); runtime config then lives in SQLite and the Web UI.
 
-For anything beyond local experimentation, use **`static_key`** auth (the only supported bootstrap mode). Add client access tokens in the **admin UI** (Access Control) after setting `ADMIN_TOKEN` and signing in with `GATEWAY_ADMIN_USER` / `GATEWAY_ADMIN_PASSWORD`.
+By default, a fresh install starts in **`hybrid`** client-auth mode with bearer tokens available immediately and inbound OAuth left passive until you configure an issuer in the admin UI. That keeps simple MCP clients working while making web-client OAuth a first-class setup path instead of a separate mode switch.
 
 For Docker Compose, the required variables (`ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, `DOWNSTREAM_AUTH_ENCRYPTION_KEY`) must be present in the host environment or passed via `docker compose --env-file .env ...`. Use an explicit env file or export the variables in your shell before `docker compose up`.
 

@@ -56,8 +56,8 @@ Session TTL and cleanup interval come from `session` in config ([`GatewayConfigF
 
 ## Configuration split
 
-- **Bootstrap file** `CONFIG_PATH/bootstrap.json` — Always loaded; **`auth` always originates here** (or defaults when the file is absent). After first startup with SQLite, changes to this file are ignored (except for `auth` which is always merged from the file).
-- **Runtime / admin slice** — When the admin UI is available, servers and policy sections (except `auth`) can be updated via the admin API / UI. Persistence goes to SQLite when configured, otherwise it rewrites `CONFIG_PATH/bootstrap.json`. See [Configuration — Config persistence](CONFIGURATION.md#config-persistence).
+- **Bootstrap file** `CONFIG_PATH/bootstrap.json` — Optional seed input. When absent, the gateway starts with built-in defaults, no downstream servers, and the default `hybrid` auth draft.
+- **Runtime / admin slice** — The admin API / UI can manage the active auth, servers, and policy sections. Persistence goes to SQLite when configured, otherwise it rewrites `CONFIG_PATH/bootstrap.json`. See [Configuration — Config persistence](CONFIGURATION.md#config-persistence).
 
 ## Tool metadata: toolcards vs client-facing projection
 
