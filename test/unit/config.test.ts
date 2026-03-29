@@ -134,6 +134,27 @@ describe('loadConfig — valid config', () => {
     ])
   })
 
+  it('merges legacy persisted admin config with auth.staticKeys but no auth.mode', () => {
+    const base = validGatewayBase()
+    const adminConfig = {
+      ...base,
+      auth: {
+        staticKeys: {
+          legacyToken: { userId: 'legacy-user', roles: ['user'] },
+        },
+      },
+    } as unknown as AdminConfig
+
+    const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
+
+    expect(merged.auth).toEqual({
+      mode: 'static_key',
+      staticKeys: {
+        legacyToken: { userId: 'legacy-user', roles: ['user'] },
+      },
+    })
+  })
+
   it('backfills missing healthchecks for legacy persisted servers', () => {
     const base = validGatewayBase()
     const adminConfig = {

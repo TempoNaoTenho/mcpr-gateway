@@ -62,8 +62,35 @@ export function mergeWithAdminConfig(_base: BootstrapConfig, override: AdminConf
   return normalizeGatewayConfig(override as GatewayConfig)
 }
 
+function migrateLegacyGatewayConfig(config: GatewayConfig): GatewayConfig {
+  const auth = config?.auth
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) {
+    return config
+  }
+
+  if ('mode' in auth) {
+    return config
+  }
+
+  if ('staticKeys' in auth) {
+    const legacyStaticKeys = (auth as { staticKeys?: unknown }).staticKeys
+    return {
+      ...config,
+      auth: {
+        mode: 'static_key',
+        staticKeys: legacyStaticKeys as Extract<AuthConfig, { mode: 'static_key' }>['staticKeys'],
+      },
+    }
+  }
+
+  return {
+    ...config,
+    auth: { mode: 'static_key' },
+  }
+}
+
 export function normalizeGatewayConfig(config: GatewayConfig): GatewayConfig {
-  return applyServerDefaults(GatewayConfigFileSchema.parse(config))
+  return applyServerDefaults(GatewayConfigFileSchema.parse(migrateLegacyGatewayConfig(config)))
 }
 
 function interpolateEnvVars(raw: string): string {
