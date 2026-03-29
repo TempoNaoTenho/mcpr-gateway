@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { DownstreamServerSchema } from '../types/server.js'
 import { GatewayMode, Mode, ToolRiskLevel } from '../types/enums.js'
+import { InboundOAuthSchema } from './oauth-schemas.js'
 
 // --- bootstrap.json (servers + policies in one file) ---
 
@@ -77,18 +78,36 @@ const AuthStaticKeyEntrySchema = z.object({
 
 const AuthStaticKeysSchema = z.record(z.string().min(1), AuthStaticKeyEntrySchema)
 
-export const AuthConfigSchema = z.object({
-  mode: z.literal('static_key'),
-  staticKeys: AuthStaticKeysSchema.optional(),
-})
+export const AuthConfigSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('static_key'),
+    staticKeys: AuthStaticKeysSchema.optional(),
+  }),
+  z.object({
+    mode: z.literal('oauth'),
+    oauth: InboundOAuthSchema,
+  }),
+  z.object({
+    mode: z.literal('hybrid'),
+    staticKeys: AuthStaticKeysSchema.optional(),
+    oauth: InboundOAuthSchema,
+  }),
+])
 
 export type AuthConfig = z.infer<typeof AuthConfigSchema>
 
-export const BootstrapAuthConfigSchema = z
-  .object({
-    mode: z.literal('static_key'),
-  })
-  .strict()
+/** bootstrap.json may declare auth mode and OAuth settings; staticKeys must be managed via admin UI only. */
+export const BootstrapAuthConfigSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('static_key') }).strict(),
+  z.object({
+    mode: z.literal('oauth'),
+    oauth: InboundOAuthSchema,
+  }),
+  z.object({
+    mode: z.literal('hybrid'),
+    oauth: InboundOAuthSchema,
+  }).strict(),
+])
 
 export type BootstrapAuthConfig = z.infer<typeof BootstrapAuthConfigSchema>
 

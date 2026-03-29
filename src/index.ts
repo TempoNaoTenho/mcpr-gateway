@@ -9,6 +9,7 @@ import { RuntimeConfigManager } from './config/runtime.js'
 import { buildServer } from './gateway/server.js'
 import { healthRoutes } from './gateway/routes/health.js'
 import { mcpRoutes } from './gateway/routes/mcp.js'
+import { oauthMetadataRoutes } from './gateway/routes/oauth-metadata.js'
 import { debugRoutes } from './gateway/routes/debug.js'
 import { adminRoutes } from './gateway/routes/admin.js'
 import { uiRoutes } from './gateway/routes/ui.js'
@@ -108,6 +109,7 @@ function assertSupportedNodeRuntime(): void {
 
 if (!isStdioTransport) {
   app.register(healthRoutes, { registry })
+  app.register(oauthMetadataRoutes)
   app.register(mcpRoutes, {
     store: activeStore,
     registry,

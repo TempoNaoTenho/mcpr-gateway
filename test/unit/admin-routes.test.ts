@@ -25,10 +25,24 @@ afterEach(() => {
   rmSync(TMP, { recursive: true, force: true })
 })
 
+function mergeHarnessAuth(
+  base: AdminConfig['auth'],
+  override: AdminConfig['auth'] | undefined,
+): AdminConfig['auth'] {
+  if (override === undefined) return base
+  if ('mode' in override && override.mode !== undefined) {
+    return override
+  }
+  return { ...base, ...override } as AdminConfig['auth']
+}
+
 function createAdminHarness(initial?: Partial<AdminConfig>) {
+  const defaults = createDefaultAdminConfig(['gmail'])
+  const { auth: initialAuth, ...restInitial } = initial ?? {}
   let current: AdminConfig = {
-    ...createDefaultAdminConfig(['gmail']),
-    ...initial,
+    ...defaults,
+    ...restInitial,
+    auth: mergeHarnessAuth(defaults.auth, initialAuth as AdminConfig['auth'] | undefined),
   }
 
   const configRepo = {
@@ -47,20 +61,13 @@ function createAdminHarness(initial?: Partial<AdminConfig>) {
 
   const configManager = {
     getBootstrap() {
-      return {
-        auth: current.auth.staticKeys
-          ? { mode: 'static_key' as const, staticKeys: current.auth.staticKeys }
-          : { mode: 'static_key' as const },
-      }
+      const a = current.auth
+      if (a.mode === 'static_key') return { mode: 'static_key' as const }
+      if (a.mode === 'oauth') return { mode: 'oauth' as const, oauth: a.oauth }
+      return { mode: 'hybrid' as const, oauth: a.oauth }
     },
     getEffective() {
-      return {
-        ...current,
-        auth: {
-          ...this.getBootstrap().auth,
-          staticKeys: current.auth.staticKeys,
-        },
-      }
+      return { ...current }
     },
     getAdminConfig() {
       return current
@@ -890,6 +897,69 @@ describe('adminRoutes', () => {
       'https://issuer.example.com',
       '*.example.org',
     ])
+
+    await app.close()
+  })
+
+  it('preserves bearer tokens added after the policies form was loaded', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness({
+      auth: {
+        staticKeys: {
+          existing: { userId: 'svc', roles: ['user'] },
+        },
+      },
+    })
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const initialPoliciesRes = await app.inject({
+      method: 'GET',
+      url: '/admin/config/policies',
+    })
+
+    expect(initialPoliciesRes.statusCode).toBe(200)
+
+    const createTokenRes = await app.inject({
+      method: 'POST',
+      url: '/admin/config/auth/tokens',
+      payload: {
+        userId: 'inspector',
+        roles: ['admin'],
+        token: 'generated-later',
+      },
+    })
+
+    expect(createTokenRes.statusCode).toBe(201)
+
+    const updateRes = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        ...initialPoliciesRes.json(),
+        auth: {
+          mode: 'static_key',
+          staticKeys: {
+            existing: { userId: 'svc', roles: ['user'] },
+          },
+        },
+        allowedOAuthProviders: ['https://issuer.example.com'],
+      },
+    })
+
+    expect(updateRes.statusCode).toBe(200)
+    expect(getCurrent().allowedOAuthProviders).toEqual(['https://issuer.example.com'])
+    expect(getCurrent().auth.staticKeys?.['existing']).toEqual({
+      userId: 'svc',
+      roles: ['user'],
+    })
+    expect(getCurrent().auth.staticKeys?.['generated-later']).toEqual({
+      userId: 'inspector',
+      roles: ['admin'],
+    })
 
     await app.close()
   })

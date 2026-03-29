@@ -10,7 +10,7 @@ import type { IConfigRepository } from '../../repositories/config/interface.js'
 import type { ISessionStore } from '../../types/interfaces.js'
 import { SessionIdSchema } from '../../types/identity.js'
 import type { DownstreamRegistry } from '../../registry/registry.js'
-import { GatewayConfigFileSchema } from '../../config/schemas.js'
+import { AuthConfigSchema, GatewayConfigFileSchema } from '../../config/schemas.js'
 import {
   mergeWithAdminConfig,
   toAdminConfig,
@@ -33,6 +33,7 @@ import {
   summarizeToolEntries,
 } from '../../admin/catalog.js'
 import { getConfig } from '../../config/index.js'
+import { getStaticKeysForAuth } from '../../auth/oauth-config.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { generateToolcards } from '../../toolcard/index.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
@@ -240,9 +241,15 @@ function normalizeAdminAccessGraph(config: AdminConfig): AdminConfig {
     })
   )
 
-  const staticKeys = config.auth.staticKeys
+  const auth = config.auth
+  if (auth.mode === 'oauth') {
+    return { ...config, namespaces, auth }
+  }
+
+  const rawStatic = getStaticKeysForAuth(auth)
+  const staticKeys = rawStatic
     ? Object.fromEntries(
-        Object.entries(config.auth.staticKeys).map(([token, entry]) => {
+        Object.entries(rawStatic).map(([token, entry]) => {
           const roles = normalizeStringList(entry.roles)
           const validRoles = roles.filter((role) => knownRoles.has(role))
 
@@ -253,15 +260,24 @@ function normalizeAdminAccessGraph(config: AdminConfig): AdminConfig {
               roles: validRoles,
             },
           ]
-        })
+        }),
       )
     : undefined
+
+  if (auth.mode === 'static_key') {
+    return {
+      ...config,
+      namespaces,
+      auth: { mode: 'static_key', staticKeys },
+    }
+  }
 
   return {
     ...config,
     namespaces,
     auth: {
-      ...config.auth,
+      mode: 'hybrid',
+      oauth: auth.oauth,
       staticKeys,
     },
   }
@@ -317,12 +333,23 @@ export function deleteNamespaceFromAdminConfig(
 }
 
 function buildAuthSummary(effectiveAuth: {
-  mode: 'static_key'
+  mode: string
   staticKeys?: Record<string, { userId: string; roles: string[] }>
+  oauth?: { publicBaseUrl: string }
 }) {
+  const clientAuth =
+    effectiveAuth.mode === 'oauth'
+      ? ('oauth' as const)
+      : effectiveAuth.mode === 'hybrid'
+        ? ('hybrid' as const)
+        : ('bearer_tokens' as const)
   return {
-    clientAuth: 'bearer_tokens' as const,
+    clientAuth,
     clientTokensConfigured: Object.keys(effectiveAuth.staticKeys ?? {}).length,
+    oauthPublicBaseUrl:
+      effectiveAuth.mode === 'oauth' || effectiveAuth.mode === 'hybrid'
+        ? effectiveAuth.oauth?.publicBaseUrl
+        : undefined,
     adminTokenConfigured: Boolean(process.env['ADMIN_TOKEN']),
   }
 }
@@ -359,11 +386,10 @@ function buildValidatedAdminConfig(
   const effectiveAuth = configManager.getEffective().auth
   const parsed = GatewayConfigFileSchema.parse({
     ...nextRecord,
-    auth: {
-      ...effectiveAuth,
-      ...nextAuth,
-      mode: configManager.getBootstrap().auth.mode,
-    },
+    auth: AuthConfigSchema.parse({
+      ...(effectiveAuth as Record<string, unknown>),
+      ...(nextAuth as Record<string, unknown>),
+    }),
   })
   const merged = mergeWithAdminConfig(configManager.getBootstrap(), {
     ...configManager.getAdminConfig(),
@@ -1318,7 +1344,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       return reply.send({
         config: configManager.getAdminConfig(),
         auth: {
-          ...configManager.getBootstrap().auth,
+          mode: effectiveAuth.mode,
           summary: buildAuthSummary(effectiveAuth),
         },
         source: persisted ? 'db' : 'file',
@@ -1329,7 +1355,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       const effectiveAuth = configManager.getEffective().auth
       return reply.send({
         summary: buildAuthSummary(effectiveAuth),
-        tokens: Object.entries(effectiveAuth.staticKeys ?? {}).map(([token, entry]) => ({
+        tokens: Object.entries(getStaticKeysForAuth(effectiveAuth) ?? {}).map(([token, entry]) => ({
           token,
           userId: entry.userId,
           roles: entry.roles,
@@ -1356,22 +1382,33 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       const requestedToken = trimToUndefined(body['token'])
       const token = requestedToken ?? nanoid(40)
       const current = configManager.getAdminConfig()
-      const existingStaticKeys = current.auth.staticKeys ?? {}
+      if (current.auth.mode === 'oauth') {
+        return reply
+          .status(400)
+          .send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
+      }
+      const existingStaticKeys = getStaticKeysForAuth(current.auth) ?? {}
       if (existingStaticKeys[token]) {
         return reply.status(409).send({ error: 'Token already exists' })
       }
 
+      const a = current.auth
+      const nextAuth =
+        a.mode === 'static_key'
+          ? {
+              mode: 'static_key' as const,
+              staticKeys: { ...existingStaticKeys, [token]: { userId, roles } },
+            }
+          : {
+              mode: 'hybrid' as const,
+              oauth: a.oauth,
+              staticKeys: { ...existingStaticKeys, [token]: { userId, roles } },
+            }
       const nextConfig = buildValidatedAdminConfig(configManager, {
         ...current,
-        auth: {
-          ...current.auth,
-          staticKeys: {
-            ...existingStaticKeys,
-            [token]: { userId, roles },
-          },
-        },
+        auth: nextAuth,
       })
-      const persistedEntry = nextConfig.auth.staticKeys?.[token]
+      const persistedEntry = getStaticKeysForAuth(nextConfig.auth)?.[token]
       const version = await configManager.saveAdminConfig(nextConfig, {
         source: 'ui_edit',
         createdBy: (request.headers['x-user-id'] as string | undefined) ?? 'admin',
@@ -1386,7 +1423,10 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       async (request, reply) => {
         const token = request.params.token
         const current = configManager.getAdminConfig()
-        const existing = current.auth.staticKeys?.[token]
+        if (current.auth.mode === 'oauth') {
+          return reply.status(400).send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
+        }
+        const existing = getStaticKeysForAuth(current.auth)?.[token]
         if (!existing) {
           return reply.status(404).send({ error: 'Token not found' })
         }
@@ -1402,17 +1442,17 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
           return reply.status(400).send({ error: 'at least one role is required' })
         }
 
+        const a = current.auth
+        const baseKeys = { ...(getStaticKeysForAuth(a) ?? {}), [token]: { userId, roles } }
+        const nextAuth =
+          a.mode === 'static_key'
+            ? { mode: 'static_key' as const, staticKeys: baseKeys }
+            : { mode: 'hybrid' as const, oauth: a.oauth, staticKeys: baseKeys }
         const nextConfig = buildValidatedAdminConfig(configManager, {
           ...current,
-          auth: {
-            ...current.auth,
-            staticKeys: {
-              ...(current.auth.staticKeys ?? {}),
-              [token]: { userId, roles },
-            },
-          },
+          auth: nextAuth,
         })
-        const persistedEntry = nextConfig.auth.staticKeys?.[token]
+        const persistedEntry = getStaticKeysForAuth(nextConfig.auth)?.[token]
         const version = await configManager.saveAdminConfig(nextConfig, {
           source: 'ui_edit',
           createdBy: (request.headers['x-user-id'] as string | undefined) ?? 'admin',
@@ -1428,19 +1468,25 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       async (request, reply) => {
         const token = request.params.token
         const current = configManager.getAdminConfig()
-        const existingStaticKeys = { ...(current.auth.staticKeys ?? {}) }
+        if (current.auth.mode === 'oauth') {
+          return reply.status(400).send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
+        }
+        const existingStaticKeys = { ...(getStaticKeysForAuth(current.auth) ?? {}) }
         if (!existingStaticKeys[token]) {
           return reply.status(404).send({ error: 'Token not found' })
         }
         delete existingStaticKeys[token]
 
+        const a = current.auth
+        const nextAuthDel =
+          a.mode === 'static_key'
+            ? { mode: 'static_key' as const, staticKeys: existingStaticKeys }
+            : { mode: 'hybrid' as const, oauth: a.oauth, staticKeys: existingStaticKeys }
+
         const version = await configManager.saveAdminConfig(
           buildValidatedAdminConfig(configManager, {
             ...current,
-            auth: {
-              ...current.auth,
-              staticKeys: existingStaticKeys,
-            },
+            auth: nextAuthDel,
           }),
           {
             source: 'ui_edit',
@@ -1880,10 +1926,8 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
 
     app.put('/admin/config/policies', async (request, reply) => {
       const current = configManager.getAdminConfig()
-      // Strip `auth` from the body: token management has dedicated endpoints.
-      // Allowing auth to be overwritten here would cause tokens created after
-      // page load to disappear when "Save Access Policy" is clicked.
-      const { auth: _ignored, ...policyFields } = request.body as Record<string, unknown>
+      const body = request.body as Record<string, unknown>
+      const { auth: _ignoredAuth, ...policyFields } = body
       const version = await configManager.saveAdminConfig(
         buildValidatedAdminConfig(configManager, {
           ...current,

@@ -8,6 +8,26 @@ import { logRequest } from '../../observability/structured-log.js'
 import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
 import { assertMcpProtocolVersionMatches } from '../mcp-protocol-version.js'
+import { assertMcpSessionOAuthBearer } from '../../auth/mcp-identity.js'
+import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
+
+function oauthChallengeError(
+  code: 'OAUTH_AUTHENTICATION_REQUIRED' | 'OAUTH_INVALID_TOKEN',
+  namespace: string,
+): GatewayError {
+  const oauth = getInboundOAuth(getConfig().auth)
+  if (!oauth) {
+    return new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+  }
+  const challenge =
+    code === GatewayErrorCode.OAUTH_INVALID_TOKEN
+      ? buildOAuthChallenge(oauth, namespace, 'invalid_token')
+      : buildOAuthChallenge(oauth, namespace)
+  return new GatewayError(code, undefined, undefined, {
+    'WWW-Authenticate': challenge.wwwAuthenticate,
+  })
+}
 
 export async function handleToolsList(
   ctx: McpHandlerContext,
@@ -30,6 +50,21 @@ export async function handleToolsList(
     throw new GatewayError(GatewayErrorCode.SESSION_NOT_FOUND)
   }
 
+  const nsKeys = new Set(Object.keys(getConfig().namespaces))
+  const check = await assertMcpSessionOAuthBearer(
+    ctx.authorization,
+    getConfig().auth,
+    namespace,
+    session.userId,
+    nsKeys,
+  )
+  if (check === 'oauth_required') {
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, namespace)
+  }
+  if (check === 'oauth_invalid' || check === 'session_mismatch') {
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_INVALID_TOKEN, namespace)
+  }
+
   assertMcpProtocolVersionMatches(session, ctx.mcpProtocolVersionHeader)
 
   const startMs = Date.now()
@@ -44,18 +79,21 @@ export async function handleToolsList(
     ctx.setToolsListChangedHeader?.(pendingToolListChange)
   }
 
-  const tools = session.toolWindow.length > 0
-    ? projectWindow(session.toolWindow, getConfig().selector)
-    : []
+  const tools =
+    session.toolWindow.length > 0 ? projectWindow(session.toolWindow, getConfig().selector) : []
 
-  logRequest(ctx.log, {
-    requestId: ctx.requestId,
-    sessionId,
-    namespace,
-    method: 'tools/list',
-    userId: session.userId,
-    latencyMs: Date.now() - startMs,
-  }, 'tools listed')
+  logRequest(
+    ctx.log,
+    {
+      requestId: ctx.requestId,
+      sessionId,
+      namespace,
+      method: 'tools/list',
+      userId: session.userId,
+      latencyMs: Date.now() - startMs,
+    },
+    'tools listed',
+  )
 
   return {
     jsonrpc: '2.0',

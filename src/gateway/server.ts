@@ -11,6 +11,7 @@ export function buildServer(opts?: { logLevel?: string }): FastifyInstance {
   const app = Fastify({
     logger: { level: opts?.logLevel ?? 'info' },
     genReqId: () => nanoid(8),
+    bodyLimit: 1_048_576,
   })
 
   app.register(sensible)
@@ -45,7 +46,24 @@ export function buildServer(opts?: { logLevel?: string }): FastifyInstance {
 
   app.setErrorHandler((err, _request, reply) => {
     if (err instanceof GatewayError) {
+      if (err.replyHeaders) {
+        for (const [key, value] of Object.entries(err.replyHeaders)) {
+          void reply.header(key, value)
+        }
+      }
       return reply.status(err.statusCode).send(sanitizeError(err, production))
+    }
+
+    if (
+      err instanceof Error &&
+      'code' in err &&
+      (err as { code?: string }).code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+    ) {
+      logErrorInternal(err, (e) => app.log.error(e))
+      return reply.status(415).send({
+        error: 'UNSUPPORTED_MEDIA_TYPE',
+        message: 'Unsupported Content-Type for this endpoint',
+      })
     }
 
     if (err instanceof ZodError) {

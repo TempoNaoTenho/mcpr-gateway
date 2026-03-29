@@ -554,10 +554,30 @@ export async function pruneAuditLogs(days?: number): Promise<{ deleted: number; 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 export interface AuthSummary {
-  clientAuth: 'bearer_tokens'
+  clientAuth: 'bearer_tokens' | 'oauth' | 'hybrid'
   clientTokensConfigured: number
+  oauthPublicBaseUrl?: string
   adminTokenConfigured: boolean
 }
+
+/** Inbound (resource-server) OAuth — mirrors `InboundOAuthSchema` on the gateway. */
+export interface InboundOAuthPolicy {
+  publicBaseUrl: string
+  authorizationServers: {
+    issuer: string
+    audience?: string
+    jwksUri?: string
+    rolesClaim?: string
+  }[]
+  requireForNamespaces?: string[]
+  scopesSupported?: string[]
+  allowedBrowserOrigins?: string[]
+}
+
+export type PoliciesAuthConfig =
+  | { mode: 'static_key'; staticKeys?: Record<string, { userId: string; roles: string[] }> }
+  | { mode: 'oauth'; oauth: InboundOAuthPolicy }
+  | { mode: 'hybrid'; staticKeys?: Record<string, { userId: string; roles: string[] }>; oauth: InboundOAuthPolicy }
 
 export type ConfigSource = 'db' | 'file'
 
@@ -642,15 +662,7 @@ export async function exportConfig(): Promise<string> {
 }
 
 export interface PoliciesConfig {
-  auth: {
-    staticKeys?: Record<
-      string,
-      {
-        userId: string
-        roles: string[]
-      }
-    >
-  }
+  auth: PoliciesAuthConfig
   namespaces: Record<
     string,
     {

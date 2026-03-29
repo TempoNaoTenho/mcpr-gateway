@@ -2,9 +2,11 @@ import { nanoid } from 'nanoid'
 import { SessionIdSchema } from '../../types/identity.js'
 import type { SelectorDecision } from '../../types/selector.js'
 import { SessionStatus, Mode, RefreshTriggerType, ToolRiskLevel, GatewayMode } from '../../types/enums.js'
-import { GatewayError } from '../../types/errors.js'
+import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
 import { getConfig } from '../../config/index.js'
-import { resolveIdentity } from '../../auth/index.js'
+import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
+import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { resolveMcpIdentityForInitialize } from '../../auth/mcp-identity.js'
 import { resolvePolicy } from '../../policy/index.js'
 import { generateToolcards } from '../../toolcard/index.js'
 import { buildCandidatePool } from '../../candidate/index.js'
@@ -61,8 +63,38 @@ export async function handleInitialize(
 ): Promise<{ id: string; negotiatedProtocolVersion: string; result: unknown }> {
   const startMs = Date.now()
   const config = getConfig()
-  const identity = resolveIdentity(ctx.authorization, config.auth)
   const namespace = ctx.namespace
+  const nsKeys = new Set(Object.keys(config.namespaces))
+  const idResult = await resolveMcpIdentityForInitialize(
+    ctx.authorization,
+    config.auth,
+    namespace,
+    nsKeys,
+  )
+
+  if (idResult.kind === 'oauth_required') {
+    const oauth = getInboundOAuth(config.auth)
+    if (!oauth) {
+      throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+    }
+    const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace)
+    throw new GatewayError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, undefined, undefined, {
+      'WWW-Authenticate': wwwAuthenticate,
+    })
+  }
+
+  if (idResult.kind === 'oauth_invalid') {
+    const oauth = getInboundOAuth(config.auth)
+    if (!oauth) {
+      throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+    }
+    const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace, 'invalid_token')
+    throw new GatewayError(GatewayErrorCode.OAUTH_INVALID_TOKEN, undefined, undefined, {
+      'WWW-Authenticate': wwwAuthenticate,
+    })
+  }
+
+  const identity = idResult.identity
   const requestedMode = (body.params?.mode as Mode | undefined) ?? Mode.Read
   const initialIntentText = normalizeInitializeIntent(body.params)
   const negotiatedProtocolVersion = negotiateMcpProtocolVersion(body.params?.protocolVersion)

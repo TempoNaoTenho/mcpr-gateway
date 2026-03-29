@@ -235,16 +235,16 @@ describe('OPTIONS /mcp/gmail', () => {
 
     expect(res.statusCode).toBe(204)
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost:6274')
-    expect(res.headers['access-control-allow-methods']).toBe('GET, POST, OPTIONS')
+    expect(res.headers['access-control-allow-methods']).toBe('GET, POST, OPTIONS, DELETE')
     expect(res.headers['access-control-allow-headers']).toBe(
-      'Authorization, Content-Type, Mcp-Session-Id'
+      'Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version'
     )
     expect(res.headers['access-control-expose-headers']).toBe(
       'Mcp-Session-Id, Mcp-Tools-Changed, MCP-Protocol-Version',
     )
   })
 
-  it('does not emit CORS headers for non-loopback origins', async () => {
+  it('rejects non-loopback origins when browser allowlist is not configured', async () => {
     const res = await app.inject({
       method: 'OPTIONS',
       url: '/mcp/gmail',
@@ -254,7 +254,7 @@ describe('OPTIONS /mcp/gmail', () => {
       },
     })
 
-    expect(res.statusCode).toBe(204)
+    expect(res.statusCode).toBe(403)
     expect(res.headers['access-control-allow-origin']).toBeUndefined()
   })
 })

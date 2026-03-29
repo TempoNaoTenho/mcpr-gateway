@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleToolsCall } from '../../src/gateway/dispatch/tools-call.js'
 import type { McpHandlerContext } from '../../src/gateway/mcp-handler-context.js'
 import { createTempSqliteSessionStore } from '../fixtures/sqlite-session-store.js'
-import { Mode, OutcomeClass, SessionStatus } from '../../src/types/enums.js'
+import { GatewayMode, Mode, OutcomeClass, SessionStatus } from '../../src/types/enums.js'
 import { GatewayError } from '../../src/types/errors.js'
 import { SessionIdSchema } from '../../src/types/identity.js'
 import type { SessionState } from '../../src/types/session.js'
@@ -13,6 +13,14 @@ import {
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
+import { setConfig } from '../../src/config/index.js'
+import {
+  defaultDebug,
+  defaultResilience,
+  defaultSelector,
+  defaultSession,
+  defaultTriggers,
+} from '../fixtures/bootstrap-json.js'
 
 function makeTriggerEngine(): TriggerEngine {
   return { evaluate: vi.fn().mockResolvedValue(undefined) } as unknown as TriggerEngine
@@ -55,6 +63,34 @@ function makeMockStore(session: SessionState) {
 
 describe('handleToolsCall', () => {
   let disposeStore: (() => void) | undefined
+  beforeEach(() => {
+    setConfig({
+      servers: [],
+      auth: { mode: 'static_key' },
+      namespaces: {
+        gmail: {
+          allowedRoles: ['user'],
+          bootstrapWindowSize: 4,
+          candidatePoolSize: 16,
+          allowedModes: [Mode.Read, Mode.Write],
+          gatewayMode: GatewayMode.Default,
+          disabledTools: [],
+        },
+      },
+      roles: {
+        user: {
+          allowNamespaces: ['gmail'],
+        },
+      },
+      selector: defaultSelector,
+      session: defaultSession,
+      triggers: defaultTriggers,
+      resilience: defaultResilience,
+      debug: defaultDebug,
+      starterPacks: {},
+    })
+  })
+
   afterEach(() => {
     disposeStore?.()
     disposeStore = undefined

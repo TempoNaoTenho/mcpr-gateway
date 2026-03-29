@@ -11,6 +11,9 @@ export const GatewayErrorCode = {
   INTERNAL_GATEWAY_ERROR: 'INTERNAL_GATEWAY_ERROR',
   OAUTH_PROVIDER_NOT_ALLOWED: 'OAUTH_PROVIDER_NOT_ALLOWED',
   INVALID_MCP_PROTOCOL_VERSION: 'INVALID_MCP_PROTOCOL_VERSION',
+  OAUTH_AUTHENTICATION_REQUIRED: 'OAUTH_AUTHENTICATION_REQUIRED',
+  OAUTH_INVALID_TOKEN: 'OAUTH_INVALID_TOKEN',
+  MCP_INVALID_ORIGIN: 'MCP_INVALID_ORIGIN',
 } as const
 
 export type GatewayErrorCode = (typeof GatewayErrorCode)[keyof typeof GatewayErrorCode]
@@ -29,6 +32,9 @@ const defaultMessages: Record<GatewayErrorCode, string> = {
   INTERNAL_GATEWAY_ERROR: 'An unexpected internal error occurred',
   OAUTH_PROVIDER_NOT_ALLOWED: 'OAuth provider URL is not in the allowed list',
   INVALID_MCP_PROTOCOL_VERSION: 'MCP-Protocol-Version does not match this session',
+  OAUTH_AUTHENTICATION_REQUIRED: 'OAuth authentication required for this MCP namespace',
+  OAUTH_INVALID_TOKEN: 'Invalid or expired OAuth access token',
+  MCP_INVALID_ORIGIN: 'Origin is not allowed for this MCP endpoint',
 }
 
 const defaultStatusCodes: Record<GatewayErrorCode, number> = {
@@ -44,18 +50,28 @@ const defaultStatusCodes: Record<GatewayErrorCode, number> = {
   INTERNAL_GATEWAY_ERROR: 500,
   OAUTH_PROVIDER_NOT_ALLOWED: 403,
   INVALID_MCP_PROTOCOL_VERSION: 400,
+  OAUTH_AUTHENTICATION_REQUIRED: 401,
+  OAUTH_INVALID_TOKEN: 401,
+  MCP_INVALID_ORIGIN: 403,
 }
 
 export class GatewayError extends Error {
   readonly code: GatewayErrorCode
   readonly statusCode: number
   readonly details?: unknown
+  readonly replyHeaders?: Record<string, string>
 
-  constructor(code: GatewayErrorCode, message?: string, details?: unknown) {
+  constructor(
+    code: GatewayErrorCode,
+    message?: string,
+    details?: unknown,
+    replyHeaders?: Record<string, string>,
+  ) {
     super(message ?? defaultMessages[code])
     this.name = 'GatewayError'
     this.code = code
     this.statusCode = defaultStatusCodes[code]
     this.details = details
+    this.replyHeaders = replyHeaders
   }
 }

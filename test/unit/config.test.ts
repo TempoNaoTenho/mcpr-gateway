@@ -138,7 +138,7 @@ describe('loadConfig — valid config', () => {
     const base = validGatewayBase()
     const adminConfig = {
       ...base,
-      auth: {},
+      auth: { mode: 'static_key' as const },
       servers: [
         {
           id: 'legacy-stdio',

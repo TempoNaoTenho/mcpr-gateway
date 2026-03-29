@@ -14,6 +14,27 @@ import {
 import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
 import { assertMcpProtocolVersionMatches } from '../mcp-protocol-version.js'
+import { getConfig } from '../../config/index.js'
+import { assertMcpSessionOAuthBearer } from '../../auth/mcp-identity.js'
+import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
+
+function oauthChallengeError(
+  code: 'OAUTH_AUTHENTICATION_REQUIRED' | 'OAUTH_INVALID_TOKEN',
+  namespace: string,
+): GatewayError {
+  const oauth = getInboundOAuth(getConfig().auth)
+  if (!oauth) {
+    return new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+  }
+  const challenge =
+    code === GatewayErrorCode.OAUTH_INVALID_TOKEN
+      ? buildOAuthChallenge(oauth, namespace, 'invalid_token')
+      : buildOAuthChallenge(oauth, namespace)
+  return new GatewayError(code, undefined, undefined, {
+    'WWW-Authenticate': challenge.wwwAuthenticate,
+  })
+}
 
 type CallToolTextContent = {
   type: 'text'
@@ -133,6 +154,21 @@ export async function handleToolsCall(
   }
   if (session.namespace !== namespace) {
     throw new GatewayError(GatewayErrorCode.SESSION_NOT_FOUND)
+  }
+
+  const nsKeys = new Set(Object.keys(getConfig().namespaces))
+  const check = await assertMcpSessionOAuthBearer(
+    ctx.authorization,
+    getConfig().auth,
+    namespace,
+    session.userId,
+    nsKeys,
+  )
+  if (check === 'oauth_required') {
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, namespace)
+  }
+  if (check === 'oauth_invalid' || check === 'session_mismatch') {
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_INVALID_TOKEN, namespace)
   }
 
   assertMcpProtocolVersionMatches(session, ctx.mcpProtocolVersionHeader)

@@ -35,12 +35,8 @@ export interface BootstrapConfig {
   auth: BootstrapAuthConfig
 }
 
-export interface AdminAuthConfig {
-  staticKeys?: AuthConfig['staticKeys']
-}
-
 // Fields managed by the admin UI and safe to persist in the database.
-export type AdminConfig = Omit<GatewayConfig, 'auth'> & { auth: AdminAuthConfig }
+export type AdminConfig = GatewayConfig
 
 const DEFAULT_SERVER_HEALTHCHECK = {
   enabled: true,
@@ -58,24 +54,12 @@ function applyServerDefaults<T extends { servers: GatewayConfig['servers'] }>(co
 }
 
 export function toAdminConfig(config: GatewayConfig): AdminConfig {
-  const { auth, ...admin } = applyServerDefaults(config)
-  return {
-    ...admin,
-    auth: {
-      staticKeys: auth.staticKeys,
-    },
-  }
+  return applyServerDefaults(config) as AdminConfig
 }
 
-export function mergeWithAdminConfig(base: BootstrapConfig, override: AdminConfig): GatewayConfig {
-  const { auth: adminAuth = {}, ...rest } = override
-  return normalizeGatewayConfig({
-    auth: {
-      ...base.auth,
-      staticKeys: adminAuth.staticKeys,
-    },
-    ...rest,
-  })
+/** Persisted / merged admin config is the full gateway snapshot; bootstrap is unused (kept for call-site compatibility). */
+export function mergeWithAdminConfig(_base: BootstrapConfig, override: AdminConfig): GatewayConfig {
+  return normalizeGatewayConfig(override as GatewayConfig)
 }
 
 export function normalizeGatewayConfig(config: GatewayConfig): GatewayConfig {
@@ -160,9 +144,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
 export function createDefaultAdminConfig(serverNamespaces: string[] = []): AdminConfig {
   const policies = createDefaultPolicies(serverNamespaces)
   return {
-    auth: {
-      staticKeys: undefined,
-    },
+    auth: { mode: 'static_key' },
     servers: [],
     namespaces: policies.namespaces,
     roles: policies.roles,
@@ -267,6 +249,15 @@ export function validateGatewayConfig(config: GatewayConfig): GatewayConfig {
     for (const role of policy.allowedRoles) {
       if (!roleKeys.has(role)) {
         warnings.push(`namespace "${ns}" references unknown role "${role}"`)
+      }
+    }
+  }
+
+  if (config.auth.mode === 'oauth' || config.auth.mode === 'hybrid') {
+    const oauth = config.auth.oauth
+    for (const ns of oauth.requireForNamespaces ?? []) {
+      if (!namespaceKeys.has(ns)) {
+        errors.push(`inbound OAuth requireForNamespaces references unknown namespace "${ns}"`)
       }
     }
   }

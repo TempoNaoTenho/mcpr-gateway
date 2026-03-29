@@ -14,10 +14,15 @@ import {
   type JsonRpcEnvelope,
 } from '../jsonrpc.js'
 import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
+import { getConfig } from '../../config/index.js'
+import { getInboundOAuth } from '../../auth/oauth-config.js'
+import {
+  isBrowserOriginAllowed,
+  setMcpCorsHeaders,
+  MCP_ALLOWED_HEADERS,
+  MCP_EXPOSED_HEADERS,
+} from '../cors.js'
 
-const LOOPBACK_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i
-const MCP_ALLOWED_HEADERS = 'Authorization, Content-Type, Mcp-Session-Id'
-const MCP_EXPOSED_HEADERS = 'Mcp-Session-Id, Mcp-Tools-Changed, MCP-Protocol-Version'
 const SSE_PING_INTERVAL_MS = 15_000
 
 interface McpRouteOptions {
@@ -30,26 +35,33 @@ interface McpRouteOptions {
   auditLogger?: IAuditLogger
 }
 
-function setMcpCorsHeaders(reply: FastifyReply, origin: string | undefined): void {
-  if (!origin || !LOOPBACK_ORIGIN.test(origin)) return
+function allowedBrowserOrigins(): string[] | undefined {
+  return getInboundOAuth(getConfig().auth)?.allowedBrowserOrigins
+}
 
-  reply.header('Access-Control-Allow-Origin', origin)
-  reply.header('Vary', 'Origin')
-  reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  reply.header('Access-Control-Allow-Headers', MCP_ALLOWED_HEADERS)
-  reply.header('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
+function assertMcpOrigin(origin: string | undefined): void {
+  const oauth = getInboundOAuth(getConfig().auth)
+  const allowed = oauth?.allowedBrowserOrigins
+  if (origin && !isBrowserOriginAllowed(origin, allowed)) {
+    throw new GatewayError(GatewayErrorCode.MCP_INVALID_ORIGIN)
+  }
+}
+
+function setSseCorsHeadersRaw(reply: FastifyReply, origin: string | undefined): void {
+  if (!origin || !isBrowserOriginAllowed(origin, allowedBrowserOrigins())) {
+    return
+  }
+  reply.raw.setHeader('Access-Control-Allow-Origin', origin)
+  reply.raw.setHeader('Vary', 'Origin')
+  reply.raw.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE')
+  reply.raw.setHeader('Access-Control-Allow-Headers', MCP_ALLOWED_HEADERS)
+  reply.raw.setHeader('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
 }
 
 function openSseStream(reply: FastifyReply, origin: string | undefined): void {
   reply.hijack()
   reply.raw.statusCode = 200
-  if (origin && LOOPBACK_ORIGIN.test(origin)) {
-    reply.raw.setHeader('Access-Control-Allow-Origin', origin)
-    reply.raw.setHeader('Vary', 'Origin')
-    reply.raw.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    reply.raw.setHeader('Access-Control-Allow-Headers', MCP_ALLOWED_HEADERS)
-    reply.raw.setHeader('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
-  }
+  setSseCorsHeadersRaw(reply, origin)
   reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   reply.raw.setHeader('Cache-Control', 'no-cache, no-transform')
   reply.raw.setHeader('Connection', 'keep-alive')
@@ -85,8 +97,27 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
     healthMonitor,
     opts.getRateLimiter,
     opts.getResponseTimeoutMs,
-    app.log
+    app.log,
   )
+
+  const jsonParser = (
+    _req: unknown,
+    body: string,
+    done: (err: Error | null, body?: unknown) => void,
+  ) => {
+    try {
+      done(null, JSON.parse(body))
+    } catch {
+      done(new Error('invalid_json'))
+    }
+  }
+
+  app.addContentTypeParser(
+    /^application\/([\w!#$&^*.+-]|\.)*\+?json\s*(;.*)?$/i,
+    { parseAs: 'string' },
+    jsonParser,
+  )
+  app.addContentTypeParser(/^text\/plain\s*(;.*)?$/i, { parseAs: 'string' }, jsonParser)
 
   app.options<{ Params: { namespace: string } }>('/mcp/:namespace', async (request, reply) => {
     const namespaceResult = NamespaceSchema.safeParse(request.params.namespace)
@@ -98,7 +129,8 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    setMcpCorsHeaders(reply, request.headers.origin)
+    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
     return reply.status(204).send()
   })
 
@@ -112,11 +144,13 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    openSseStream(reply, request.headers.origin)
+    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    openSseStream(reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
   })
 
   app.post<{ Params: { namespace: string } }>('/mcp/:namespace', async (request, reply) => {
-    setMcpCorsHeaders(reply, request.headers.origin)
+    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
 
     const namespaceResult = NamespaceSchema.safeParse(request.params.namespace)
     if (!namespaceResult.success) {
@@ -194,7 +228,7 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
           store,
           router,
           triggerEngine,
-          auditLogger
+          auditLogger,
         )
         return reply.send(result)
       }
