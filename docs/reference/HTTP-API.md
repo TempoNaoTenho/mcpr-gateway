@@ -16,6 +16,12 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 | ------ | ---- | ----------- |
 | `GET` | `/.well-known/oauth-protected-resource/mcp/:namespace` | JSON metadata: `resource`, `authorization_servers`, `scopes_supported`, … when `auth.mode` is `oauth` or `hybrid` |
 | `GET` | `/mcp/:namespace/.well-known/oauth-protected-resource` | Same document (alternate path for some clients) |
+| `GET` | `/.well-known/oauth-authorization-server` | Authorization-server metadata derived from the configured inbound issuer |
+| `GET` | `/.well-known/oauth-authorization-server/mcp/:namespace` | Same metadata with namespace-specific `resource` |
+| `GET` | `/mcp/:namespace/.well-known/oauth-authorization-server` | Alternate namespace-aware authorization-server alias |
+| `GET` | `/.well-known/openid-configuration` | OpenID configuration derived from the configured inbound issuer |
+| `GET` | `/.well-known/openid-configuration/mcp/:namespace` | Same metadata with namespace-specific `resource` |
+| `GET` | `/mcp/:namespace/.well-known/openid-configuration` | Alternate namespace-aware OpenID alias |
 
 If inbound OAuth is disabled (`static_key` only), these routes return **404**.
 

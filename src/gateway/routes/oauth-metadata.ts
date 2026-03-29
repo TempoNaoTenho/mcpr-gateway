@@ -66,6 +66,25 @@ async function sendDiscoveryDocument(
 }
 
 export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook('onReady', async () => {
+    const config = getConfig()
+    const oauth = getInboundOAuth(config.auth)
+    if (!oauth) {
+      app.log.info('[oauth-metadata] inbound OAuth metadata routes mounted in passive mode (auth.mode=static_key)')
+      return
+    }
+
+    app.log.info(
+      {
+        authMode: config.auth.mode,
+        publicBaseUrl: oauth.publicBaseUrl,
+        issuers: oauth.authorizationServers.map((issuer) => issuer.issuer.replace(/\/$/, '')),
+        protectedNamespaces: oauth.requireForNamespaces ?? 'all',
+      },
+      '[oauth-metadata] inbound OAuth metadata routes mounted',
+    )
+  })
+
   app.get<{ Params: { namespace: string } }>(
     '/.well-known/oauth-protected-resource/mcp/:namespace',
     async (request, reply) => {

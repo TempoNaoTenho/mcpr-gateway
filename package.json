@@ -23,6 +23,7 @@
     "test": "node scripts/test-vitest.mjs run",
     "test:coverage": "npm run check:gate && node scripts/test-vitest.mjs run --coverage",
     "test:watch": "node scripts/test-vitest.mjs",
+    "smoke:oauth-remote": "node scripts/check-remote-oauth-metadata.mjs",
     "verify": "npm ci && npm run test:coverage && npm --prefix ui ci && npm --prefix ui run check && npm run build",
     "ci": "npm run verify",
     "prepush": "npm run verify",
