@@ -18,21 +18,84 @@
 
 ## Current features
 
-| Feature                                              | ✅/❌/Optional   | Feature                                         | ✅/❌/Optional |
-| ---------------------------------------------------- | ---------------- | ----------------------------------------------- | -------------- |
-| WebUI and Admin API                                  | ✅               | OAuth Support                                   | ✅             |
-| Active sessions management                           | ✅               | Audit & Observability                           | ✅             |
-| Auto refresh tools                                   | ✅               | Namespaces for MCP Downstream Servers Isolation | ✅             |
-| SQLite Support                                       | ✅               | Active sessions management                      | ✅             |
-| Downstream tool editing                              | ✅               | MCP Client Permission Management                | ✅             |
-| Downstream tool token usage counter                  | ✅               | Client Bearer Token Managment                   | ✅             |
-| HTTP-Streamable Support                              | ✅ - All         | Bootstrap file support                          | ✅             |
-| BM25 / lexical ranking                               | ✅ - Compat Mode | Downstream Server Token ENV Support             | ✅             |
-| Two-tool Low Schema Mode                             | ✅ - Compat Mode | Encrypted Downstream Server Token SQL Storage   | ✅             |
-| Performance-focused Sandbox Execution Tool discovery | ✅ - Code Mode   |
-| All Tools Loaded Mode                                | ✅ - Default     |
-| Stdio Support                                        | ❌               |
-| PGSQL Support                                        | ❌               |
+<div align="center">
+
+| Category                  | Feature                           | Status     |
+| ------------------------- | --------------------------------- | ---------- |
+| **🗄️ Database**           | SQLite Support                    | ✅         |
+|                           | PostgreSQL Support                | ❌ Planned |
+| **🖥️ Interface & Admin**  | WebUI and Admin API               | ✅         |
+|                           | Active sessions management        | ✅         |
+|                           | Bootstrap file support            | ✅         |
+|                           | Config versioning & rollback      | ✅         |
+|                           | Config export as JSON             | ✅         |
+| **⚙️ Operating Modes**    | All Tools Loaded Mode             | ✅ Default |
+|                           | Two-tool Low Schema Mode          | ✅ Compat  |
+|                           | BM25 / lexical ranking            | ✅ Compat  |
+|                           | Sandbox Execution Tool discovery  | ✅ Code    |
+| **📡 Transport**          | HTTP-Streamable Support           | ✅         |
+|                           | Stdio Support                     | ❌ Planned |
+|                           | Stdio Interactive Auth            | ✅         |
+|                           | Protocol version negotiation      | ✅         |
+| **🔌 Downstream Servers** | Tool editing                      | ✅         |
+|                           | Tool token usage counter          | ✅         |
+|                           | Namespaces for isolation          | ✅         |
+|                           | Token ENV Support                 | ✅         |
+|                           | Encrypted Token SQL Storage       | ✅         |
+|                           | OAuth Support                     | ✅         |
+|                           | Bearer Token Support              | ✅         |
+|                           | Command allowlist (stdio)         | ✅         |
+|                           | Health-aware tool ranking         | ✅         |
+|                           | Tool quarantining                 | ✅         |
+|                           | Server import preview             | ✅         |
+| **🛡️ Security**           | External idP + DCR OAuth          | ✅         |
+|                           | Bearer token per user/service     | ✅         |
+|                           | SSRF protection                   | ✅         |
+|                           | Shell injection prevention        | ✅         |
+|                           | OAuth URL allowlist (wildcards)   | ✅         |
+|                           | Env var sanitization              | ✅         |
+|                           | Admin session (HttpOnly cookie)   | ✅         |
+|                           | HTTP security headers             | ✅         |
+|                           | CORS restricted to loopback       | ✅         |
+| **🎯 Focus Mode**         | Adaptive tool window              | ✅         |
+|                           | Tool capability inference         | ✅         |
+|                           | Write/admin/unhealthy penalties   | ✅         |
+|                           | Successful pattern tracking       | ✅         |
+| **⚡ Resilience**         | Per-session rate limiting         | ✅         |
+|                           | Per-user rate limiting            | ✅         |
+|                           | Per-downstream concurrency        | ✅         |
+|                           | Circuit breaker                   | ✅         |
+|                           | Connect/response/total timeouts   | ✅         |
+| **🔄 Triggers**           | refreshOnSuccess                  | ✅         |
+|                           | refreshOnTimeout                  | ✅         |
+|                           | refreshOnError                    | ✅         |
+|                           | FirstSuccessInDomain              | ✅         |
+|                           | ErrorThreshold                    | ✅         |
+|                           | IdleTimeout                       | ✅         |
+|                           | replaceOrAppend mode              | ✅         |
+|                           | cooldownSeconds                   | ✅         |
+| **📦 Starter Packs**      | preferredTags filtering           | ✅         |
+|                           | Risk level filtering              | ✅         |
+|                           | Mode filtering                    | ✅         |
+|                           | maxTools cap                      | ✅         |
+| **💾 Code Runtime**       | Artifact store (save/list)        | ✅         |
+|                           | Result APIs (pick/limit/grep)     | ✅         |
+|                           | Handle registry (TTL-based)       | ✅         |
+|                           | Memory/execution limits           | ✅         |
+| **🔐 RBAC**               | Roles (allow/deny namespaces)     | ✅         |
+|                           | Permission Management             | ✅         |
+|                           | Bearer Token Management           | ✅         |
+|                           | Allowed OAuth providers           | ✅         |
+| **🏷️ Tool Trust**         | Risk levels (Low/Med/High)        | ✅         |
+|                           | Source trust (Untrusted/Verified) | ✅         |
+|                           | Schema compression                | ✅         |
+| **🔍 Observability**      | Auto refresh tools                | ✅         |
+|                           | Audit & Observability             | ✅         |
+|                           | Pino structured logging           | ✅         |
+|                           | Audit log pruning                 | ✅         |
+|                           | Debug endpoints (loopback)        | ✅         |
+
+</div>
 
 ## Operating Modes
 
