@@ -7,8 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+
+- 2026-03-28 - Added - Inbound OAuth for MCP clients: `auth.mode` `static_key` | `oauth` | `hybrid`, RFC 9728 `/.well-known/oauth-protected-resource` metadata, `401` + `WWW-Authenticate` challenges, JWT validation via `jose` + JWKS discovery, optional browser Origin allowlist/CORS helper fields on inbound OAuth config, extra MCP `Content-Type` parsing and `415` on unsupported media types; WebUI config section; docs and Vitest coverage (unit + integration).
+
 ### Fixed
 
+- 2026-03-29 - Fixed - Inbound OAuth browser origin checks now require exact origin matches, protected-resource metadata routes emit CORS headers for allowed browser origins, and `PUT /admin/config/policies` no longer overwrites newer bearer tokens from dedicated auth endpoints
 - 2026-03-28 - Fixed - stdio downstream transport now converts `stdin` `EPIPE` / closed-pipe writes into rejected MCP transport errors instead of leaking unhandled exceptions during tests and benchmark flows
 - 2026-03-28 - Fixed - `npm test`, `npm run test:coverage`, and `npm run test:watch` now run the native runtime preflight, auto-rebuild stale `isolated-vm` / `better-sqlite3` binaries, and force `--no-node-snapshot` before starting Vitest
 - 2026-03-28 - Fixed - The standard repository contract is now `npm ci`, `npm run build`, `npm start`; `npm run build` validates Node 24 and rebuilds stale native modules before producing the UI and gateway artifacts

@@ -230,14 +230,35 @@ Typical admin request after login:
 Cookie: admin_session=<value-from-set-cookie>
 ```
 
+## MCP client authentication (inbound)
+
+Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/config/schemas.ts) and [`oauth-schemas.ts`](../src/config/oauth-schemas.ts)):
+
+| `mode`       | Behavior |
+| ------------ | -------- |
+| `static_key` | Map `Authorization: Bearer <token>` against `auth.staticKeys` (bootstrap and/or admin). Unknown/missing token → `anonymous`. |
+| `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
+| `hybrid`     | Try static keys first; if no match and OAuth applies to the namespace, validate JWT as in `oauth`. |
+
+**JWT / OAuth:** `oauth.publicBaseUrl` must be the HTTPS origin clients use to reach the gateway in production. The gateway validates `aud` against `publicBaseUrl + /mcp/{namespace}` unless an issuer entry sets a custom `audience`. Issuer `issuer` URLs must match the JWT `iss` claim. Optional `jwksUri`; otherwise JWKS URL is discovered (OpenID discovery, OAuth authorization-server metadata, then `/.well-known/jwks.json`). Role strings are read from the claim named by `rolesClaim` (default `roles`).
+
+**Metadata:** Clients can fetch protected-resource metadata at:
+
+- `GET /.well-known/oauth-protected-resource/mcp/:namespace`
+- `GET /mcp/:namespace/.well-known/oauth-protected-resource`
+
+These metadata endpoints return browser CORS headers for loopback origins and for exact matches from `auth.oauth.allowedBrowserOrigins`. Configured entries are treated as origins, not prefixes or wildcard patterns.
+
+When `auth.mode` is `static_key` only, these URLs return **404**.
+
+The legacy `auth.mode` value `mock_dev` is rejected at startup.
+
 ## Client bearer authentication (`static_key`)
 
-Bootstrap auth uses **`static_key` only**. The legacy `auth.mode` value `mock_dev` is rejected at startup.
-
-For each MCP request, the gateway resolves the caller from `Authorization: Bearer <token>`:
+For each MCP request in `static_key` or `hybrid`, the gateway resolves the caller from `Authorization: Bearer <token>` when using static keys:
 
 - If the token matches an entry in effective `auth.staticKeys` (bootstrap and/or admin-managed tokens), `sub` and `roles` come from that entry.
-- If the header is missing or the token is unknown, the caller is `sub = "anonymous"` and `roles = []`.
+- If the header is missing or the token is unknown **and** OAuth does not apply to this namespace, the caller is `sub = "anonymous"` and `roles = []`.
 
 Namespace access requires both:
 

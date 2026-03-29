@@ -10,11 +10,20 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 | `POST`    | `/mcp/:namespace` | Single endpoint for MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`) |
 | `OPTIONS` | `/mcp/:namespace` | Browser preflight for loopback web clients (for example MCP Inspector)      |
 
+### OAuth protected-resource metadata (RFC 9728)
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/.well-known/oauth-protected-resource/mcp/:namespace` | JSON metadata: `resource`, `authorization_servers`, `scopes_supported`, … when `auth.mode` is `oauth` or `hybrid` |
+| `GET` | `/mcp/:namespace/.well-known/oauth-protected-resource` | Same document (alternate path for some clients) |
+
+If inbound OAuth is disabled (`static_key` only), these routes return **404**.
+
 - **Namespace:** URL segment must satisfy server validation (invalid → 400).
 - **Body:** JSON-RPC object; request methods require `id`, notifications may omit it; unsupported `method` → gateway error ([`src/gateway/routes/mcp.ts`](../src/gateway/routes/mcp.ts)).
 - **Session:** After `initialize`, clients must send **`Mcp-Session-Id`** on subsequent requests (header) for `tools/list` and `tools/call`.
-- **Loopback CORS:** `OPTIONS`, `GET`, and `POST` emit CORS headers for loopback origins only (`localhost`, `127.0.0.1`, `::1`), and expose `Mcp-Session-Id` for browser-based clients.
-- **Client auth (`static_key`):** Send `Authorization: Bearer <client-access-token>`. The token must match a configured client token (from `auth.staticKeys` and/or tokens issued in the admin UI). Missing or unknown tokens resolve to `anonymous` with no roles, so role-protected namespaces require a valid token and matching policy.
+- **Browser CORS:** Without inbound OAuth browser allowlist, MCP responses use the existing loopback-only CORS behavior. When `auth.oauth.allowedBrowserOrigins` is set (see config schemas), browsers sending `Origin` must exactly match those entries as origins, not prefixes or wildcard patterns (loopback still allowed). The protected-resource metadata routes emit the same CORS headers for allowed origins. Non-browser clients without an `Origin` header are not blocked by that check.
+- **Client auth:** With **`static_key`** or **`hybrid`**, send `Authorization: Bearer <client-access-token>` for pre-mapped tokens. With **`oauth`** / **`hybrid`** (and OAuth applicable to the namespace), send a Bearer **JWT** from a configured issuer; missing or invalid tokens return **401** with `WWW-Authenticate` including `resource_metadata="…"`. Unsupported request `Content-Type` on POST may return **415**.
 - **Codex CLI auth:** For Codex streamable HTTP servers, configure `bearer_token_env_var` in `~/.codex/config.toml`. A bare `Authorization = "Bearer ..."` entry in the server block is not interpreted as an HTTP header by Codex.
 - **JSON-RPC errors:** Tool failures, validation failures, and downstream failures often return **HTTP 200** with a JSON-RPC `error` object in the body. Clients must inspect the JSON-RPC payload, not only the HTTP status.
 - **Client display caveat:** Some MCP clients may not surface the full JSON-RPC `result` payload to the model even when the gateway returned it successfully. For server-side diagnosis, compare client behavior with a raw HTTP JSON-RPC request.
@@ -108,8 +117,8 @@ Admin routes are registered when **any** of the following holds ([`src/index.ts`
 | `POST`   | `/admin/config/servers`           | Append server                                                                                                                                                                                             |
 | `PUT`    | `/admin/config/servers/:id`       | Patch server by id                                                                                                                                                                                        |
 | `DELETE` | `/admin/config/servers/:id`       | Remove server                                                                                                                                                                                             |
-| `GET`    | `/admin/config/policies`          | Namespaces, roles, selector, session, triggers, resilience, debug, starter packs                                                                                                                          |
-| `PUT`    | `/admin/config/policies`          | Update those sections                                                                                                                                                                                     |
+| `GET`    | `/admin/config/policies`          | Namespaces, roles, selector, session, triggers, resilience, debug, starter packs, `codeMode`, `allowedOAuthProviders`; auth token state is returned for display but managed by dedicated auth endpoints |
+| `PUT`    | `/admin/config/policies`          | Update policy sections only; does not overwrite bearer tokens or other auth state                                                                                                                         |
 | `GET`    | `/admin/namespaces`               | Namespace list for admin UI: `metrics` (MCP `tools/list` token estimates, plus compat/code `initializeInstructionsTokens` and `firstTurnEstimatedTokens`), `catalogMetrics` (downstream catalog), `tools` |
 
 Implementation: [`src/gateway/routes/admin.ts`](../src/gateway/routes/admin.ts).

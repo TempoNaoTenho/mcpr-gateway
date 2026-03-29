@@ -61,7 +61,7 @@ Run from repo root (provide required variables through `.env` or your shell — 
 docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
-For any real deployment, clients should authenticate with persisted client Bearer tokens (issued via the Access Control panel or present under `auth.staticKeys` in bootstrap).
+For any real deployment, MCP clients authenticate either with persisted **static Bearer tokens** (issued via the Access Control panel or `auth.staticKeys` in bootstrap) or, when you enable **inbound OAuth** (`auth.mode` `oauth` / `hybrid`), with **JWT access tokens** from your IdP; use an HTTPS `publicBaseUrl` and configure issuers per [`CONFIGURATION.md`](../CONFIGURATION.md#mcp-client-authentication-inbound).
 
 By default the gateway uses **SQLite** for sessions, audit, config version history, and downstream auth rows (`DATABASE_PATH`, default `./data/gateway.db`). Set **`SESSION_BACKEND=memory`** only if you explicitly want **no** database file (ephemeral sessions; admin changes persist to `CONFIG_PATH/bootstrap.json` instead). The DB layer is wired through `IDbAdapter` / `SqliteAdapter` in [`src/db/`](../src/db/) for future alternative backends. See [`src/index.ts`](../src/index.ts).
 
