@@ -140,6 +140,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await runtimeConfigManager.initialize()
   config = runtimeConfigManager.getEffective()
 
+  if (config.auth.mode === 'oauth' || config.auth.mode === 'hybrid') {
+    app.log.info(
+      {
+        authMode: config.auth.mode,
+        publicBaseUrl: config.auth.oauth.publicBaseUrl,
+        issuers: config.auth.oauth.authorizationServers.map((issuer) => issuer.issuer.replace(/\/$/, '')),
+        protectedNamespaces: config.auth.oauth.requireForNamespaces ?? 'all',
+      },
+      '[startup] inbound OAuth enabled for MCP clients',
+    )
+  } else {
+    app.log.info({ authMode: config.auth.mode }, '[startup] inbound OAuth disabled for MCP clients')
+  }
+
   activeStore.start(config.session.ttlSeconds, config.session.cleanupIntervalSeconds)
 
   async function shutdownHttp(): Promise<void> {

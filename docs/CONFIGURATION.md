@@ -246,10 +246,18 @@ Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/
 
 - `GET /.well-known/oauth-protected-resource/mcp/:namespace`
 - `GET /mcp/:namespace/.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-authorization-server`
+- `GET /.well-known/oauth-authorization-server/mcp/:namespace`
+- `GET /mcp/:namespace/.well-known/oauth-authorization-server`
+- `GET /.well-known/openid-configuration`
+- `GET /.well-known/openid-configuration/mcp/:namespace`
+- `GET /mcp/:namespace/.well-known/openid-configuration`
 
 These metadata endpoints return browser CORS headers for loopback origins and for exact matches from `auth.oauth.allowedBrowserOrigins`. Configured entries are treated as origins, not prefixes or wildcard patterns.
 
-When `auth.mode` is `static_key` only, these URLs return **404**.
+The protected-resource routes identify this gateway resource (`resource`, `authorization_servers`, `scopes_supported`). The authorization-server and OpenID routes proxy normalized issuer discovery metadata from the configured inbound IdP and include `resource` on namespace-specific aliases.
+
+When `auth.mode` is `static_key` only, all of these URLs return **404**.
 
 The legacy `auth.mode` value `mock_dev` is rejected at startup.
 
