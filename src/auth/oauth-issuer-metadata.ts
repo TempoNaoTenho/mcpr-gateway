@@ -1,6 +1,6 @@
-import type { InboundOAuthConfig, IssuerConfig } from '../config/oauth-schemas.js'
+import type { IssuerConfig } from '../config/oauth-schemas.js'
 import { discoverJwksUri } from './oauth-discovery.js'
-import { resourceAudienceForNamespace } from './oauth-config.js'
+import { resourceAudienceForNamespace, type ResolvedInboundOAuthConfig } from './oauth-config.js'
 
 type JsonRecord = Record<string, unknown>
 
@@ -141,13 +141,13 @@ class InboundIssuerMetadataCache {
 
 const sharedCache = new InboundIssuerMetadataCache()
 
-function mergeScopes(oauth: InboundOAuthConfig, metadata: ResolvedIssuerMetadata): string[] | undefined {
+function mergeScopes(oauth: ResolvedInboundOAuthConfig, metadata: ResolvedIssuerMetadata): string[] | undefined {
   if (oauth.scopesSupported?.length) return oauth.scopesSupported
   return metadata.scopes_supported?.length ? metadata.scopes_supported : ['openid']
 }
 
 export async function getAuthorizationServerMetadataDocument(
-  oauth: InboundOAuthConfig,
+  oauth: ResolvedInboundOAuthConfig,
   issuerCfg: IssuerConfig,
   namespace?: string,
   signal?: AbortSignal,
@@ -163,7 +163,7 @@ export async function getAuthorizationServerMetadataDocument(
 }
 
 export async function getOpenIdConfigurationDocument(
-  oauth: InboundOAuthConfig,
+  oauth: ResolvedInboundOAuthConfig,
   issuerCfg: IssuerConfig,
   namespace?: string,
   signal?: AbortSignal,

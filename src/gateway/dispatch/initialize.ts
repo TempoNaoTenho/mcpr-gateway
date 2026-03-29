@@ -70,10 +70,11 @@ export async function handleInitialize(
     config.auth,
     namespace,
     nsKeys,
+    ctx.requestOrigin,
   )
 
   if (idResult.kind === 'oauth_required') {
-    const oauth = getInboundOAuth(config.auth)
+    const oauth = getInboundOAuth(config.auth, ctx.requestOrigin)
     if (!oauth) {
       throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
     }
@@ -84,7 +85,7 @@ export async function handleInitialize(
   }
 
   if (idResult.kind === 'oauth_invalid') {
-    const oauth = getInboundOAuth(config.auth)
+    const oauth = getInboundOAuth(config.auth, ctx.requestOrigin)
     if (!oauth) {
       throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
     }

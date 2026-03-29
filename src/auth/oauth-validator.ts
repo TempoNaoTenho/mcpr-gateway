@@ -1,8 +1,9 @@
 import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTPayload } from 'jose'
-import type { InboundOAuthConfig, IssuerConfig } from '../config/oauth-schemas.js'
+import { createPublicKey } from 'node:crypto'
+import type { IssuerConfig } from '../config/oauth-schemas.js'
 import type { UserIdentity } from '../types/identity.js'
 import { discoverJwksUri } from './oauth-discovery.js'
-import { resourceAudienceForNamespace } from './oauth-config.js'
+import { resourceAudienceForNamespace, type ResolvedInboundOAuthConfig } from './oauth-config.js'
 
 export class OAuthJwtValidator {
   private readonly jwksByIssuerUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
@@ -28,7 +29,7 @@ export class OAuthJwtValidator {
     return set
   }
 
-  private issuerConfigForTokenIss(oauth: InboundOAuthConfig, iss: string): IssuerConfig | undefined {
+  private issuerConfigForTokenIss(oauth: ResolvedInboundOAuthConfig, iss: string): IssuerConfig | undefined {
     const normalized = iss.replace(/\/$/, '')
     return oauth.authorizationServers.find((s) => s.issuer.replace(/\/$/, '') === normalized)
   }
@@ -53,12 +54,44 @@ export class OAuthJwtValidator {
     return []
   }
 
+  private async validateEmbedded(
+    token: string,
+    oauth: ResolvedInboundOAuthConfig,
+    namespace: string,
+    decoded: JWTPayload,
+  ): Promise<UserIdentity | null> {
+    if (oauth.provider !== 'embedded') return null
+    const embedded = oauth.embedded
+    if (!embedded?.publicJwk) return null
+    const iss = typeof decoded.iss === 'string' ? decoded.iss : ''
+    if (iss.replace(/\/$/, '') !== oauth.publicBaseUrl.replace(/\/$/, '')) return null
+    const expectedAud = resourceAudienceForNamespace(oauth, namespace)
+
+    let payload: JWTPayload
+    try {
+      const publicKey = createPublicKey({ key: embedded.publicJwk as never, format: 'jwk' })
+      ;({ payload } = await jwtVerify(token, publicKey, {
+        issuer: oauth.publicBaseUrl,
+        audience: expectedAud,
+      }))
+    } catch {
+      return null
+    }
+
+    if (!this.audienceMatches(payload, expectedAud)) {
+      return null
+    }
+    const sub = typeof payload.sub === 'string' ? payload.sub : ''
+    if (!sub) return null
+    return { sub, roles: this.rolesFromPayload(payload, 'roles') }
+  }
+
   /**
    * Validate JWT access token; return UserIdentity or null.
    */
   async validate(
     token: string,
-    oauth: InboundOAuthConfig,
+    oauth: ResolvedInboundOAuthConfig,
     namespace: string,
   ): Promise<UserIdentity | null> {
     let decoded: JWTPayload
@@ -70,6 +103,10 @@ export class OAuthJwtValidator {
 
     const iss = typeof decoded.iss === 'string' ? decoded.iss : ''
     if (!iss) return null
+
+    if (oauth.provider === 'embedded') {
+      return this.validateEmbedded(token, oauth, namespace, decoded)
+    }
 
     const issuerCfg = this.issuerConfigForTokenIss(oauth, iss)
     if (!issuerCfg) return null

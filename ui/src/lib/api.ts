@@ -562,7 +562,8 @@ export interface AuthSummary {
 
 /** Inbound (resource-server) OAuth — mirrors `InboundOAuthSchema` on the gateway. */
 export interface InboundOAuthPolicy {
-  publicBaseUrl: string
+  provider?: 'embedded' | 'external'
+  publicBaseUrl?: string
   authorizationServers: {
     issuer: string
     audience?: string
@@ -572,6 +573,9 @@ export interface InboundOAuthPolicy {
   requireForNamespaces?: string[]
   scopesSupported?: string[]
   allowedBrowserOrigins?: string[]
+  embedded?: {
+    keyId?: string
+  }
 }
 
 export type PoliciesAuthConfig =

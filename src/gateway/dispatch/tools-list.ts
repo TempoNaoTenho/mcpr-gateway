@@ -15,8 +15,9 @@ import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
 function oauthChallengeError(
   code: 'OAUTH_AUTHENTICATION_REQUIRED' | 'OAUTH_INVALID_TOKEN',
   namespace: string,
+  requestOrigin?: string,
 ): GatewayError {
-  const oauth = getInboundOAuth(getConfig().auth)
+  const oauth = getInboundOAuth(getConfig().auth, requestOrigin)
   if (!oauth) {
     return new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
   }
@@ -57,12 +58,13 @@ export async function handleToolsList(
     namespace,
     session.userId,
     nsKeys,
+    ctx.requestOrigin,
   )
   if (check === 'oauth_required') {
-    throw oauthChallengeError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, namespace)
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, namespace, ctx.requestOrigin)
   }
   if (check === 'oauth_invalid' || check === 'session_mismatch') {
-    throw oauthChallengeError(GatewayErrorCode.OAUTH_INVALID_TOKEN, namespace)
+    throw oauthChallengeError(GatewayErrorCode.OAUTH_INVALID_TOKEN, namespace, ctx.requestOrigin)
   }
 
   assertMcpProtocolVersionMatches(session, ctx.mcpProtocolVersionHeader)

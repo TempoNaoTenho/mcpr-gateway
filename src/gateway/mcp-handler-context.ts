@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger, FastifyReply, FastifyRequest } from 'fastify'
+import { getRequestOrigin } from './request-origin.js'
 
 export type McpHandlerContext = {
   namespace: string
@@ -11,6 +12,7 @@ export type McpHandlerContext = {
   mcpProtocolVersionHeader?: string
   /** HTTP transport: maps to Mcp-Tools-Changed when the session opts into listChanged */
   setToolsListChangedHeader?: (toolsChanged: boolean) => void
+  requestOrigin?: string
 }
 
 export function mcpContextFromFastifyRequest(
@@ -39,5 +41,6 @@ export function mcpContextFromFastifyRequest(
     log: request.log,
     mcpProtocolVersionHeader,
     setToolsListChangedHeader,
+    requestOrigin: getRequestOrigin(request),
   }
 }

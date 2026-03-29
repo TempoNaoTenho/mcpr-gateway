@@ -7,6 +7,7 @@ import {
   GatewayConfigFileSchema,
   BootstrapAuthConfigSchema,
 } from './schemas.js'
+import { DEFAULT_EMBEDDED_BROWSER_ORIGINS } from './oauth-schemas.js'
 import type {
   ServersFile,
   PoliciesFile,
@@ -42,6 +43,15 @@ const DEFAULT_SERVER_HEALTHCHECK = {
   enabled: true,
   intervalSeconds: 30,
 } as const
+
+const DEFAULT_AUTH_CONFIG: AuthConfig = {
+  mode: 'hybrid',
+  oauth: {
+    provider: 'embedded',
+    authorizationServers: [],
+    allowedBrowserOrigins: [...DEFAULT_EMBEDDED_BROWSER_ORIGINS],
+  },
+}
 
 function applyServerDefaults<T extends { servers: GatewayConfig['servers'] }>(config: T): T {
   return {
@@ -144,7 +154,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
   const effectiveNamespaces = namespaces.length > 0 ? namespaces : ['default']
 
   return PoliciesFileSchema.parse({
-    auth: { mode: 'static_key' },
+    auth: DEFAULT_AUTH_CONFIG,
     namespaces: Object.fromEntries(
       effectiveNamespaces.map((namespace) => [
         namespace,
@@ -171,7 +181,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
 export function createDefaultAdminConfig(serverNamespaces: string[] = []): AdminConfig {
   const policies = createDefaultPolicies(serverNamespaces)
   return {
-    auth: { mode: 'static_key' },
+    auth: DEFAULT_AUTH_CONFIG,
     servers: [],
     namespaces: policies.namespaces,
     roles: policies.roles,
@@ -188,12 +198,12 @@ export function createDefaultAdminConfig(serverNamespaces: string[] = []): Admin
 
 function createBootstrapConfig(raw: unknown): BootstrapConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { auth: { mode: 'static_key' } }
+    return { auth: DEFAULT_AUTH_CONFIG }
   }
 
   const authValue = 'auth' in raw ? (raw as { auth?: unknown }).auth : undefined
   if (authValue === undefined) {
-    return { auth: { mode: 'static_key' } }
+    return { auth: DEFAULT_AUTH_CONFIG }
   }
 
   if (authValue && typeof authValue === 'object' && !Array.isArray(authValue)) {
@@ -308,7 +318,7 @@ export function loadConfig(configPath?: string): GatewayConfig {
   let config: GatewayConfig
 
   if (raw === null) {
-    config = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, createDefaultAdminConfig())
+    config = mergeWithAdminConfig({ auth: DEFAULT_AUTH_CONFIG }, createDefaultAdminConfig())
   } else {
     const bootstrap = createBootstrapConfig(raw)
     const parsed = validateSchema(GatewayConfigFileSchema, raw, 'bootstrap.json')

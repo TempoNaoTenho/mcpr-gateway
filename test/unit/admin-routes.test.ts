@@ -594,7 +594,7 @@ describe('adminRoutes', () => {
     expect(listRes.statusCode).toBe(200)
     expect(listRes.json()).toEqual({
       summary: {
-        clientAuth: 'bearer_tokens',
+        clientAuth: 'hybrid',
         clientTokensConfigured: 2,
         adminTokenConfigured: false,
       },

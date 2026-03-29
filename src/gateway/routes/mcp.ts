@@ -16,6 +16,7 @@ import {
 import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
 import { getConfig } from '../../config/index.js'
 import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { getRequestOrigin } from '../request-origin.js'
 import {
   isBrowserOriginAllowed,
   setMcpCorsHeaders,
@@ -35,20 +36,27 @@ interface McpRouteOptions {
   auditLogger?: IAuditLogger
 }
 
-function allowedBrowserOrigins(): string[] | undefined {
-  return getInboundOAuth(getConfig().auth)?.allowedBrowserOrigins
+function allowedBrowserOrigins(request: { protocol: string; headers: Record<string, unknown> }): string[] | undefined {
+  return getInboundOAuth(getConfig().auth, getRequestOrigin(request))?.allowedBrowserOrigins
 }
 
-function assertMcpOrigin(origin: string | undefined): void {
-  const oauth = getInboundOAuth(getConfig().auth)
+function assertMcpOrigin(
+  request: { protocol: string; headers: Record<string, unknown> },
+  origin: string | undefined,
+): void {
+  const oauth = getInboundOAuth(getConfig().auth, getRequestOrigin(request))
   const allowed = oauth?.allowedBrowserOrigins
   if (origin && !isBrowserOriginAllowed(origin, allowed)) {
     throw new GatewayError(GatewayErrorCode.MCP_INVALID_ORIGIN)
   }
 }
 
-function setSseCorsHeadersRaw(reply: FastifyReply, origin: string | undefined): void {
-  if (!origin || !isBrowserOriginAllowed(origin, allowedBrowserOrigins())) {
+function setSseCorsHeadersRaw(
+  request: { protocol: string; headers: Record<string, unknown> },
+  reply: FastifyReply,
+  origin: string | undefined,
+): void {
+  if (!origin || !isBrowserOriginAllowed(origin, allowedBrowserOrigins(request))) {
     return
   }
   reply.raw.setHeader('Access-Control-Allow-Origin', origin)
@@ -58,10 +66,14 @@ function setSseCorsHeadersRaw(reply: FastifyReply, origin: string | undefined): 
   reply.raw.setHeader('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
 }
 
-function openSseStream(reply: FastifyReply, origin: string | undefined): void {
+function openSseStream(
+  request: { protocol: string; headers: Record<string, unknown> },
+  reply: FastifyReply,
+  origin: string | undefined,
+): void {
   reply.hijack()
   reply.raw.statusCode = 200
-  setSseCorsHeadersRaw(reply, origin)
+  setSseCorsHeadersRaw(request, reply, origin)
   reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   reply.raw.setHeader('Cache-Control', 'no-cache, no-transform')
   reply.raw.setHeader('Connection', 'keep-alive')
@@ -129,8 +141,8 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins(request))
     return reply.status(204).send()
   })
 
@@ -144,13 +156,13 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    openSseStream(reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    openSseStream(request, reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
   })
 
   app.post<{ Params: { namespace: string } }>('/mcp/:namespace', async (request, reply) => {
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins(request))
 
     const namespaceResult = NamespaceSchema.safeParse(request.params.namespace)
     if (!namespaceResult.success) {

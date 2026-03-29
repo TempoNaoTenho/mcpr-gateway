@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { buildServer } from '../../src/gateway/server.js'
 import { healthRoutes } from '../../src/gateway/routes/health.js'
 import { oauthMetadataRoutes } from '../../src/gateway/routes/oauth-metadata.js'
+import { embeddedOAuthRoutes } from '../../src/gateway/routes/embedded-oauth.js'
 import { mcpRoutes } from '../../src/gateway/routes/mcp.js'
 import { MemorySessionStore } from '../../src/session/store.js'
 import { DownstreamRegistry } from '../../src/registry/registry.js'
@@ -20,6 +21,8 @@ import {
 } from '../fixtures/bootstrap-json.js'
 import type { FastifyInstance } from 'fastify'
 import { resetInboundIssuerMetadataCache } from '../../src/auth/oauth-issuer-metadata.js'
+import type { AdminConfig } from '../../src/config/loader.js'
+import { createHash } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const TMP = join(__dirname, '__tmp_oauth_integration__')
@@ -329,5 +332,138 @@ describe('metadata disabled for static_key', () => {
       url: '/mcp/gmail/.well-known/openid-configuration',
     })
     expect(openIdRes.statusCode).toBe(404)
+  })
+})
+
+describe('embedded oauth flow', () => {
+  let embeddedApp: FastifyInstance
+  let embeddedDisposeBackend: () => void
+  let embeddedRegistry: DownstreamRegistry
+  let currentConfig: AdminConfig
+
+  beforeAll(async () => {
+    mkdirSync(TMP + '_embedded', { recursive: true })
+    writeFileSync(
+      join(TMP + '_embedded', 'bootstrap.json'),
+      JSON.stringify(
+        {
+          servers: [],
+          auth: {
+            mode: 'hybrid',
+            oauth: {
+              provider: 'embedded',
+              allowedBrowserOrigins: ['https://chatgpt.com'],
+            },
+          },
+          ...basePolicies,
+        },
+        null,
+        2,
+      ),
+    )
+    currentConfig = initConfig(TMP + '_embedded')
+    const configManager = {
+      getBootstrap() {
+        return { auth: currentConfig.auth }
+      },
+      getEffective() {
+        return currentConfig
+      },
+      getAdminConfig() {
+        return currentConfig
+      },
+      async saveAdminConfig(config: AdminConfig) {
+        currentConfig = config
+        setConfig(config)
+        return 1
+      },
+      async rollback() {},
+    }
+
+    const store = new MemorySessionStore()
+    store.start(defaultSession.ttlSeconds, defaultSession.cleanupIntervalSeconds)
+    embeddedDisposeBackend = () => {
+      store.stop()
+    }
+    embeddedRegistry = new DownstreamRegistry()
+    const selector = new SelectorEngine()
+    const triggerEngine = new TriggerEngine(store, embeddedRegistry, selector)
+    embeddedApp = buildServer({ logLevel: 'silent' })
+    await embeddedApp.register(healthRoutes)
+    await embeddedApp.register(oauthMetadataRoutes)
+    await embeddedApp.register(embeddedOAuthRoutes, { configManager: configManager as any })
+    await embeddedApp.register(mcpRoutes, { store, registry: embeddedRegistry, triggerEngine })
+    await embeddedApp.ready()
+  })
+
+  afterAll(async () => {
+    await embeddedApp?.close()
+    embeddedRegistry?.stop()
+    embeddedDisposeBackend?.()
+    rmSync(TMP + '_embedded', { recursive: true, force: true })
+    setConfig(oauthConfigSnapshot)
+  })
+
+  it('supports dynamic client registration, PKCE auth code flow, and JWT access to initialize', async () => {
+    const metadataRes = await embeddedApp.inject({
+      method: 'GET',
+      url: '/.well-known/oauth-authorization-server/mcp/gmail',
+      headers: { host: 'gw.embedded.test' },
+    })
+    expect(metadataRes.statusCode).toBe(200)
+    expect(metadataRes.json()).toMatchObject({
+      issuer: 'http://gw.embedded.test',
+      authorization_endpoint: 'http://gw.embedded.test/oauth/authorize',
+      token_endpoint: 'http://gw.embedded.test/oauth/token',
+      registration_endpoint: 'http://gw.embedded.test/oauth/register',
+      jwks_uri: 'http://gw.embedded.test/.well-known/jwks.json',
+    })
+
+    const registerRes = await embeddedApp.inject({
+      method: 'POST',
+      url: '/oauth/register',
+      headers: { host: 'gw.embedded.test', 'content-type': 'application/json' },
+      payload: {
+        redirect_uris: ['https://chat.openai.com/a/oauth/callback'],
+        client_name: 'ChatGPT test app',
+      },
+    })
+    expect(registerRes.statusCode).toBe(201)
+    const clientId = registerRes.json().client_id as string
+
+    const verifier = 'pkce-verifier-example'
+    const challenge = createHash('sha256').update(verifier).digest('base64url')
+    const authorizeRes = await embeddedApp.inject({
+      method: 'GET',
+      url: `/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent('https://chat.openai.com/a/oauth/callback')}&response_type=code&resource=${encodeURIComponent('http://gw.embedded.test/mcp/gmail')}&code_challenge=${challenge}&code_challenge_method=S256`,
+      headers: { host: 'gw.embedded.test' },
+    })
+    expect(authorizeRes.statusCode).toBe(302)
+    const redirect = new URL(String(authorizeRes.headers.location))
+    const code = redirect.searchParams.get('code')
+    expect(code).toBeTruthy()
+
+    const tokenRes = await embeddedApp.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { host: 'gw.embedded.test', 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `grant_type=authorization_code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent('https://chat.openai.com/a/oauth/callback')}&code=${encodeURIComponent(code!)}&code_verifier=${encodeURIComponent(verifier)}`,
+    })
+    expect(tokenRes.statusCode).toBe(200)
+    const accessToken = tokenRes.json().access_token as string
+    expect(accessToken).toBeTruthy()
+
+    const initRes = await embeddedApp.inject({
+      method: 'POST',
+      url: '/mcp/gmail',
+      headers: {
+        host: 'gw.embedded.test',
+        'content-type': 'application/json',
+        authorization: `Bearer ${accessToken}`,
+      },
+      payload: { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
+    })
+    expect(initRes.statusCode).toBe(200)
+    expect(initRes.json()).toHaveProperty('result')
   })
 })

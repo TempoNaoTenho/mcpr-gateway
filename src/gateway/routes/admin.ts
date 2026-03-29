@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance } from 'fastify'
@@ -37,15 +36,23 @@ import { getStaticKeysForAuth } from '../../auth/oauth-config.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { generateToolcards } from '../../toolcard/index.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
-import {
-  getGatewayAdminUserFromEnv,
-} from '../../security/runtime-config.js'
 import { buildGatewayInstructions } from '../dispatch/initialize.js'
 import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { toolCandidateKey } from '../../candidate/lexical.js'
 import { downstreamAuthManager } from '../../registry/auth/index.js'
 import { DownstreamAuthStatus } from '../../types/enums.js'
 import { StdioInteractiveAuthStatus } from '../../types/enums.js'
+import {
+  authCookieHeaders,
+  clearAuthCookieHeaders,
+  createAdminSession,
+  getGatewayAdminPassword,
+  getGatewayAdminUser,
+  revokeAdminSession,
+  sessionFromCookies,
+  validateAdminCredentials,
+} from '../admin-auth-session.js'
+import { getRequestOrigin } from '../request-origin.js'
 
 interface AdminRouteOptions {
   auditRepo?: IAuditRepository
@@ -115,22 +122,6 @@ function trimToUndefined(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : undefined
-}
-
-function getRequestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
-  const protoHeader = request.headers['x-forwarded-proto']
-  const forwardedProto =
-    typeof protoHeader === 'string'
-      ? protoHeader.split(',')[0]?.trim()
-      : Array.isArray(protoHeader)
-        ? protoHeader[0]
-        : undefined
-  const hostHeader = request.headers['x-forwarded-host'] ?? request.headers['host']
-  const host =
-    typeof hostHeader === 'string'
-      ? hostHeader.split(',')[0]?.trim()
-      : '127.0.0.1:3000'
-  return `${forwardedProto || request.protocol}://${host}`
 }
 
 function inferInboundOAuthPublicBaseUrl(
@@ -369,7 +360,7 @@ export function deleteNamespaceFromAdminConfig(
 function buildAuthSummary(effectiveAuth: {
   mode: string
   staticKeys?: Record<string, { userId: string; roles: string[] }>
-  oauth?: { publicBaseUrl: string }
+  oauth?: { publicBaseUrl?: string }
 }) {
   const clientAuth =
     effectiveAuth.mode === 'oauth'
@@ -750,52 +741,6 @@ function buildImportPreview(current: AdminConfig, body: unknown): ImportPreview 
   }
 }
 
-// ── In-memory admin session store (HttpOnly cookie → session id) ──────────────
-
-const adminSessions = new Map<string, { createdAt: number }>()
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000 // 8 hours
-
-function pruneAdminSessions() {
-  const now = Date.now()
-  for (const [id, s] of adminSessions) {
-    if (now - s.createdAt > SESSION_TTL_MS) adminSessions.delete(id)
-  }
-}
-
-function isValidAdminSession(sessionId: string): boolean {
-  pruneAdminSessions()
-  const s = adminSessions.get(sessionId)
-  if (!s) return false
-  if (Date.now() - s.createdAt > SESSION_TTL_MS) {
-    adminSessions.delete(sessionId)
-    return false
-  }
-  return true
-}
-
-function revokeAdminSession(sessionId: string | undefined): void {
-  if (!sessionId) return
-  adminSessions.delete(sessionId)
-}
-
-function timingSafeStrEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, 'utf-8')
-  const bufB = Buffer.from(b, 'utf-8')
-  if (bufA.length !== bufB.length) {
-    timingSafeEqual(bufA, bufA)
-    return false
-  }
-  return timingSafeEqual(bufA, bufB)
-}
-
-function getGatewayAdminUser(): string {
-  return getGatewayAdminUserFromEnv(process.env)
-}
-
-function getGatewayAdminPassword(): string | undefined {
-  return trimToUndefined(process.env['GATEWAY_ADMIN_PASSWORD'])
-}
-
 // ── Auth middleware ────────────────────────────────────────────────────────────
 
 /**
@@ -815,8 +760,7 @@ function requireAdminAuth(app: FastifyInstance): void {
     // Check HttpOnly cookie session
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cookies = (request as any).cookies as Record<string, string> | undefined
-    const sessionId = cookies?.['admin_session']
-    if (sessionId && isValidAdminSession(sessionId)) return
+    if (sessionFromCookies(cookies)) return
 
     return reply.status(401).send({ error: 'Unauthorized' })
   })
@@ -916,27 +860,23 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
 
       const body = request.body as { username?: string; password?: string } | undefined
 
-      const expectedUser = getGatewayAdminUser()
-      const adminPasswordEnv = getGatewayAdminPassword()
       const username = body?.username?.trim()
       const password = (body?.password ?? '').trim()
 
-      if (!adminPasswordEnv) {
+      if (!getGatewayAdminPassword()) {
         return reply.status(503).send({ error: 'Admin authentication is misconfigured' })
       }
 
-      if (!timingSafeStrEqual(username ?? '', expectedUser) || !timingSafeStrEqual(password, adminPasswordEnv)) {
+      if (!validateAdminCredentials(username, password)) {
         return reply.status(401).send({ error: 'Invalid credentials' })
       }
 
-      const sessionId = nanoid(32)
-      adminSessions.set(sessionId, { createdAt: Date.now() })
+      const sessionId = createAdminSession()
 
       const isProduction = process.env['NODE_ENV'] === 'production'
-      reply.header(
-        'Set-Cookie',
-        `admin_session=${sessionId}; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=${SESSION_TTL_MS / 1000}`
-      )
+      reply.headers({
+        'Set-Cookie': authCookieHeaders(sessionId, isProduction),
+      })
 
       return reply.send({ authenticated: true })
     }
@@ -945,13 +885,12 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
   app.post('/admin/auth/logout', async (request, reply) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cookies = (request as any).cookies as Record<string, string> | undefined
-    revokeAdminSession(cookies?.['admin_session'])
+    revokeAdminSession(sessionFromCookies(cookies))
 
     const isProduction = process.env['NODE_ENV'] === 'production'
-    reply.header(
-      'Set-Cookie',
-      `admin_session=; Path=/; HttpOnly; SameSite=Strict${isProduction ? '; Secure' : ''}; Max-Age=0`
-    )
+    reply.headers({
+      'Set-Cookie': clearAuthCookieHeaders(isProduction),
+    })
     return reply.send({ authenticated: false })
   })
 
@@ -961,8 +900,7 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cookies = (request as any).cookies as Record<string, string> | undefined
-    const sessionId = cookies?.['admin_session']
-    const authenticated = Boolean(sessionId && isValidAdminSession(sessionId))
+    const authenticated = Boolean(sessionFromCookies(cookies))
     return reply.send({ authenticated })
   })
 

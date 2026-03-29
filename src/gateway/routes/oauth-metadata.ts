@@ -7,9 +7,10 @@ import {
   getOpenIdConfigurationDocument,
 } from '../../auth/oauth-issuer-metadata.js'
 import { setMcpCorsHeaders } from '../cors.js'
+import { getRequestOrigin } from '../request-origin.js'
 
-function protectedResourceBody(namespace: string) {
-  const oauth = getInboundOAuth(getConfig().auth)
+function protectedResourceBody(namespace: string, requestOrigin?: string) {
+  const oauth = getInboundOAuth(getConfig().auth, requestOrigin)
   if (!oauth) {
     return null
   }
@@ -26,9 +27,9 @@ function protectedResourceBody(namespace: string) {
   }
 }
 
-function metadataFailureReason(namespace?: string): Record<string, unknown> {
+function metadataFailureReason(namespace?: string, requestOrigin?: string): Record<string, unknown> {
   const config = getConfig()
-  const oauth = getInboundOAuth(config.auth)
+  const oauth = getInboundOAuth(config.auth, requestOrigin)
   const namespaceExists = namespace ? Boolean(config.namespaces[namespace]) : undefined
   const oauthEnabled = Boolean(oauth)
   const oauthApplies =
@@ -46,19 +47,19 @@ function metadataFailureReason(namespace?: string): Record<string, unknown> {
   }
 }
 
-function logMetadata404(app: FastifyInstance, route: string, namespace?: string): void {
+function logMetadata404(app: FastifyInstance, route: string, namespace?: string, requestOrigin?: string): void {
   app.log.info(
-    metadataFailureReason(namespace),
+    metadataFailureReason(namespace, requestOrigin),
     `[oauth-metadata] returning 404 for ${route}`,
   )
 }
 
-function metadataContext(namespace?: string): {
+function metadataContext(namespace?: string, requestOrigin?: string): {
   oauth: NonNullable<ReturnType<typeof getInboundOAuth>>
   issuer: NonNullable<ReturnType<typeof getInboundOAuth>>['authorizationServers'][number]
 } | null {
   const config = getConfig()
-  const oauth = getInboundOAuth(config.auth)
+  const oauth = getInboundOAuth(config.auth, requestOrigin)
   if (!oauth) return null
 
   if (namespace) {
@@ -84,16 +85,37 @@ async function sendDiscoveryDocument(
   origin: string | undefined,
   route: string,
   namespace: string | undefined,
+  requestOrigin: string | undefined,
   builder: () => Promise<Record<string, unknown> | null>,
 ) {
-  const allowedOrigins = getInboundOAuth(getConfig().auth)?.allowedBrowserOrigins
+  const allowedOrigins = getInboundOAuth(getConfig().auth, requestOrigin)?.allowedBrowserOrigins
   setMcpCorsHeaders(reply, origin, allowedOrigins)
   const body = await builder()
   if (!body) {
-    logMetadata404(app, route, namespace)
+    logMetadata404(app, route, namespace, requestOrigin)
     return reply.status(404).send({ error: 'not_found' })
   }
   return reply.header('Content-Type', 'application/json; charset=utf-8').send(body)
+}
+
+function embeddedAuthorizationServerDocument(
+  oauth: NonNullable<ReturnType<typeof getInboundOAuth>>,
+  namespace?: string,
+): Record<string, unknown> {
+  const base = oauth.publicBaseUrl.replace(/\/$/, '')
+  return {
+    issuer: base,
+    authorization_endpoint: `${base}/oauth/authorize`,
+    token_endpoint: `${base}/oauth/token`,
+    jwks_uri: `${base}/.well-known/jwks.json`,
+    registration_endpoint: `${base}/oauth/register`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code'],
+    token_endpoint_auth_methods_supported: ['none'],
+    code_challenge_methods_supported: ['S256'],
+    scopes_supported: oauth.scopesSupported?.length ? oauth.scopesSupported : ['openid'],
+    ...(namespace ? { resource: `${base}/mcp/${namespace}` } : {}),
+  }
 }
 
 export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
@@ -101,7 +123,11 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
     const config = getConfig()
     const oauth = getInboundOAuth(config.auth)
     if (!oauth) {
-      app.log.info('[oauth-metadata] inbound OAuth metadata routes mounted in passive mode (auth.mode=static_key)')
+      const message =
+        config.auth.mode === 'hybrid'
+          ? '[oauth-metadata] inbound OAuth metadata routes mounted in passive mode (auth.mode=hybrid, oauthReady=false)'
+          : '[oauth-metadata] inbound OAuth metadata routes mounted in passive mode (auth.mode=static_key)'
+      app.log.info(message)
       return
     }
 
@@ -119,15 +145,16 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { namespace: string } }>(
     '/.well-known/oauth-protected-resource/mcp/:namespace',
     async (request, reply) => {
-      const allowedOrigins = getInboundOAuth(getConfig().auth)?.allowedBrowserOrigins
+      const requestOrigin = getRequestOrigin(request)
+      const allowedOrigins = getInboundOAuth(getConfig().auth, requestOrigin)?.allowedBrowserOrigins
       setMcpCorsHeaders(reply, request.headers.origin, allowedOrigins)
       const nsResult = NamespaceSchema.safeParse(request.params.namespace)
       if (!nsResult.success) {
         return reply.status(400).send({ error: 'invalid_namespace' })
       }
-      const body = protectedResourceBody(nsResult.data)
+      const body = protectedResourceBody(nsResult.data, requestOrigin)
       if (!body) {
-        logMetadata404(app, '/.well-known/oauth-protected-resource/mcp/:namespace', nsResult.data)
+        logMetadata404(app, '/.well-known/oauth-protected-resource/mcp/:namespace', nsResult.data, requestOrigin)
         return reply.status(404).send({ error: 'not_found' })
       }
       return reply.header('Content-Type', 'application/json; charset=utf-8').send(body)
@@ -141,15 +168,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
       if (!nsResult.success) {
         return reply.status(400).send({ error: 'invalid_namespace' })
       }
+      const requestOrigin = getRequestOrigin(request)
       return sendDiscoveryDocument(
         app,
         reply,
         request.headers.origin,
         '/.well-known/oauth-authorization-server/mcp/:namespace',
         nsResult.data,
+        requestOrigin,
         async () => {
-        const ctx = metadataContext(nsResult.data)
+        const ctx = metadataContext(nsResult.data, requestOrigin)
         if (!ctx) return null
+        if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth, nsResult.data)
         return getAuthorizationServerMetadataDocument(ctx.oauth, ctx.issuer, nsResult.data)
         },
       )
@@ -163,15 +193,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
       if (!nsResult.success) {
         return reply.status(400).send({ error: 'invalid_namespace' })
       }
+      const requestOrigin = getRequestOrigin(request)
       return sendDiscoveryDocument(
         app,
         reply,
         request.headers.origin,
         '/mcp/:namespace/.well-known/oauth-authorization-server',
         nsResult.data,
+        requestOrigin,
         async () => {
-        const ctx = metadataContext(nsResult.data)
+        const ctx = metadataContext(nsResult.data, requestOrigin)
         if (!ctx) return null
+        if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth, nsResult.data)
         return getAuthorizationServerMetadataDocument(ctx.oauth, ctx.issuer, nsResult.data)
         },
       )
@@ -179,15 +212,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
   )
 
   app.get('/.well-known/oauth-authorization-server', async (request, reply) => {
+    const requestOrigin = getRequestOrigin(request)
     return sendDiscoveryDocument(
       app,
       reply,
       request.headers.origin,
       '/.well-known/oauth-authorization-server',
       undefined,
+      requestOrigin,
       async () => {
-      const ctx = metadataContext()
+      const ctx = metadataContext(undefined, requestOrigin)
       if (!ctx) return null
+      if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth)
       return getAuthorizationServerMetadataDocument(ctx.oauth, ctx.issuer)
       },
     )
@@ -200,15 +236,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
       if (!nsResult.success) {
         return reply.status(400).send({ error: 'invalid_namespace' })
       }
+      const requestOrigin = getRequestOrigin(request)
       return sendDiscoveryDocument(
         app,
         reply,
         request.headers.origin,
         '/.well-known/openid-configuration/mcp/:namespace',
         nsResult.data,
+        requestOrigin,
         async () => {
-        const ctx = metadataContext(nsResult.data)
+        const ctx = metadataContext(nsResult.data, requestOrigin)
         if (!ctx) return null
+        if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth, nsResult.data)
         return getOpenIdConfigurationDocument(ctx.oauth, ctx.issuer, nsResult.data)
         },
       )
@@ -222,15 +261,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
       if (!nsResult.success) {
         return reply.status(400).send({ error: 'invalid_namespace' })
       }
+      const requestOrigin = getRequestOrigin(request)
       return sendDiscoveryDocument(
         app,
         reply,
         request.headers.origin,
         '/mcp/:namespace/.well-known/openid-configuration',
         nsResult.data,
+        requestOrigin,
         async () => {
-        const ctx = metadataContext(nsResult.data)
+        const ctx = metadataContext(nsResult.data, requestOrigin)
         if (!ctx) return null
+        if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth, nsResult.data)
         return getOpenIdConfigurationDocument(ctx.oauth, ctx.issuer, nsResult.data)
         },
       )
@@ -238,15 +280,18 @@ export async function oauthMetadataRoutes(app: FastifyInstance): Promise<void> {
   )
 
   app.get('/.well-known/openid-configuration', async (request, reply) => {
+    const requestOrigin = getRequestOrigin(request)
     return sendDiscoveryDocument(
       app,
       reply,
       request.headers.origin,
       '/.well-known/openid-configuration',
       undefined,
+      requestOrigin,
       async () => {
-      const ctx = metadataContext()
+      const ctx = metadataContext(undefined, requestOrigin)
       if (!ctx) return null
+      if (ctx.oauth.provider === 'embedded') return embeddedAuthorizationServerDocument(ctx.oauth)
       return getOpenIdConfigurationDocument(ctx.oauth, ctx.issuer)
       },
     )

@@ -1,5 +1,4 @@
-import type { InboundOAuthConfig } from '../config/oauth-schemas.js'
-import { resourceAudienceForNamespace } from './oauth-config.js'
+import { resourceAudienceForNamespace, type ResolvedInboundOAuthConfig } from './oauth-config.js'
 
 export type OAuthChallengeDetails = {
   wwwAuthenticate: string
@@ -10,7 +9,7 @@ export type OAuthChallengeDetails = {
  * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
  */
 export function buildOAuthChallenge(
-  oauth: InboundOAuthConfig,
+  oauth: ResolvedInboundOAuthConfig,
   namespace: string,
   error?: 'invalid_token',
 ): OAuthChallengeDetails {
@@ -26,6 +25,6 @@ export function buildOAuthChallenge(
   return { wwwAuthenticate: directive }
 }
 
-export function expectedResourceParameter(oauth: InboundOAuthConfig, namespace: string): string {
+export function expectedResourceParameter(oauth: ResolvedInboundOAuthConfig, namespace: string): string {
   return resourceAudienceForNamespace(oauth, namespace)
 }

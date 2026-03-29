@@ -17,6 +17,7 @@ export async function resolveMcpIdentityForInitialize(
   auth: AuthConfig,
   namespace: string,
   configuredNamespaceKeys: Set<string>,
+  requestOrigin?: string,
 ): Promise<McpIdentityResult> {
   const token = extractBearerToken(authHeader)
   const staticKeys = getStaticKeysForAuth(auth)
@@ -28,7 +29,7 @@ export async function resolveMcpIdentityForInitialize(
     }
   }
 
-  const oauth = getInboundOAuth(auth)
+  const oauth = getInboundOAuth(auth, requestOrigin)
   const oauthActive = oauth && oauthAppliesToNamespace(oauth, namespace, configuredNamespaceKeys)
 
   if (!oauthActive) {
@@ -59,8 +60,9 @@ export async function assertMcpSessionOAuthBearer(
   namespace: string,
   sessionUserId: string,
   configuredNamespaceKeys: Set<string>,
+  requestOrigin?: string,
 ): Promise<'ok' | 'oauth_required' | 'oauth_invalid' | 'session_mismatch'> {
-  const oauth = getInboundOAuth(auth)
+  const oauth = getInboundOAuth(auth, requestOrigin)
   if (!oauth || !oauthAppliesToNamespace(oauth, namespace, configuredNamespaceKeys)) {
     return 'ok'
   }
