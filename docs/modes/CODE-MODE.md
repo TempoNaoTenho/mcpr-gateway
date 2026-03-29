@@ -24,6 +24,8 @@ The sandbox is **memory- and time-limited** (configurable via `code.*` config). 
 
 ```javascript
 // 🔍 Discover tools
+const servers = await catalog.servers()
+
 const tools = await catalog.search('fastmcp docs', {
   serverId: 'fastmcp',     // optional: restrict to one downstream server
   requiredArgs: ['query'], // optional: filter by required argument names
@@ -59,6 +61,7 @@ return { saved, count: result.count(filtered), sample: text }
 ### API notes
 
 - `result` is a **reserved global** — do not assign to it; use `return` or an expression as the snippet's final value
+- `catalog.servers()` returns the exact downstream `serverId` values available in the namespace; use it only when the target integration is unclear
 - Snippets may be a single expression or a block with `return`; the final value must be JSON-serializable
 - `catalog.search()` returns handles scoped to the current session — do not persist them across calls
 - `catalog.describe(..., { detail: "signature" })` returns required args plus short property metadata (`type`, `description`, `enum` when present)
@@ -87,6 +90,6 @@ See [Configuration](../CONFIGURATION.md) for full `code` and `resilience` option
 
 ## See Also
 
-- [Compat Mode](COMPAT-MODE.md) — two meta-tools for large catalogs without a sandbox
+- [Compat Mode](COMPAT-MODE.md) — compact discovery/call mode for large catalogs without a sandbox
 - [Default Mode](DEFAULT-MODE.md) — exposes all tools directly
 - [Configuration](../CONFIGURATION.md) — `code.*` and `resilience` settings

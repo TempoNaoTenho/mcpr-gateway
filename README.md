@@ -94,6 +94,11 @@
 |                           | Pino structured logging           | ✅         |
 |                           | Audit log pruning                 | ✅         |
 |                           | Debug endpoints (loopback)        | ✅         |
+| **🔌 Client Support**     | Claude Code                       | ✅         |
+|                           | OpenAI Codex                      | ✅         |
+|                           | OpenCode                          | ✅         |
+|                           | Claude Web Client                 | ✅         |
+|                           | ChatGPT Web Client                | ✅         |
 
 </div>
 
@@ -175,13 +180,13 @@ npm run build
 npm start                 # built UI + MCP gateway on PORT
 ```
 
-Replace the `change-me-*` security placeholders in `.env` with your own values before `npm start`.
+Before running `npm start`, replace `change-me-*` in `.env` with your own secure values.
 
-`npm ci`, `npm run build`, and `npm start` are the standard install/build/run contract. The build step requires Node 24 LTS, rebuilds `isolated-vm` and `better-sqlite3` if they were compiled for another Node version, and produces the production UI plus gateway artifacts.
+Use Node 24 LTS. Run: `npm ci`, `npm run build`, then `npm start` (serves UI + gateway on same port). The build step auto-rebuilds `isolated-vm`/`better-sqlite3` if needed.
 
-`.env` is a local convenience, not a deployment requirement. `npm start` first uses variables already present in the process environment, then fills any missing keys from `.env` if that file exists. It attempts a one-time automatic rebuild of stale `isolated-vm` and `better-sqlite3` binaries when it detects an older Node ABI, refuses to start with missing or placeholder security values, and serves the built UI and MCP gateway on the same port. `npm run dev` applies the same native-module repair before launching the gateway watcher. `npm test`, `npm run test:coverage`, and `npm run test:watch` now use the same preflight and force `--no-node-snapshot` for `isolated-vm` stability before starting Vitest. `npm run setup` remains available only as a local convenience helper when you want guided editing of `.env` or to create `config/bootstrap.json`.
+`.env` is optional; environment variables take priority. The app exits if required security settings are missing or default. Native module fixes and test preflights are automatic for all scripts. Use `npm run setup` if you want help editing `.env` or generating `bootstrap.json`.
 
-Open `http://127.0.0.1:3000` after `npm start`. The root path redirects to the built admin UI under `/ui/`, and MCP clients use the same port. `npm run dev` remains available for contributors; in that mode Vite serves the UI on `PORT` and the gateway API uses `PORT + 1`.
+App runs at `http://127.0.0.1:3000` (UI at `/ui/`). For development, use `npm run dev` (UI on `PORT`, API on `PORT+1`).
 
 #### Minimum security variables
 
@@ -203,11 +208,19 @@ The compose file reads `ADMIN_TOKEN`, `GATEWAY_ADMIN_PASSWORD`, and `DOWNSTREAM_
 
 If the UI or `/health` fails from the browser, try **`http://127.0.0.1:3000`** instead of `http://localhost:3000` (some systems resolve `localhost` to IPv6 first).
 
-### 2. Connect an MCP client
+---
 
-Issue a **client Bearer token** from the Access Control panel at `/ui/access` (or add it to `auth.staticKeys` in `bootstrap.json`), then configure your client:
+## 🔌 Connect an MCP client
 
-**Claude Code** (`~/.claude/settings.json`):
+Issue a **client Bearer token** from the Access Control panel at `/ui/access` (or add it to `auth.staticKeys` in `bootstrap.json`), then configure your client.
+
+> 💡 Without `bootstrap.json`, the built-in namespace is `default`. Replace it only when you configure custom namespaces.
+
+---
+
+### 🛠️ Development Tools
+
+#### **Claude Code** (`~/.claude/settings.json`)
 
 ```json
 {
@@ -221,7 +234,7 @@ Issue a **client Bearer token** from the Access Control panel at `/ui/access` (o
 }
 ```
 
-**OpenAI Codex** (`~/.codex/config.toml`):
+#### **OpenAI Codex** (`~/.codex/config.toml`)
 
 ```toml
 [mcp_servers.mcpr-gateway]
@@ -234,9 +247,43 @@ bearer_token_env_var = "MCPR_GATEWAY_TOKEN"
 export MCPR_GATEWAY_TOKEN=<your-token>
 ```
 
-**Any HTTP MCP client**: send `Authorization: Bearer <token>` on every request. After `initialize`, include the `Mcp-Session-Id` header returned by the gateway.
+#### **OpenCode**
 
-> 💡 Without `bootstrap.json`, the built-in namespace is `default`. Replace it only when you configure custom namespaces.
+```bash
+# Add via CLI or config file
+opencode mcp add mcpr-gateway \
+  --url "http://localhost:3000/mcp/<namespace_name>" \
+  --token "<your-token>"
+```
+
+---
+
+### 🌐 Web Clients
+
+#### **Claude Web** (claude.ai)
+
+1. Go to **Settings** → **Integrations** → **MCP Servers**
+2. Click **Add Integration**
+3. Fill the form:
+   - **Name**: `MCPR Gateway`
+   - **URL**: `http://localhost:3000/mcp/<namespace_name>`
+4. Save and enable the integration
+
+#### **ChatGPT Web** (chat.openai.com)
+
+1. Go to **Settings** → **Plugins** → **MCP Servers** (or search "MCP" in plugin store)
+2. Add a new MCP server
+3. Configure:
+   - **Server URL**: `http://localhost:3000/mcp/<namespace_name>`
+4. Save and activate
+
+**Both supports OAuth.**
+
+---
+
+### 🔗 Any HTTP MCP Client
+
+Send `Authorization: Bearer <token>` on every request. After `initialize`, include the `Mcp-Session-Id` header returned by the gateway.
 
 ---
 

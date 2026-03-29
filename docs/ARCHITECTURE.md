@@ -74,7 +74,7 @@ Each namespace runs in one of three modes, configured under `namespaces[].mode`:
 | Mode | Exposed tools | Best for |
 | ---- | ------------- | -------- |
 | **Default** | All enabled downstream tools filtered by namespace | Small tool sets, maximum transparency |
-| **Compat** | Two meta-tools: `gateway_search_tools` + `gateway_call_tool` | Large catalogs, context-window efficiency |
+| **Compat** | Three gateway tools: `gateway_search_tools` + `gateway_call_tool` + `gateway_list_servers` | Large catalogs, context-window efficiency |
 | **Code** | Two tools: `gateway_run_code` + `gateway_help` | Programmatic multi-tool orchestration in a JS sandbox |
 
 - [Default Mode](modes/DEFAULT-MODE.md) — full tool catalog, no indirection
