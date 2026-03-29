@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-const baseUrl = (process.argv[2] ?? process.env['MCP_GATEWAY_BASE_URL'] ?? '').trim().replace(/\/$/, '')
+const baseUrl = (process.argv[2] ?? process.env['MCP_GATEWAY_BASE_URL'] ?? '')
+  .trim()
+  .replace(/\/$/, '')
 const namespace = (process.argv[3] ?? process.env['MCP_GATEWAY_NAMESPACE'] ?? 'default').trim()
 
 if (!baseUrl) {
   console.error('Usage: node scripts/check-remote-oauth-metadata.mjs <base-url> [namespace]')
-  console.error('Example: node scripts/check-remote-oauth-metadata.mjs https://mcpr-gateway.onrender.com default')
+  console.error(
+    'Example: node scripts/check-remote-oauth-metadata.mjs https://my-domain.com default'
+  )
   process.exit(1)
 }
 
