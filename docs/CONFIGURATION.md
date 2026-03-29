@@ -237,7 +237,7 @@ Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/
 | `mode`       | Behavior |
 | ------------ | -------- |
 | `static_key` | Map `Authorization: Bearer <token>` against `auth.staticKeys` (bootstrap and/or admin). Unknown/missing token → `anonymous`. |
-| `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
+| `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces and SSE connects → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
 | `hybrid`     | Try static keys first; if no match and OAuth applies to the namespace, validate JWT as in `oauth`. |
 
 **JWT / OAuth:** `oauth.publicBaseUrl` must be the HTTPS origin clients use to reach the gateway in production. The gateway validates `aud` against `publicBaseUrl + /mcp/{namespace}` unless an issuer entry sets a custom `audience`. Issuer `issuer` URLs must match the JWT `iss` claim. Optional `jwksUri`; otherwise JWKS URL is discovered (OpenID discovery, OAuth authorization-server metadata, then `/.well-known/jwks.json`). Role strings are read from the claim named by `rolesClaim` (default `roles`).

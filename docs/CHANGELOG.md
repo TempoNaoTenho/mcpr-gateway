@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-29 - Fixed - `test/unit/health.test.ts` now initializes config before `app.ready()`; the exported gateway `app` only loads config when run as the process entrypoint, while `oauth-metadata` registers an `onReady` hook that calls `getConfig()`
+- 2026-03-29 - Fixed - `GET /mcp/:namespace` now enforces inbound OAuth and returns `401` + `WWW-Authenticate` for unauthenticated SSE requests instead of opening an anonymous stream
 - 2026-03-29 - Fixed - Embedded inbound OAuth now includes `https://claude.com` in the default browser-origin allowlist, logs now distinguish rejected browser origins from OAuth `401` initialize challenges, and docs/UI now clarify that `allowedBrowserOrigins` is not an OAuth callback allowlist
 - 2026-03-29 - Fixed - Inbound OAuth browser origin checks now require exact origin matches, protected-resource metadata routes emit CORS headers for allowed browser origins, and `PUT /admin/config/policies` no longer overwrites newer bearer tokens from dedicated auth endpoints
 - 2026-03-28 - Fixed - stdio downstream transport now converts `stdin` `EPIPE` / closed-pipe writes into rejected MCP transport errors instead of leaking unhandled exceptions during tests and benchmark flows
