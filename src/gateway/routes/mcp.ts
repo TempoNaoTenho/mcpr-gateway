@@ -15,7 +15,10 @@ import {
 } from '../jsonrpc.js'
 import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
 import { getConfig } from '../../config/index.js'
+import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
 import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { resolveMcpIdentityForInitialize } from '../../auth/mcp-identity.js'
+import { getRequestOrigin } from '../request-origin.js'
 import {
   isBrowserOriginAllowed,
   setMcpCorsHeaders,
@@ -35,20 +38,43 @@ interface McpRouteOptions {
   auditLogger?: IAuditLogger
 }
 
-function allowedBrowserOrigins(): string[] | undefined {
-  return getInboundOAuth(getConfig().auth)?.allowedBrowserOrigins
+function allowedBrowserOrigins(request: { protocol: string; headers: Record<string, unknown> }): string[] | undefined {
+  return getInboundOAuth(getConfig().auth, getRequestOrigin(request))?.allowedBrowserOrigins
 }
 
-function assertMcpOrigin(origin: string | undefined): void {
-  const oauth = getInboundOAuth(getConfig().auth)
+function assertMcpOrigin(
+  request: {
+    protocol: string
+    headers: Record<string, unknown>
+    log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
+    params?: Record<string, unknown>
+  },
+  origin: string | undefined,
+): void {
+  const oauth = getInboundOAuth(getConfig().auth, getRequestOrigin(request))
   const allowed = oauth?.allowedBrowserOrigins
   if (origin && !isBrowserOriginAllowed(origin, allowed)) {
+    request.log?.warn(
+      {
+        origin,
+        requestOrigin: getRequestOrigin(request),
+        namespace: request.params?.['namespace'],
+        authMode: getConfig().auth.mode,
+        oauthProvider: oauth?.provider,
+        allowedBrowserOrigins: allowed,
+      },
+      '[mcp] rejected browser origin for MCP endpoint',
+    )
     throw new GatewayError(GatewayErrorCode.MCP_INVALID_ORIGIN)
   }
 }
 
-function setSseCorsHeadersRaw(reply: FastifyReply, origin: string | undefined): void {
-  if (!origin || !isBrowserOriginAllowed(origin, allowedBrowserOrigins())) {
+function setSseCorsHeadersRaw(
+  request: { protocol: string; headers: Record<string, unknown> },
+  reply: FastifyReply,
+  origin: string | undefined,
+): void {
+  if (!origin || !isBrowserOriginAllowed(origin, allowedBrowserOrigins(request))) {
     return
   }
   reply.raw.setHeader('Access-Control-Allow-Origin', origin)
@@ -58,10 +84,14 @@ function setSseCorsHeadersRaw(reply: FastifyReply, origin: string | undefined): 
   reply.raw.setHeader('Access-Control-Expose-Headers', MCP_EXPOSED_HEADERS)
 }
 
-function openSseStream(reply: FastifyReply, origin: string | undefined): void {
+function openSseStream(
+  request: { protocol: string; headers: Record<string, unknown> },
+  reply: FastifyReply,
+  origin: string | undefined,
+): void {
   reply.hijack()
   reply.raw.statusCode = 200
-  setSseCorsHeadersRaw(reply, origin)
+  setSseCorsHeadersRaw(request, reply, origin)
   reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   reply.raw.setHeader('Cache-Control', 'no-cache, no-transform')
   reply.raw.setHeader('Connection', 'keep-alive')
@@ -129,8 +159,8 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins(request))
     return reply.status(204).send()
   })
 
@@ -144,13 +174,44 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
       })
     }
 
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    openSseStream(reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    const config = getConfig()
+    const namespace = namespaceResult.data
+    const requestOrigin = getRequestOrigin(request)
+    const idResult = await resolveMcpIdentityForInitialize(
+      typeof request.headers.authorization === 'string' ? request.headers.authorization : undefined,
+      config.auth,
+      namespace,
+      new Set(Object.keys(config.namespaces)),
+      requestOrigin,
+    )
+    if (idResult.kind === 'oauth_required' || idResult.kind === 'oauth_invalid') {
+      const oauth = getInboundOAuth(config.auth, requestOrigin)
+      if (!oauth) {
+        throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+      }
+      const { wwwAuthenticate } = buildOAuthChallenge(
+        oauth,
+        namespace,
+        idResult.kind === 'oauth_invalid' ? 'invalid_token' : undefined,
+      )
+      return reply.header('WWW-Authenticate', wwwAuthenticate).status(401).send({
+        error:
+          idResult.kind === 'oauth_invalid'
+            ? GatewayErrorCode.OAUTH_INVALID_TOKEN
+            : GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED,
+        message:
+          idResult.kind === 'oauth_invalid'
+            ? 'Invalid or expired OAuth access token'
+            : 'OAuth authentication required for this MCP namespace',
+      })
+    }
+    openSseStream(request, reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
   })
 
   app.post<{ Params: { namespace: string } }>('/mcp/:namespace', async (request, reply) => {
-    assertMcpOrigin(typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
-    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins())
+    assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    setMcpCorsHeaders(reply, request.headers.origin, allowedBrowserOrigins(request))
 
     const namespaceResult = NamespaceSchema.safeParse(request.params.namespace)
     if (!namespaceResult.success) {

@@ -106,7 +106,7 @@ afterEach(() => {
 })
 
 describe('loadConfig — valid config', () => {
-  it('merges legacy persisted admin config without an auth block', () => {
+  it('merges legacy persisted admin config without an auth block into the hybrid draft default', () => {
     const base = validGatewayBase()
     const adminConfig = {
       servers: base.servers,
@@ -122,7 +122,14 @@ describe('loadConfig — valid config', () => {
 
     const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
 
-    expect(merged.auth).toEqual({ mode: 'static_key', staticKeys: undefined })
+    expect(merged.auth).toEqual({
+      mode: 'hybrid',
+      oauth: {
+        provider: 'embedded',
+        authorizationServers: [],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
+      },
+    })
     expect(merged.servers).toEqual([
       {
         ...base.servers[0],
@@ -132,6 +139,27 @@ describe('loadConfig — valid config', () => {
         },
       },
     ])
+  })
+
+  it('merges legacy persisted admin config with auth.staticKeys but no auth.mode', () => {
+    const base = validGatewayBase()
+    const adminConfig = {
+      ...base,
+      auth: {
+        staticKeys: {
+          legacyToken: { userId: 'legacy-user', roles: ['user'] },
+        },
+      },
+    } as unknown as AdminConfig
+
+    const merged = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, adminConfig)
+
+    expect(merged.auth).toEqual({
+      mode: 'static_key',
+      staticKeys: {
+        legacyToken: { userId: 'legacy-user', roles: ['user'] },
+      },
+    })
   })
 
   it('backfills missing healthchecks for legacy persisted servers', () => {
@@ -225,12 +253,19 @@ describe('loadConfig — valid config', () => {
     expect(config.starterPacks['test'].maxTools).toBe(4)
   })
 
-  it('defaults auth to static_key when auth is omitted from bootstrap.json', () => {
+  it('defaults auth to hybrid draft when auth is omitted from bootstrap.json', () => {
     const base = validGatewayBase()
     const { auth: _a, ...withoutAuth } = base
     writeGatewayJson(TMP, withoutAuth)
     const config = loadConfig(TMP)
-    expect(config.auth).toEqual({ mode: 'static_key' })
+    expect(config.auth).toEqual({
+      mode: 'hybrid',
+      oauth: {
+        provider: 'embedded',
+        authorizationServers: [],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
+      },
+    })
   })
 
   it('defaults debug.enabled to false when omitted', () => {
@@ -308,7 +343,14 @@ describe('loadConfig — bootstrap defaults', () => {
     const config = loadConfig(TMP)
 
     expect(config.servers).toEqual([])
-    expect(config.auth).toEqual({ mode: 'static_key' })
+    expect(config.auth).toEqual({
+      mode: 'hybrid',
+      oauth: {
+        provider: 'embedded',
+        authorizationServers: [],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
+      },
+    })
     expect(config.namespaces['default']).toBeDefined()
     expect(config.roles['user']).toEqual({
       allowNamespaces: ['default'],

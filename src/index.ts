@@ -10,9 +10,11 @@ import { buildServer } from './gateway/server.js'
 import { healthRoutes } from './gateway/routes/health.js'
 import { mcpRoutes } from './gateway/routes/mcp.js'
 import { oauthMetadataRoutes } from './gateway/routes/oauth-metadata.js'
+import { getInboundOAuth } from './auth/oauth-config.js'
 import { debugRoutes } from './gateway/routes/debug.js'
 import { adminRoutes } from './gateway/routes/admin.js'
 import { uiRoutes } from './gateway/routes/ui.js'
+import { embeddedOAuthRoutes } from './gateway/routes/embedded-oauth.js'
 import { sessionStore } from './session/index.js'
 import { registry } from './registry/index.js'
 import { SelectorEngine } from './selector/engine.js'
@@ -140,6 +142,26 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await runtimeConfigManager.initialize()
   config = runtimeConfigManager.getEffective()
 
+  const inboundOAuth = getInboundOAuth(config.auth)
+  if (inboundOAuth) {
+    app.log.info(
+      {
+        authMode: config.auth.mode,
+        publicBaseUrl: inboundOAuth.publicBaseUrl,
+        issuers: inboundOAuth.authorizationServers.map((issuer) => issuer.issuer.replace(/\/$/, '')),
+        protectedNamespaces: inboundOAuth.requireForNamespaces ?? 'all',
+      },
+      '[startup] inbound OAuth enabled for MCP clients',
+    )
+  } else if (config.auth.mode === 'hybrid') {
+    app.log.info(
+      { authMode: config.auth.mode, oauthReady: false },
+      '[startup] hybrid client auth enabled; inbound OAuth metadata stays passive until an issuer is configured',
+    )
+  } else {
+    app.log.info({ authMode: config.auth.mode }, '[startup] inbound OAuth disabled for MCP clients')
+  }
+
   activeStore.start(config.session.ttlSeconds, config.session.cleanupIntervalSeconds)
 
   async function shutdownHttp(): Promise<void> {
@@ -210,6 +232,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       registry,
     })
   }
+
+  app.register(embeddedOAuthRoutes, {
+    configManager: runtimeConfigManager,
+  })
 
   app.register(uiRoutes)
 

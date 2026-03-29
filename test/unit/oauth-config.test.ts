@@ -10,9 +10,16 @@ import type { AuthConfig } from '../../src/config/schemas.js'
 describe('oauth-config helpers', () => {
   const nsKeys = new Set(['a', 'b'])
 
-  it('getInboundOAuth returns config only for oauth and hybrid', () => {
+  it('getInboundOAuth returns config only when oauth is fully configured', () => {
     const staticOnly: AuthConfig = { mode: 'static_key' }
     expect(getInboundOAuth(staticOnly)).toBeUndefined()
+    const hybridDraft: AuthConfig = {
+      mode: 'hybrid',
+      oauth: {
+        authorizationServers: [],
+      },
+    }
+    expect(getInboundOAuth(hybridDraft)).toBeUndefined()
     const oauth: AuthConfig = {
       mode: 'oauth',
       oauth: {

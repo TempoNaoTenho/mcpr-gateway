@@ -594,7 +594,7 @@ describe('adminRoutes', () => {
     expect(listRes.statusCode).toBe(200)
     expect(listRes.json()).toEqual({
       summary: {
-        clientAuth: 'bearer_tokens',
+        clientAuth: 'hybrid',
         clientTokensConfigured: 2,
         adminTokenConfigured: false,
       },
@@ -959,6 +959,127 @@ describe('adminRoutes', () => {
     expect(getCurrent().auth.staticKeys?.['generated-later']).toEqual({
       userId: 'inspector',
       roles: ['admin'],
+    })
+
+    await app.close()
+  })
+
+  it('persists inbound OAuth policy changes from PUT /admin/config/policies', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness()
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: 'https://gw.example.com',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+            allowedBrowserOrigins: ['https://chatgpt.com'],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'oauth',
+      oauth: {
+        publicBaseUrl: 'https://gw.example.com',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+        allowedBrowserOrigins: ['https://chatgpt.com'],
+      },
+    })
+
+    await app.close()
+  })
+
+  it('promotes oauth policy saves to hybrid when bearer tokens already exist', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness({
+      auth: {
+        mode: 'static_key',
+        staticKeys: {
+          existing: { userId: 'svc', roles: ['user'] },
+        },
+      },
+    })
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: 'https://gw.example.com',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'hybrid',
+      oauth: {
+        publicBaseUrl: 'https://gw.example.com',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+      },
+      staticKeys: {
+        existing: { userId: 'svc', roles: ['user'] },
+      },
+    })
+
+    await app.close()
+  })
+
+  it('infers publicBaseUrl from the admin request origin when OAuth is enabled remotely', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness()
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      headers: {
+        host: 'gateway.example.test',
+        'x-forwarded-proto': 'https',
+      },
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: '',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'oauth',
+      oauth: {
+        publicBaseUrl: 'https://gateway.example.test',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+      },
     })
 
     await app.close()

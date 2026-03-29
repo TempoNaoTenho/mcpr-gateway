@@ -7,6 +7,7 @@ import {
   GatewayConfigFileSchema,
   BootstrapAuthConfigSchema,
 } from './schemas.js'
+import { DEFAULT_EMBEDDED_BROWSER_ORIGINS } from './oauth-schemas.js'
 import type {
   ServersFile,
   PoliciesFile,
@@ -43,6 +44,15 @@ const DEFAULT_SERVER_HEALTHCHECK = {
   intervalSeconds: 30,
 } as const
 
+const DEFAULT_AUTH_CONFIG: AuthConfig = {
+  mode: 'hybrid',
+  oauth: {
+    provider: 'embedded',
+    authorizationServers: [],
+    allowedBrowserOrigins: [...DEFAULT_EMBEDDED_BROWSER_ORIGINS],
+  },
+}
+
 function applyServerDefaults<T extends { servers: GatewayConfig['servers'] }>(config: T): T {
   return {
     ...config,
@@ -62,8 +72,35 @@ export function mergeWithAdminConfig(_base: BootstrapConfig, override: AdminConf
   return normalizeGatewayConfig(override as GatewayConfig)
 }
 
+function migrateLegacyGatewayConfig(config: GatewayConfig): GatewayConfig {
+  const auth = config?.auth
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) {
+    return config
+  }
+
+  if ('mode' in auth) {
+    return config
+  }
+
+  if ('staticKeys' in auth) {
+    const legacyStaticKeys = (auth as { staticKeys?: unknown }).staticKeys
+    return {
+      ...config,
+      auth: {
+        mode: 'static_key',
+        staticKeys: legacyStaticKeys as Extract<AuthConfig, { mode: 'static_key' }>['staticKeys'],
+      },
+    }
+  }
+
+  return {
+    ...config,
+    auth: { mode: 'static_key' },
+  }
+}
+
 export function normalizeGatewayConfig(config: GatewayConfig): GatewayConfig {
-  return applyServerDefaults(GatewayConfigFileSchema.parse(config))
+  return applyServerDefaults(GatewayConfigFileSchema.parse(migrateLegacyGatewayConfig(config)))
 }
 
 function interpolateEnvVars(raw: string): string {
@@ -117,7 +154,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
   const effectiveNamespaces = namespaces.length > 0 ? namespaces : ['default']
 
   return PoliciesFileSchema.parse({
-    auth: { mode: 'static_key' },
+    auth: DEFAULT_AUTH_CONFIG,
     namespaces: Object.fromEntries(
       effectiveNamespaces.map((namespace) => [
         namespace,
@@ -144,7 +181,7 @@ function createDefaultPolicies(serverNamespaces: string[]): PoliciesFile {
 export function createDefaultAdminConfig(serverNamespaces: string[] = []): AdminConfig {
   const policies = createDefaultPolicies(serverNamespaces)
   return {
-    auth: { mode: 'static_key' },
+    auth: DEFAULT_AUTH_CONFIG,
     servers: [],
     namespaces: policies.namespaces,
     roles: policies.roles,
@@ -161,12 +198,12 @@ export function createDefaultAdminConfig(serverNamespaces: string[] = []): Admin
 
 function createBootstrapConfig(raw: unknown): BootstrapConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { auth: { mode: 'static_key' } }
+    return { auth: DEFAULT_AUTH_CONFIG }
   }
 
   const authValue = 'auth' in raw ? (raw as { auth?: unknown }).auth : undefined
   if (authValue === undefined) {
-    return { auth: { mode: 'static_key' } }
+    return { auth: DEFAULT_AUTH_CONFIG }
   }
 
   if (authValue && typeof authValue === 'object' && !Array.isArray(authValue)) {
@@ -281,7 +318,7 @@ export function loadConfig(configPath?: string): GatewayConfig {
   let config: GatewayConfig
 
   if (raw === null) {
-    config = mergeWithAdminConfig({ auth: { mode: 'static_key' } }, createDefaultAdminConfig())
+    config = mergeWithAdminConfig({ auth: DEFAULT_AUTH_CONFIG }, createDefaultAdminConfig())
   } else {
     const bootstrap = createBootstrapConfig(raw)
     const parsed = validateSchema(GatewayConfigFileSchema, raw, 'bootstrap.json')

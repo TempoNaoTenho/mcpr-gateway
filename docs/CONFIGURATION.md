@@ -20,7 +20,7 @@ The gateway uses a **two-tier configuration model**:
 │  • servers, namespaces, policies: used to seed SQLite           │
 │                                                                 │
 │  After first start, changes to this file are IGNORED            │
-│  (except for auth which is always merged from the file)         │
+│  runtime saves can manage auth too; bootstrap remains optional  │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ First startup only (if SQLite is empty)
                       ▼
@@ -80,7 +80,7 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 | Section        | Purpose                                                                                                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `servers`      | Downstream MCP servers (stdio or HTTP). Optional in the file; the WebUI can manage them later. See [`DownstreamServerSchema`](../src/types/server.ts).                                                                   |
-| `auth`         | Bootstrap auth section. **ALWAYS sourced from file** (merged at runtime). In normal use, client Bearer tokens are managed from the WebUI and stored in `staticKeys`. See [`AuthConfigSchema`](../src/config/schemas.ts). |
+| `auth`         | Inbound client auth section. It can be seeded from `bootstrap.json`, but normal operation may manage it from the WebUI/runtime config. See [`AuthConfigSchema`](../src/config/schemas.ts). |
 | `namespaces`   | Per-namespace tool window sizes and allowed modes/roles.                                                                                                                                                                 |
 | `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                                             |
 | `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication).                  |
@@ -196,7 +196,7 @@ If `bootstrap.json` does not exist, the gateway starts with **no downstream serv
 
 In the SQLite case:
 
-- **Bootstrap auth still comes from `bootstrap.json`** (merged with the active SQLite row at runtime).
+- **Bootstrap auth can seed the instance**, but the active auth config may also be managed from the WebUI/runtime config.
 - **`servers`, namespaces, roles, selector, session, triggers, resilience, debug, and starter packs** can be managed from the WebUI and are versioned in SQLite.
 - **Client access tokens** are managed from the WebUI and persisted in the admin config slice inside SQLite.
 - The admin API `GET /admin/config` returns the admin-managed config plus a read-only auth summary.
@@ -237,7 +237,7 @@ Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/
 | `mode`       | Behavior |
 | ------------ | -------- |
 | `static_key` | Map `Authorization: Bearer <token>` against `auth.staticKeys` (bootstrap and/or admin). Unknown/missing token → `anonymous`. |
-| `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
+| `oauth`      | Resource-server style: expect an access token JWT from a configured issuer. Missing/invalid token on protected namespaces and SSE connects → **401** and `WWW-Authenticate` with `resource_metadata` (RFC 9728). |
 | `hybrid`     | Try static keys first; if no match and OAuth applies to the namespace, validate JWT as in `oauth`. |
 
 **JWT / OAuth:** `oauth.publicBaseUrl` must be the HTTPS origin clients use to reach the gateway in production. The gateway validates `aud` against `publicBaseUrl + /mcp/{namespace}` unless an issuer entry sets a custom `audience`. Issuer `issuer` URLs must match the JWT `iss` claim. Optional `jwksUri`; otherwise JWKS URL is discovered (OpenID discovery, OAuth authorization-server metadata, then `/.well-known/jwks.json`). Role strings are read from the claim named by `rolesClaim` (default `roles`).
@@ -246,10 +246,22 @@ Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/
 
 - `GET /.well-known/oauth-protected-resource/mcp/:namespace`
 - `GET /mcp/:namespace/.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-authorization-server`
+- `GET /.well-known/oauth-authorization-server/mcp/:namespace`
+- `GET /mcp/:namespace/.well-known/oauth-authorization-server`
+- `GET /.well-known/openid-configuration`
+- `GET /.well-known/openid-configuration/mcp/:namespace`
+- `GET /mcp/:namespace/.well-known/openid-configuration`
 
 These metadata endpoints return browser CORS headers for loopback origins and for exact matches from `auth.oauth.allowedBrowserOrigins`. Configured entries are treated as origins, not prefixes or wildcard patterns.
 
-When `auth.mode` is `static_key` only, these URLs return **404**.
+`auth.oauth.allowedBrowserOrigins` is only a browser `Origin`/CORS allowlist for the metadata routes and `/mcp/:namespace`. It is **not** an OAuth redirect/callback URI allowlist.
+
+For `provider: "embedded"`, remote clients register their own `redirect_uris` through dynamic client registration (`POST /oauth/register`). For external issuers, configure callback allowlists in the upstream IdP itself. For Claude remote MCP connectors, Anthropic currently documents `https://claude.ai/api/mcp/auth_callback` and recommends also allowing `https://claude.com/api/mcp/auth_callback`.
+
+The protected-resource routes identify this gateway resource (`resource`, `authorization_servers`, `scopes_supported`). The authorization-server and OpenID routes proxy normalized issuer discovery metadata from the configured inbound IdP and include `resource` on namespace-specific aliases.
+
+When `auth.mode` is `static_key` only, all of these URLs return **404**.
 
 The legacy `auth.mode` value `mock_dev` is rejected at startup.
 

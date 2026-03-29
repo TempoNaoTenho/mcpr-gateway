@@ -200,7 +200,14 @@ export const StarterPacksFileSchema = z.object({
 export type StarterPacksFile = z.infer<typeof StarterPacksFileSchema>
 
 export const PoliciesFileSchema = z.object({
-  auth: AuthConfigSchema.default({ mode: 'static_key' }),
+  auth: AuthConfigSchema.default({
+    mode: 'hybrid',
+    oauth: {
+      provider: 'embedded',
+      authorizationServers: [],
+      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
+    },
+  }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema),
   roles: z.record(z.string().min(1), RolePolicySchema),
   selector: SelectorConfigSchema.default({}),
@@ -217,7 +224,14 @@ export type PoliciesFile = z.infer<typeof PoliciesFileSchema>
 /** Full on-disk config: downstream servers plus auth, policies, and tuning. */
 export const GatewayConfigFileSchema = z.object({
   servers: z.array(DownstreamServerSchema).default([]),
-  auth: AuthConfigSchema.default({ mode: 'static_key' }),
+  auth: AuthConfigSchema.default({
+    mode: 'hybrid',
+    oauth: {
+      provider: 'embedded',
+      authorizationServers: [],
+      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
+    },
+  }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema).default({}),
   roles: z.record(z.string().min(1), RolePolicySchema).default({}),
   selector: SelectorConfigSchema.default({}),

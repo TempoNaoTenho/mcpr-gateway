@@ -6,7 +6,7 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 
 | Method    | Path              | Description                                                                 |
 | --------- | ----------------- | --------------------------------------------------------------------------- |
-| `GET`     | `/mcp/:namespace` | SSE stream endpoint for streamable HTTP clients                             |
+| `GET`     | `/mcp/:namespace` | SSE stream endpoint for streamable HTTP clients; inbound OAuth protects this route too |
 | `POST`    | `/mcp/:namespace` | Single endpoint for MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`) |
 | `OPTIONS` | `/mcp/:namespace` | Browser preflight for loopback web clients (for example MCP Inspector)      |
 
@@ -16,6 +16,12 @@ Base URL is wherever the gateway listens (`HOST`/`PORT`). All paths below are re
 | ------ | ---- | ----------- |
 | `GET` | `/.well-known/oauth-protected-resource/mcp/:namespace` | JSON metadata: `resource`, `authorization_servers`, `scopes_supported`, … when `auth.mode` is `oauth` or `hybrid` |
 | `GET` | `/mcp/:namespace/.well-known/oauth-protected-resource` | Same document (alternate path for some clients) |
+| `GET` | `/.well-known/oauth-authorization-server` | Authorization-server metadata derived from the configured inbound issuer |
+| `GET` | `/.well-known/oauth-authorization-server/mcp/:namespace` | Same metadata with namespace-specific `resource` |
+| `GET` | `/mcp/:namespace/.well-known/oauth-authorization-server` | Alternate namespace-aware authorization-server alias |
+| `GET` | `/.well-known/openid-configuration` | OpenID configuration derived from the configured inbound issuer |
+| `GET` | `/.well-known/openid-configuration/mcp/:namespace` | Same metadata with namespace-specific `resource` |
+| `GET` | `/mcp/:namespace/.well-known/openid-configuration` | Alternate namespace-aware OpenID alias |
 
 If inbound OAuth is disabled (`static_key` only), these routes return **404**.
 
@@ -23,7 +29,8 @@ If inbound OAuth is disabled (`static_key` only), these routes return **404**.
 - **Body:** JSON-RPC object; request methods require `id`, notifications may omit it; unsupported `method` → gateway error ([`src/gateway/routes/mcp.ts`](../src/gateway/routes/mcp.ts)).
 - **Session:** After `initialize`, clients must send **`Mcp-Session-Id`** on subsequent requests (header) for `tools/list` and `tools/call`.
 - **Browser CORS:** Without inbound OAuth browser allowlist, MCP responses use the existing loopback-only CORS behavior. When `auth.oauth.allowedBrowserOrigins` is set (see config schemas), browsers sending `Origin` must exactly match those entries as origins, not prefixes or wildcard patterns (loopback still allowed). The protected-resource metadata routes emit the same CORS headers for allowed origins. Non-browser clients without an `Origin` header are not blocked by that check.
-- **Client auth:** With **`static_key`** or **`hybrid`**, send `Authorization: Bearer <client-access-token>` for pre-mapped tokens. With **`oauth`** / **`hybrid`** (and OAuth applicable to the namespace), send a Bearer **JWT** from a configured issuer; missing or invalid tokens return **401** with `WWW-Authenticate` including `resource_metadata="…"`. Unsupported request `Content-Type` on POST may return **415**.
+- **Origin vs callback:** `auth.oauth.allowedBrowserOrigins` controls browser `Origin`/CORS only. It does not register OAuth redirect URIs. In embedded OAuth, clients provide `redirect_uris` via DCR. With an external IdP, callback allowlists must be configured in that IdP.
+- **Client auth:** With **`static_key`** or **`hybrid`**, send `Authorization: Bearer <client-access-token>` for pre-mapped tokens. With **`oauth`** / **`hybrid`** (and OAuth applicable to the namespace), send a Bearer **JWT** from a configured issuer; missing or invalid tokens on both `POST` and `GET /mcp/:namespace` return **401** with `WWW-Authenticate` including `resource_metadata="…"`. Unsupported request `Content-Type` on POST may return **415**.
 - **Codex CLI auth:** For Codex streamable HTTP servers, configure `bearer_token_env_var` in `~/.codex/config.toml`. A bare `Authorization = "Bearer ..."` entry in the server block is not interpreted as an HTTP header by Codex.
 - **JSON-RPC errors:** Tool failures, validation failures, and downstream failures often return **HTTP 200** with a JSON-RPC `error` object in the body. Clients must inspect the JSON-RPC payload, not only the HTTP status.
 - **Client display caveat:** Some MCP clients may not surface the full JSON-RPC `result` payload to the model even when the gateway returned it successfully. For server-side diagnosis, compare client behavior with a raw HTTP JSON-RPC request.
