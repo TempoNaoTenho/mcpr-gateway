@@ -118,9 +118,43 @@ function trimToUndefined(value: unknown): string | undefined {
 }
 
 function getRequestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
+  const protoHeader = request.headers['x-forwarded-proto']
+  const forwardedProto =
+    typeof protoHeader === 'string'
+      ? protoHeader.split(',')[0]?.trim()
+      : Array.isArray(protoHeader)
+        ? protoHeader[0]
+        : undefined
+  const hostHeader = request.headers['x-forwarded-host'] ?? request.headers['host']
   const host =
-    typeof request.headers['host'] === 'string' ? request.headers['host'] : '127.0.0.1:3000'
-  return `${request.protocol}://${host}`
+    typeof hostHeader === 'string'
+      ? hostHeader.split(',')[0]?.trim()
+      : '127.0.0.1:3000'
+  return `${forwardedProto || request.protocol}://${host}`
+}
+
+function inferInboundOAuthPublicBaseUrl(
+  requested: unknown,
+  requestOrigin: string
+): Record<string, unknown> | undefined {
+  if (!isRecord(requested) || typeof requested['mode'] !== 'string') {
+    return undefined
+  }
+
+  if (requested['mode'] !== 'oauth' && requested['mode'] !== 'hybrid') {
+    return requested
+  }
+
+  const oauth = isRecord(requested['oauth']) ? requested['oauth'] : {}
+  const publicBaseUrl = trimToUndefined(oauth['publicBaseUrl']) ?? requestOrigin
+
+  return {
+    ...requested,
+    oauth: {
+      ...oauth,
+      publicBaseUrl,
+    },
+  }
 }
 
 function redactServerSecrets(server: DownstreamServer): DownstreamServer {
@@ -357,23 +391,27 @@ function buildAuthSummary(effectiveAuth: {
 function mergeInboundAuthPolicy(
   current: AdminConfig['auth'],
   requested: unknown,
+  requestOrigin?: string,
 ): AdminConfig['auth'] {
-  if (!isRecord(requested) || typeof requested['mode'] !== 'string') {
+  const normalizedRequested =
+    requestOrigin !== undefined ? inferInboundOAuthPublicBaseUrl(requested, requestOrigin) : requested
+
+  if (!isRecord(normalizedRequested) || typeof normalizedRequested['mode'] !== 'string') {
     return current
   }
 
   const currentStaticKeys = getStaticKeysForAuth(current)
   const hasStaticKeys = Boolean(currentStaticKeys && Object.keys(currentStaticKeys).length > 0)
 
-  if (requested['mode'] === 'static_key') {
+  if (normalizedRequested['mode'] === 'static_key') {
     return {
       mode: 'static_key',
       staticKeys: currentStaticKeys,
     }
   }
 
-  if (requested['mode'] === 'oauth') {
-    const parsed = AuthConfigSchema.parse(requested)
+  if (normalizedRequested['mode'] === 'oauth') {
+    const parsed = AuthConfigSchema.parse(normalizedRequested)
     if (parsed.mode !== 'oauth') return current
     if (hasStaticKeys) {
       return {
@@ -385,8 +423,8 @@ function mergeInboundAuthPolicy(
     return parsed
   }
 
-  if (requested['mode'] === 'hybrid') {
-    const parsed = AuthConfigSchema.parse(requested)
+  if (normalizedRequested['mode'] === 'hybrid') {
+    const parsed = AuthConfigSchema.parse(normalizedRequested)
     if (parsed.mode !== 'hybrid') return current
     return {
       mode: 'hybrid',
@@ -1972,10 +2010,11 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       const current = configManager.getAdminConfig()
       const body = request.body as Record<string, unknown>
       const { auth: nextAuth, ...policyFields } = body
+      const requestOrigin = getRequestOrigin(request)
       const version = await configManager.saveAdminConfig(
         buildValidatedAdminConfig(configManager, {
           ...current,
-          auth: mergeInboundAuthPolicy(current.auth, nextAuth),
+          auth: mergeInboundAuthPolicy(current.auth, nextAuth, requestOrigin),
           ...policyFields,
         }),
         {

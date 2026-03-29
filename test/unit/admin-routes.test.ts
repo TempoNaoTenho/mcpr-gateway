@@ -1046,6 +1046,45 @@ describe('adminRoutes', () => {
     await app.close()
   })
 
+  it('infers publicBaseUrl from the admin request origin when OAuth is enabled remotely', async () => {
+    const { configRepo, configManager, getCurrent } = createAdminHarness()
+    const app = buildServer({ logLevel: 'silent' })
+    await app.register(adminRoutes, {
+      configRepo,
+      configManager,
+    })
+    await app.ready()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/config/policies',
+      headers: {
+        host: 'gateway.example.test',
+        'x-forwarded-proto': 'https',
+      },
+      payload: {
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            publicBaseUrl: '',
+            authorizationServers: [{ issuer: 'https://issuer.example.com' }],
+          },
+        },
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(getCurrent().auth).toEqual({
+      mode: 'oauth',
+      oauth: {
+        publicBaseUrl: 'https://gateway.example.test',
+        authorizationServers: [{ issuer: 'https://issuer.example.com', rolesClaim: 'roles' }],
+      },
+    })
+
+    await app.close()
+  })
+
   it('drops missing namespace profile references while keeping valid ones', async () => {
     const { configRepo, configManager, getCurrent } = createAdminHarness({
       roles: {

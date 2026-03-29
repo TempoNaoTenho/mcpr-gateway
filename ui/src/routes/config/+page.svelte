@@ -26,6 +26,9 @@
   let starterPackJson = $state('{}');
   let allowedOAuthProvidersText = $state('');
   let oauthIssuersJson = $state('[{ "issuer": "https://issuer.example" }]');
+  let primaryOAuthIssuer = $state('');
+  let detectedPublicBaseUrl = $state('http://127.0.0.1:3000');
+  let oauthAdvancedOpen = $state(false);
   let oauthRequireNsText = $state('');
   let oauthScopesText = $state('');
   let oauthOriginsText = $state('');
@@ -39,18 +42,46 @@
     )];
   }
 
-  function defaultInboundOAuth(): InboundOAuthPolicy {
+  function detectPublicBaseUrl(): string {
+    if (typeof window === 'undefined') return 'http://127.0.0.1:3000';
+    return window.location.origin.replace(/\/$/, '');
+  }
+
+  function hasAdvancedOAuthSettings(oauth: InboundOAuthPolicy): boolean {
+    if (oauth.authorizationServers.length > 1) return true;
+    const primary = oauth.authorizationServers[0];
+    if (primary?.audience || primary?.jwksUri) return true;
+    if (primary?.rolesClaim && primary.rolesClaim !== 'roles') return true;
+    return Boolean(
+      (oauth.requireForNamespaces && oauth.requireForNamespaces.length > 0) ||
+        (oauth.scopesSupported && oauth.scopesSupported.length > 0) ||
+        (oauth.allowedBrowserOrigins && oauth.allowedBrowserOrigins.length > 0),
+    );
+  }
+
+  function defaultInboundOAuth(baseUrl = detectedPublicBaseUrl): InboundOAuthPolicy {
     return {
-      publicBaseUrl: 'http://127.0.0.1:3000',
-      authorizationServers: [{ issuer: 'https://issuer.example' }],
+      publicBaseUrl: baseUrl,
+      authorizationServers: [{ issuer: '' }],
     };
   }
 
   function hydrateOAuthFields(oauth: InboundOAuthPolicy) {
     oauthIssuersJson = JSON.stringify(oauth.authorizationServers, null, 2);
+    primaryOAuthIssuer = oauth.authorizationServers[0]?.issuer ?? '';
+    detectedPublicBaseUrl = detectPublicBaseUrl();
+    oauthAdvancedOpen = hasAdvancedOAuthSettings(oauth);
     oauthRequireNsText = (oauth.requireForNamespaces ?? []).join('\n');
     oauthScopesText = (oauth.scopesSupported ?? []).join('\n');
     oauthOriginsText = (oauth.allowedBrowserOrigins ?? []).join('\n');
+  }
+
+  function toggleOAuthAdvanced() {
+    if (!oauthAdvancedOpen && policies && (policies.auth.mode === 'oauth' || policies.auth.mode === 'hybrid')) {
+      const currentPrimary = policies.auth.oauth.authorizationServers[0] ?? { rolesClaim: 'roles' };
+      oauthIssuersJson = JSON.stringify([{ ...currentPrimary, issuer: primaryOAuthIssuer.trim() }], null, 2);
+    }
+    oauthAdvancedOpen = !oauthAdvancedOpen;
   }
 
   function setClientAuthMode(mode: PoliciesAuthConfig['mode']) {
@@ -81,6 +112,7 @@
   async function load() {
     loading = true;
     try {
+      detectedPublicBaseUrl = detectPublicBaseUrl();
       const [policyRes, configRes] = await Promise.all([getPolicies(), getConfig()]);
       policies = {
         ...policyRes,
@@ -97,6 +129,9 @@
       starterPackJson = JSON.stringify(policyRes.starterPacks, null, 2);
       allowedOAuthProvidersText = (policyRes.allowedOAuthProviders ?? []).join('\n');
       if (policyRes.auth.mode === 'oauth' || policyRes.auth.mode === 'hybrid') {
+        if (!policyRes.auth.oauth.publicBaseUrl) {
+          policyRes.auth.oauth.publicBaseUrl = detectedPublicBaseUrl;
+        }
         hydrateOAuthFields(policyRes.auth.oauth);
       }
     } catch {
@@ -113,21 +148,33 @@
       let auth: PoliciesConfig['auth'] = policies.auth;
       if (policies.auth.mode === 'oauth' || policies.auth.mode === 'hybrid') {
         let authorizationServers: InboundOAuthPolicy['authorizationServers'];
-        try {
-          const parsed = JSON.parse(oauthIssuersJson);
-          if (!Array.isArray(parsed) || parsed.length === 0) {
-            throw new Error('Authorization servers must be a non-empty JSON array');
+        if (oauthAdvancedOpen) {
+          try {
+            const parsed = JSON.parse(oauthIssuersJson);
+            if (!Array.isArray(parsed) || parsed.length === 0) {
+              throw new Error('Authorization servers must be a non-empty JSON array');
+            }
+            authorizationServers = parsed;
+          } catch (e) {
+            notifications.error(e instanceof Error ? e.message : 'Invalid authorization servers JSON');
+            saving = false;
+            return;
           }
-          authorizationServers = parsed;
-        } catch (e) {
-          notifications.error(e instanceof Error ? e.message : 'Invalid authorization servers JSON');
-          saving = false;
-          return;
+        } else {
+          const issuer = primaryOAuthIssuer.trim();
+          if (!issuer) {
+            notifications.error('Issuer URL is required to enable OAuth web clients');
+            saving = false;
+            return;
+          }
+          const currentPrimary = policies.auth.oauth.authorizationServers[0] ?? { rolesClaim: 'roles' };
+          authorizationServers = [{ ...currentPrimary, issuer }];
         }
         auth = {
           ...policies.auth,
           oauth: {
             ...policies.auth.oauth,
+            publicBaseUrl: policies.auth.oauth.publicBaseUrl.trim() || detectedPublicBaseUrl,
             authorizationServers,
             requireForNamespaces:
               parseAllowedOAuthProviders(oauthRequireNsText).length > 0
@@ -192,7 +239,10 @@
     }
   }
 
-  onMount(load);
+  onMount(() => {
+    detectedPublicBaseUrl = detectPublicBaseUrl();
+    void load();
+  });
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleString();
@@ -232,83 +282,110 @@
 
         <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-4">
           <h2 class="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">
-            MCP client auth (inbound)
-            <InfoTooltip text="How browser and CLI clients authenticate to MCP HTTP routes. static_key: map Bearer tokens to roles (manage tokens under Access Control). hybrid is the recommended compatibility mode: it keeps static Bearer tokens working and also validates JWTs from external issuers. oauth enforces JWT-only clients. publicBaseUrl must match what clients use; JWT audience checked is publicBaseUrl plus /mcp/ plus the namespace segment." />
+            Client access
+            <InfoTooltip text="Choose how MCP clients authenticate to this gateway. The recommended mode keeps existing Bearer tokens working and also enables OAuth discovery for web clients like ChatGPT." />
           </h2>
           <label class="block text-sm space-y-1 max-w-md">
-            <span class="text-slate-600 dark:text-slate-300">Mode</span>
+            <span class="text-slate-600 dark:text-slate-300">Compatibility mode</span>
             <select
               class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
               value={policies.auth.mode}
               onchange={(e) => setClientAuthMode(e.currentTarget.value as PoliciesAuthConfig['mode'])}
             >
-              <option value="static_key">static_key (Bearer token map only)</option>
-              <option value="hybrid">hybrid (recommended: static keys, then JWT)</option>
-              <option value="oauth">oauth (JWT / external IdP only)</option>
+              <option value="static_key">Bearer tokens only</option>
+              <option value="hybrid">Bearer tokens + OAuth web clients (recommended)</option>
+              <option value="oauth">OAuth only</option>
             </select>
           </label>
 
           {#if policies.auth.mode === 'oauth' || policies.auth.mode === 'hybrid'}
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              Use HTTPS for publicBaseUrl in production. Issuer URLs must match the <code class="text-[11px]">iss</code> claim. Optional fields: omit or leave text areas empty to apply “all namespaces” / defaults.
-            </p>
-            <label class="block text-sm space-y-1">
+            <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100">
+              This setup enables MCP web clients like ChatGPT and Claude without disabling existing Bearer-token clients.
+            </div>
+            <label class="block text-sm space-y-1 max-w-xl">
               <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
                 Public base URL
-                <InfoTooltip text="Origin clients use to reach the gateway (no trailing slash). Used in RFC 9728 resource metadata and as the base for the per-namespace JWT audience (publicBaseUrl + /mcp/ + namespace)." />
+                <InfoTooltip text="Public origin clients use to reach the gateway. If left blank, the gateway saves the current admin origin automatically in remote deployments." />
               </span>
               <input
                 type="url"
                 bind:value={policies.auth.oauth.publicBaseUrl}
+                placeholder={detectedPublicBaseUrl}
                 class="w-full max-w-xl px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[13px]"
               />
             </label>
-            <label class="block text-sm space-y-1">
+            <label class="block text-sm space-y-1 max-w-xl">
               <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                Authorization servers (JSON array)
-                <InfoTooltip text="Each JSON object: issuer (required), plus optional audience, jwksUri, rolesClaim. If jwksUri is omitted, the gateway discovers the JWKS URL via OpenID or OAuth authorization-server metadata." />
+                OAuth issuer
+                <InfoTooltip text="Issuer URL from the identity provider that signs the inbound JWTs. It must match the token iss claim." />
               </span>
-              <textarea
-                bind:value={oauthIssuersJson}
-                rows="6"
-                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
-              ></textarea>
+              <input
+                type="url"
+                bind:value={primaryOAuthIssuer}
+                placeholder="https://issuer.example.com"
+                class="w-full max-w-xl px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[13px]"
+              />
             </label>
-            <label class="block text-sm space-y-1">
-              <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                Require OAuth only for namespaces (one per line)
-                <InfoTooltip text="If empty, every configured namespace uses OAuth (when mode is oauth/hybrid). If set, only listed namespaces get 401 without a valid JWT." />
-              </span>
-              <textarea
-                bind:value={oauthRequireNsText}
-                rows="3"
-                placeholder="e.g. gmail"
-                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
-              ></textarea>
-            </label>
-            <label class="block text-sm space-y-1">
-              <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                Scopes supported (one per line)
-                <InfoTooltip text="Advertised in protected-resource metadata and WWW-Authenticate; first scope used when none configured is openid." />
-              </span>
-              <textarea
-                bind:value={oauthScopesText}
-                rows="2"
-                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
-              ></textarea>
-            </label>
-            <label class="block text-sm space-y-1">
-              <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                Allowed browser origins (one per line)
-                <InfoTooltip text="When set, only these Origins (plus loopback) get CORS for MCP. Non-browser clients without Origin header are still allowed. Leave empty for loopback-only browser behavior." />
-              </span>
-              <textarea
-                bind:value={oauthOriginsText}
-                rows="2"
-                placeholder="https://chatgpt.com"
-                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
-              ></textarea>
-            </label>
+            <button
+              type="button"
+              class="text-sm font-medium text-slate-700 underline underline-offset-2 dark:text-slate-300"
+              onclick={toggleOAuthAdvanced}
+            >
+              {oauthAdvancedOpen ? 'Hide advanced OAuth settings' : 'Show advanced OAuth settings'}
+            </button>
+            {#if oauthAdvancedOpen}
+              <div class="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-4">
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Advanced settings are optional. Leave them empty to apply defaults across all namespaces.
+                </p>
+                <label class="block text-sm space-y-1">
+                  <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                    Authorization servers (JSON array)
+                    <InfoTooltip text="Each JSON object: issuer (required), plus optional audience, jwksUri, rolesClaim. If jwksUri is omitted, the gateway discovers the JWKS URL via OpenID or OAuth authorization-server metadata." />
+                  </span>
+                  <textarea
+                    bind:value={oauthIssuersJson}
+                    rows="6"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
+                  ></textarea>
+                </label>
+                <label class="block text-sm space-y-1">
+                  <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                    Require OAuth only for namespaces (one per line)
+                    <InfoTooltip text="If empty, every configured namespace uses OAuth when mode is OAuth or hybrid. If set, only listed namespaces require JWT." />
+                  </span>
+                  <textarea
+                    bind:value={oauthRequireNsText}
+                    rows="3"
+                    placeholder="e.g. gmail"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
+                  ></textarea>
+                </label>
+                <label class="block text-sm space-y-1">
+                  <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                    Scopes supported (one per line)
+                    <InfoTooltip text="Advertised in protected-resource metadata and WWW-Authenticate. If empty, the gateway advertises openid." />
+                  </span>
+                  <textarea
+                    bind:value={oauthScopesText}
+                    rows="2"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
+                  ></textarea>
+                </label>
+                <label class="block text-sm space-y-1">
+                  <span class="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                    Allowed browser origins (one per line)
+                    <InfoTooltip text="Optional browser CORS allowlist for MCP web clients. Non-browser clients without Origin header are still allowed." />
+                  </span>
+                  <textarea
+                    bind:value={oauthOriginsText}
+                    rows="2"
+                    placeholder="https://chatgpt.com"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
+                  ></textarea>
+                </label>
+              </div>
+            {/if}
           {:else}
             <p class="text-xs text-slate-500 dark:text-slate-400">
               Client Bearer tokens are managed under <strong>Access Control</strong>. Namespace policies (roles) still apply after the token is resolved.
