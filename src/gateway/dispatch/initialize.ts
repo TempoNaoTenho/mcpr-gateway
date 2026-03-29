@@ -78,6 +78,16 @@ export async function handleInitialize(
     if (!oauth) {
       throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
     }
+    ctx.log?.info(
+      {
+        requestId: ctx.requestId,
+        namespace,
+        requestOrigin: ctx.requestOrigin,
+        authMode: config.auth.mode,
+        oauthProvider: oauth.provider,
+      },
+      '[mcp] initialize requires OAuth bearer token',
+    )
     const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace)
     throw new GatewayError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, undefined, undefined, {
       'WWW-Authenticate': wwwAuthenticate,
@@ -89,6 +99,16 @@ export async function handleInitialize(
     if (!oauth) {
       throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
     }
+    ctx.log?.warn(
+      {
+        requestId: ctx.requestId,
+        namespace,
+        requestOrigin: ctx.requestOrigin,
+        authMode: config.auth.mode,
+        oauthProvider: oauth.provider,
+      },
+      '[mcp] initialize received invalid OAuth bearer token',
+    )
     const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace, 'invalid_token')
     throw new GatewayError(GatewayErrorCode.OAUTH_INVALID_TOKEN, undefined, undefined, {
       'WWW-Authenticate': wwwAuthenticate,

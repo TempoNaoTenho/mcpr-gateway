@@ -10,7 +10,11 @@ const OptionalUrlSchema = z.preprocess(blankToUndefined, z.string().url().option
 const OptionalNonEmptyStringSchema = z.preprocess(blankToUndefined, z.string().min(1).optional())
 const LooseObjectSchema = z.record(z.unknown())
 
-export const DEFAULT_EMBEDDED_BROWSER_ORIGINS = ['https://chatgpt.com', 'https://claude.ai'] as const
+export const DEFAULT_EMBEDDED_BROWSER_ORIGINS = [
+  'https://chatgpt.com',
+  'https://claude.ai',
+  'https://claude.com',
+] as const
 
 export const IssuerConfigSchema = z.object({
   issuer: z.string().url(),

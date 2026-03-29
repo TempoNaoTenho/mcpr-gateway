@@ -127,7 +127,7 @@ describe('loadConfig — valid config', () => {
       oauth: {
         provider: 'embedded',
         authorizationServers: [],
-        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai'],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
       },
     })
     expect(merged.servers).toEqual([
@@ -263,7 +263,7 @@ describe('loadConfig — valid config', () => {
       oauth: {
         provider: 'embedded',
         authorizationServers: [],
-        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai'],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
       },
     })
   })
@@ -348,7 +348,7 @@ describe('loadConfig — bootstrap defaults', () => {
       oauth: {
         provider: 'embedded',
         authorizationServers: [],
-        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai'],
+        allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
       },
     })
     expect(config.namespaces['default']).toBeDefined()

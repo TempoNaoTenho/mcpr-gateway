@@ -205,7 +205,7 @@ export const PoliciesFileSchema = z.object({
     oauth: {
       provider: 'embedded',
       authorizationServers: [],
-      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai'],
+      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
     },
   }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema),
@@ -229,7 +229,7 @@ export const GatewayConfigFileSchema = z.object({
     oauth: {
       provider: 'embedded',
       authorizationServers: [],
-      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai'],
+      allowedBrowserOrigins: ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'],
     },
   }),
   namespaces: z.record(z.string().min(1), NamespacePolicySchema).default({}),

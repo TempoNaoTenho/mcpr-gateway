@@ -41,12 +41,28 @@ function allowedBrowserOrigins(request: { protocol: string; headers: Record<stri
 }
 
 function assertMcpOrigin(
-  request: { protocol: string; headers: Record<string, unknown> },
+  request: {
+    protocol: string
+    headers: Record<string, unknown>
+    log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
+    params?: Record<string, unknown>
+  },
   origin: string | undefined,
 ): void {
   const oauth = getInboundOAuth(getConfig().auth, getRequestOrigin(request))
   const allowed = oauth?.allowedBrowserOrigins
   if (origin && !isBrowserOriginAllowed(origin, allowed)) {
+    request.log?.warn(
+      {
+        origin,
+        requestOrigin: getRequestOrigin(request),
+        namespace: request.params?.['namespace'],
+        authMode: getConfig().auth.mode,
+        oauthProvider: oauth?.provider,
+        allowedBrowserOrigins: allowed,
+      },
+      '[mcp] rejected browser origin for MCP endpoint',
+    )
     throw new GatewayError(GatewayErrorCode.MCP_INVALID_ORIGIN)
   }
 }

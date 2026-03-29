@@ -71,7 +71,7 @@ beforeAll(async () => {
             oauth: {
               publicBaseUrl: 'https://gw.oauth.test',
               authorizationServers: [{ issuer: 'https://issuer.oauth.test', rolesClaim: 'roles' }],
-              allowedBrowserOrigins: ['https://chatgpt.com/', 'https://allowed.example'],
+              allowedBrowserOrigins: ['https://chatgpt.com/', 'https://claude.com', 'https://allowed.example'],
             },
           },
           ...basePolicies,
@@ -215,6 +215,18 @@ describe('RFC 9728 metadata (oauth mode)', () => {
     expect(res.headers['vary']).toBe('Origin')
   })
 
+  it('returns CORS headers for Claude browser origins on metadata routes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/.well-known/oauth-protected-resource/mcp/gmail',
+      headers: { origin: 'https://claude.com' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['access-control-allow-origin']).toBe('https://claude.com')
+    expect(res.headers['vary']).toBe('Origin')
+  })
+
   it('returns CORS headers for loopback browser origins on metadata routes', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -352,7 +364,6 @@ describe('embedded oauth flow', () => {
             mode: 'hybrid',
             oauth: {
               provider: 'embedded',
-              allowedBrowserOrigins: ['https://chatgpt.com'],
             },
           },
           ...basePolicies,
@@ -465,5 +476,20 @@ describe('embedded oauth flow', () => {
     })
     expect(initRes.statusCode).toBe(200)
     expect(initRes.json()).toHaveProperty('result')
+  })
+
+  it('includes Claude default browser origins for embedded metadata CORS', async () => {
+    const res = await embeddedApp.inject({
+      method: 'GET',
+      url: '/.well-known/oauth-protected-resource/mcp/gmail',
+      headers: {
+        host: 'gw.embedded.test',
+        origin: 'https://claude.com',
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['access-control-allow-origin']).toBe('https://claude.com')
+    expect(res.headers['vary']).toBe('Origin')
   })
 })

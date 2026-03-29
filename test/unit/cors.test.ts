@@ -9,6 +9,7 @@ describe('isBrowserOriginAllowed', () => {
 
   it('allows exact configured origins', () => {
     expect(isBrowserOriginAllowed('https://chatgpt.com', ['https://chatgpt.com'])).toBe(true)
+    expect(isBrowserOriginAllowed('https://claude.com', ['https://claude.com'])).toBe(true)
   })
 
   it('tolerates a trailing slash in configured origins', () => {

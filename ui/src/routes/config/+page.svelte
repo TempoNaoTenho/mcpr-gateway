@@ -34,7 +34,7 @@
   let oauthScopesText = $state('');
   let oauthOriginsText = $state('');
 
-  const defaultWebClientOrigins = ['https://chatgpt.com', 'https://claude.ai'];
+  const defaultWebClientOrigins = ['https://chatgpt.com', 'https://claude.ai', 'https://claude.com'];
 
   function parseAllowedOAuthProviders(text: string): string[] {
     return [...new Set(
@@ -498,7 +498,7 @@
                   <textarea
                     bind:value={oauthOriginsText}
                     rows="2"
-                    placeholder="https://chatgpt.com&#10;https://claude.ai"
+                    placeholder="https://chatgpt.com&#10;https://claude.ai&#10;https://claude.com"
                     class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[12px]"
                   ></textarea>
                 </label>

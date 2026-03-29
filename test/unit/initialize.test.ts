@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -670,6 +670,58 @@ describe('handleInitialize', () => {
         name: 'resolve-library-id',
         serverId: 'context7',
       })
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
+  it('logs when initialize needs an OAuth bearer token', async () => {
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        auth: {
+          mode: 'oauth',
+          oauth: {
+            provider: 'embedded',
+            publicBaseUrl: 'https://gw.example.test',
+            authorizationServers: [],
+          },
+        },
+      })
+
+      const info = vi.fn()
+      const warn = vi.fn()
+      const { store, close } = createTempSqliteSessionStore()
+      disposeStore = () => {
+        store.stop()
+        close()
+      }
+
+      await expect(
+        handleInitialize(
+          {
+            namespace: 'gmail',
+            requestId: 'req-oauth-required',
+            requestOrigin: 'https://gw.example.test',
+            log: { info, warn } as never,
+          },
+          { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
+          store,
+          makeRegistry([]) as never
+        ),
+      ).rejects.toMatchObject({ code: 'OAUTH_AUTHENTICATION_REQUIRED' })
+
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'req-oauth-required',
+          namespace: 'gmail',
+          requestOrigin: 'https://gw.example.test',
+          authMode: 'oauth',
+          oauthProvider: 'embedded',
+        }),
+        '[mcp] initialize requires OAuth bearer token',
+      )
     } finally {
       setConfig(previousConfig)
     }
