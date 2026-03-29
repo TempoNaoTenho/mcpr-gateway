@@ -2,6 +2,7 @@ export type SandboxBackend = 'isolated-vm'
 
 export type SandboxHostApi = {
   catalogSearch: (query: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
+  catalogServers: () => Promise<unknown> | unknown
   catalogList: (filters?: Record<string, unknown>) => Promise<unknown> | unknown
   catalogDescribe: (handle: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
   mcpCall: (handle: string, args?: Record<string, unknown>) => Promise<unknown> | unknown
@@ -36,6 +37,7 @@ export type SandboxExecutionResult = {
 
 export type SandboxBridgeOperation =
   | 'catalog.search'
+  | 'catalog.servers'
   | 'catalog.list'
   | 'catalog.describe'
   | 'mcp.call'
@@ -205,6 +207,10 @@ const SETUP_SOURCE = `
 globalThis.catalog = Object.freeze({
   search: (query, options) =>
     globalThis.__catalogSearch.applySyncPromise(undefined, [query, options], {
+      arguments: { copy: true },
+    }),
+  servers: () =>
+    globalThis.__catalogServers.applySyncPromise(undefined, [], {
       arguments: { copy: true },
     }),
   list: (filters) =>
@@ -413,6 +419,24 @@ async function executeWithIsolatedVm(
                 pendingBridged,
                 'catalog.search',
                 hostApi.catalogSearch(query, runtimeOptions),
+                diagnostics,
+                options.operationTimeoutMs,
+              )
+            ).value
+          )
+      )
+    )
+    jail.setSync(
+      '__catalogServers',
+      new ivm.Reference(
+        async () =>
+          externalizeBridgeValue(
+            ivm,
+            normalizeBridgeValue(
+              await trackBridgedPromise(
+                pendingBridged,
+                'catalog.servers',
+                hostApi.catalogServers(),
                 diagnostics,
                 options.operationTimeoutMs,
               )

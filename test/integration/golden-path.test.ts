@@ -257,7 +257,8 @@ describe('Golden path — tools/list with bootstrap window', () => {
     const toolNames = listRes.json().result.tools.map((t: { name: string }) => t.name)
     expect(toolNames).toContain('gateway_search_tools')
     expect(toolNames).toContain('gateway_call_tool')
-    expect(toolNames).toHaveLength(2)
+    expect(toolNames).toContain('gateway_list_servers')
+    expect(toolNames).toHaveLength(3)
   })
 })
 
@@ -398,7 +399,8 @@ describe('Golden path — cold start explicit (no registry tools)', () => {
     const toolNames = listRes.json().result.tools.map((t: { name: string }) => t.name)
     expect(toolNames).toContain('gateway_search_tools')
     expect(toolNames).toContain('gateway_call_tool')
-    expect(toolNames).toHaveLength(2)
+    expect(toolNames).toContain('gateway_list_servers')
+    expect(toolNames).toHaveLength(3)
 
     await emptyApp.close()
     emptyStore.stop()

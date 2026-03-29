@@ -8,6 +8,7 @@ import {
   isGatewayInternalTool,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
 } from '../discovery.js'
@@ -113,6 +114,30 @@ function normalizeInternalToolResult(toolName: string, value: unknown): CallTool
       matches.length > 0
         ? [`Matches for "${query}":`, ...matches].join('\n')
         : `No matching tools found for "${query}".`
+
+    return {
+      content: [{ type: 'text', text }],
+      structuredContent: value,
+    }
+  }
+
+  if (
+    toolName === GATEWAY_LIST_SERVERS_TOOL_NAME &&
+    isRecord(value) &&
+    Array.isArray(value['servers'])
+  ) {
+    const servers = value['servers']
+      .filter(isRecord)
+      .map((server) =>
+        typeof server['serverId'] === 'string' && server['serverId'].trim().length > 0
+          ? `- ${server['serverId'].trim()}`
+          : '- <unknown>'
+      )
+
+    const text =
+      servers.length > 0
+        ? ['Available downstream servers:', ...servers].join('\n')
+        : 'No downstream servers are currently available in this namespace.'
 
     return {
       content: [{ type: 'text', text }],

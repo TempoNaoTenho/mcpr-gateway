@@ -81,7 +81,8 @@ describe('gateway_search_tools over real MCP flows (real_usage_benchmark fixture
     const tools = await client.toolsList(sessionId)
     expect(tools.map((t) => t.name)).toContain('gateway_search_tools')
     expect(tools.map((t) => t.name)).toContain('gateway_call_tool')
-    expect(tools).toHaveLength(2)
+    expect(tools.map((t) => t.name)).toContain('gateway_list_servers')
+    expect(tools).toHaveLength(3)
 
     for (const [label, probe] of Object.entries(probes)) {
       const searchResult = await client.callTool(sessionId, 'gateway_search_tools', {

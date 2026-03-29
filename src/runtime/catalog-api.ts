@@ -174,6 +174,13 @@ export class CatalogRuntimeApi {
     return ranked.map(({ toolcard }) => this.formatTool(toolcard, detail))
   }
 
+  servers(): unknown[] {
+    const serverIds = [...new Set(this.toolcards.map((tool) => tool.serverId))]
+      .filter((serverId) => typeof serverId === 'string' && serverId.length > 0)
+      .sort((left, right) => left.localeCompare(right))
+    return serverIds.map((serverId) => ({ serverId }))
+  }
+
   list(filters: CatalogListFilters = {}): unknown[] {
     const detail = filters.detail ?? 'summary'
     const visible = this.toolcards.filter((tool) =>

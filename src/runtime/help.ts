@@ -2,6 +2,8 @@ import { GatewayMode } from '../types/enums.js'
 
 const HELP_TOPICS: Record<string, string> = {
   catalog: [
+    'catalog.servers()',
+    '  Return exact downstream server IDs available in the current namespace',
     'catalog.search(query, { k, limit, serverId, risk, tags, requiredArgs, detail })',
     '  query: natural language search for tools',
     '  k: number of results (default 5)',
@@ -22,6 +24,7 @@ const HELP_TOPICS: Record<string, string> = {
     '  handles are session-scoped and short-lived; use the handle returned in the current execution',
     '',
     'Example:',
+    '  const servers = await catalog.servers()',
     '  const tools = await catalog.search("fastmcp docs", { serverId: "fastmcp", requiredArgs: ["query"], detail: "signature", k: 3 })',
     '  const details = await catalog.describe(tools[0].handle, { detail: "signature" })',
     '  // details.properties.query.type, details.required, details.acceptsAdditionalProperties',
@@ -95,11 +98,12 @@ const MODE_GUIDANCE: Record<string, string[]> = {
   [GatewayMode.Compat]: [
     '',
     '═══════════════════════════════════════════════════════════',
-    'COMPAT MODE — Use gateway_search_tools and gateway_call_tool',
+    'COMPAT MODE — Use gateway_search_tools, gateway_call_tool, and gateway_list_servers when needed',
     '═══════════════════════════════════════════════════════════',
     '',
     '1. DISCOVER TOOLS: Use gateway_search_tools with a query',
-    '   Example: gateway_search_tools({ query: "github issues" })',
+    '   If the integration is unclear, call gateway_list_servers first to confirm exact server IDs',
+    '   Example: gateway_search_tools({ query: "github issues", serverId: "github" })',
     '',
     '2. CALL TOOLS: Use gateway_call_tool with the exact name and serverId from search results',
     '   Example: gateway_call_tool({',
@@ -122,6 +126,7 @@ const MODE_GUIDANCE: Record<string, string[]> = {
     '═══════════════════════════════════════════════════════════',
     '',
     '1. DISCOVER: catalog.search() or catalog.list()',
+    '   Use catalog.servers() only when you need to confirm exact server IDs first',
     '   Returns tool handles for use with mcp.call()',
     '',
     '2. EXECUTE: mcp.call(handle, args) or mcp.batch([...])',

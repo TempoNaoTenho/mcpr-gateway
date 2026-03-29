@@ -22,12 +22,14 @@ import {
   type SandboxDiagnosticEvent,
 } from '../runtime/index.js'
 import {
+  executeGatewayListServers,
   executeGatewaySearch,
   parseGatewayCallArgs,
   parseGatewayRunCodeArgs,
   GATEWAY_SERVER_ID,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
   isGatewayInternalTool,
@@ -193,6 +195,22 @@ export class ExecutionRouter implements IExecutionRouter {
       isToolVisible(session.toolWindow, GATEWAY_CALL_TOOL_NAME, GATEWAY_SERVER_ID)
     ) {
       return this.handleGatewayCall(session, sessionId, args, rateLimiter)
+    }
+
+    if (
+      toolName === GATEWAY_LIST_SERVERS_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_LIST_SERVERS_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
+      const { result } = await executeGatewayListServers(session, this.registry)
+      return {
+        toolName,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId,
+        outcome: OutcomeClass.Success,
+        result,
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      }
     }
 
     if (

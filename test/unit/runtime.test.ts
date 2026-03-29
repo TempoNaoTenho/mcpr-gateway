@@ -123,6 +123,41 @@ describe('HandleRegistry', () => {
 })
 
 describe('executeCodeMode', () => {
+  it('lists exact downstream server IDs through catalog.servers', async () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: vi.fn().mockReturnValue([
+        {
+          server: makeServer('fastmcp'),
+          records: [makeToolRecord('search_fast_mcp', 'Search FastMCP docs', 'fastmcp')],
+        },
+        {
+          server: makeServer('context7'),
+          records: [makeToolRecord('query_docs', 'Query Context7 docs', 'context7')],
+        },
+      ]),
+    }
+
+    const result = (await executeCodeMode(
+      `
+      return await catalog.servers()
+      `,
+      session,
+      registry as never,
+      {
+        memoryLimitMb: 128,
+        executionTimeoutMs: 5_000,
+        maxToolCallsPerExecution: 10,
+        maxResultSizeBytes: 8_192,
+        artifactStoreTtlSeconds: 300,
+        maxConcurrentToolCalls: 5,
+      },
+      vi.fn()
+    )) as { value: Array<{ serverId: string }> }
+
+    expect(result.value).toEqual([{ serverId: 'context7' }, { serverId: 'fastmcp' }])
+  })
+
   it('runs discovery, tool execution, and projection inside one runtime call', async () => {
     const session = makeSession()
     const registry = {

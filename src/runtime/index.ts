@@ -136,6 +136,7 @@ export async function executeCodeMode(
     },
     {
       catalogSearch: (query, options) => catalog.search(query, options),
+      catalogServers: () => catalog.servers(),
       catalogList: (filters) => catalog.list(filters),
       catalogDescribe: (handle, options) => catalog.describe(handle, options),
       mcpCall: (handle, args) => mcp.call(handle, args),

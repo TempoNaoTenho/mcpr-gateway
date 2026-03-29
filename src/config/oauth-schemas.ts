@@ -10,6 +10,43 @@ const OptionalUrlSchema = z.preprocess(blankToUndefined, z.string().url().option
 const OptionalNonEmptyStringSchema = z.preprocess(blankToUndefined, z.string().min(1).optional())
 const LooseObjectSchema = z.record(z.unknown())
 
+/**
+ * HTTP `publicBaseUrl` whose host is loopback-only. Allows `NODE_ENV=production` locally (e.g. default
+ * config inferring `http://127.0.0.1:port`) without weakening internet-facing deployments: non-loopback
+ * HTTP URLs still fail validation in production.
+ */
+export function isLoopbackHttpPublicBaseUrl(publicBaseUrl: string): boolean {
+  try {
+    const u = new URL(publicBaseUrl)
+    if (u.protocol !== 'http:') return false
+    return isLoopbackHostname(u.hostname)
+  } catch {
+    return false
+  }
+}
+
+function normalizeHostnameForLoopback(hostname: string): string {
+  let h = hostname.trim().toLowerCase()
+  if (h.startsWith('[') && h.endsWith(']')) {
+    h = h.slice(1, -1)
+  }
+  return h
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const h = normalizeHostnameForLoopback(hostname)
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1') return true
+  // IPv4-mapped loopback: literal ::ffff:127.0.0.1 or URL-parsed ::ffff:7f00:1
+  if (h === '::ffff:127.0.0.1' || h === '::ffff:7f00:1') return true
+  return false
+}
+
+function mustUseHttpsInProduction(publicBaseUrl: string): boolean {
+  if (publicBaseUrl.startsWith('https://')) return false
+  if (isLoopbackHttpPublicBaseUrl(publicBaseUrl)) return false
+  return true
+}
+
 export const DEFAULT_EMBEDDED_BROWSER_ORIGINS = [
   'https://chatgpt.com',
   'https://claude.ai',
@@ -60,10 +97,11 @@ export const InboundOAuthSchema = z
           message: 'publicBaseUrl is required for external OAuth',
           path: ['publicBaseUrl'],
         })
-      } else if (!o.publicBaseUrl.startsWith('https://') && process.env['NODE_ENV'] === 'production') {
+      } else if (mustUseHttpsInProduction(o.publicBaseUrl) && process.env['NODE_ENV'] === 'production') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'publicBaseUrl must use https:// in production',
+          message:
+            'publicBaseUrl must use https:// in production (http:// is allowed only for localhost / 127.0.0.1 / IPv6 loopback)',
           path: ['publicBaseUrl'],
         })
       }
@@ -86,10 +124,11 @@ export const InboundOAuthSchema = z
       return
     }
 
-    if (o.publicBaseUrl && !o.publicBaseUrl.startsWith('https://') && process.env['NODE_ENV'] === 'production') {
+    if (o.publicBaseUrl && mustUseHttpsInProduction(o.publicBaseUrl) && process.env['NODE_ENV'] === 'production') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'publicBaseUrl must use https:// in production',
+        message:
+          'publicBaseUrl must use https:// in production (http:// is allowed only for localhost / 127.0.0.1 / IPv6 loopback)',
         path: ['publicBaseUrl'],
       })
     }

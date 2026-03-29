@@ -10,6 +10,7 @@ import type { VisibleTool } from '../../src/types/tools.js'
 import {
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
@@ -156,6 +157,34 @@ describe('ExecutionRouter', () => {
     expect(registry.getServer).not.toHaveBeenCalled()
   })
 
+  it('returns gateway_list_servers without resolving downstream servers directly', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const session = makeSession([makeTool(GATEWAY_LIST_SERVERS_TOOL_NAME, GATEWAY_SERVER_ID)])
+    await store.set(session.id, session)
+
+    const registry = {
+      getServer: vi.fn(),
+      getToolsByNamespace: vi.fn(() => [
+        { server: makeServer('gmail-primary'), records: [makeTool('read_email', 'gmail-primary')] },
+        { server: makeServer('docs'), records: [makeTool('search_docs', 'docs')] },
+      ]),
+    }
+
+    const router = new ExecutionRouter(registry as never, store)
+    const outcome = await router.route(GATEWAY_LIST_SERVERS_TOOL_NAME, {}, session.id)
+
+    expect(outcome.outcome).toBe(OutcomeClass.Success)
+    expect(outcome.serverId).toBe(GATEWAY_SERVER_ID)
+    expect(outcome.result).toEqual({
+      servers: [{ serverId: 'docs' }, { serverId: 'gmail-primary' }],
+    })
+    expect(registry.getServer).not.toHaveBeenCalled()
+  })
+
   it('rejects gateway meta-tools when they are not visible in the session window', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {
@@ -177,11 +206,14 @@ describe('ExecutionRouter', () => {
       { name: 'read_email', serverId: 'gmail-primary', arguments: {} },
       session.id,
     )
+    const listServersOutcome = await router.route(GATEWAY_LIST_SERVERS_TOOL_NAME, {}, session.id)
 
     expect(searchOutcome.outcome).toBe(OutcomeClass.ToolError)
     expect(searchOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(callOutcome.outcome).toBe(OutcomeClass.ToolError)
     expect(callOutcome.error).toBe('TOOL_NOT_VISIBLE')
+    expect(listServersOutcome.outcome).toBe(OutcomeClass.ToolError)
+    expect(listServersOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(registry.getServer).not.toHaveBeenCalled()
   })
 })

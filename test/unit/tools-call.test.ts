@@ -9,6 +9,7 @@ import type { SessionState } from '../../src/types/session.js'
 import type { TriggerEngine } from '../../src/trigger/index.js'
 import {
   GATEWAY_HELP_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
@@ -347,6 +348,65 @@ describe('handleToolsCall', () => {
           {
             type: 'text',
             text: expect.stringContaining('search_fast_mcp (fastmcp)'),
+          },
+        ],
+        structuredContent: result,
+      },
+    })
+  })
+
+  it('wraps gateway_list_servers results as MCP CallToolResult content', async () => {
+    const session = {
+      ...makeSession(),
+      toolWindow: [
+        {
+          name: GATEWAY_LIST_SERVERS_TOOL_NAME,
+          description: 'list servers',
+          inputSchema: { type: 'object' },
+          serverId: GATEWAY_SERVER_ID,
+          namespace: 'gmail',
+          riskLevel: 'Low',
+          tags: [],
+        },
+      ],
+    } as SessionState
+    const store = makeMockStore(session)
+    const result = {
+      servers: [{ serverId: 'docs' }, { serverId: 'fastmcp' }],
+    }
+    const router = {
+      route: vi.fn().mockResolvedValue({
+        toolName: GATEWAY_LIST_SERVERS_TOOL_NAME,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId: session.id,
+        outcome: OutcomeClass.Success,
+        result,
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      }),
+    }
+
+    const response = await handleToolsCall(
+      makeCtx(session.id),
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: GATEWAY_LIST_SERVERS_TOOL_NAME, arguments: {} },
+      },
+      store as never,
+      router as never,
+      makeTriggerEngine(),
+    )
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: expect.stringContaining('Available downstream servers:'),
           },
         ],
         structuredContent: result,

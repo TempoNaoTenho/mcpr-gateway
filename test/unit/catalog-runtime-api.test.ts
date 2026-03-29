@@ -105,6 +105,29 @@ beforeEach(() => {
 })
 
 describe('CatalogRuntimeApi', () => {
+  it('lists unique server IDs in sorted order', () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: () => [
+        {
+          server: makeServer('fastmcp'),
+          records: [makeToolRecord('search_fast_mcp', 'Search FastMCP docs', 'fastmcp')],
+        },
+        {
+          server: makeServer('context7'),
+          records: [makeToolRecord('query-docs', 'Query docs', 'context7')],
+        },
+        {
+          server: makeServer('fastmcp'),
+          records: [makeToolRecord('read_fastmcp_doc', 'Read FastMCP docs', 'fastmcp')],
+        },
+      ],
+    }
+
+    const api = new CatalogRuntimeApi(session, registry as never, new HandleRegistry())
+    expect(api.servers()).toEqual([{ serverId: 'context7' }, { serverId: 'fastmcp' }])
+  })
+
   it('accepts limit as a compatibility alias for search', () => {
     const session = makeSession()
     const registry = {

@@ -30,6 +30,7 @@ import type { ToolRecord, VisibleTool } from '../../src/types/tools.js'
 import {
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
 } from '../../src/gateway/discovery.js'
@@ -243,7 +244,11 @@ describe('TriggerEngine', () => {
       RefreshTriggerType.FirstSuccessInDomain,
     )
     // After refresh, toolWindow is always just the gateway meta-tools
-    expect(updated?.toolWindow.map((tool) => tool.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(updated?.toolWindow.map((tool) => tool.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
+    ])
   })
 
   it('passes the initial session intent through refresh recomputation', async () => {
@@ -334,7 +339,11 @@ describe('TriggerEngine', () => {
 
     const updated = await store.get(SessionIdSchema.parse('session-1'))
     // After refresh, toolWindow is always just the gateway meta-tools
-    expect(updated?.toolWindow.map((tool) => tool.name)).toEqual([GATEWAY_SEARCH_TOOL_NAME, GATEWAY_CALL_TOOL_NAME])
+    expect(updated?.toolWindow.map((tool) => tool.name)).toEqual([
+      GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_CALL_TOOL_NAME,
+      GATEWAY_LIST_SERVERS_TOOL_NAME,
+    ])
   })
 
   it('preserves gateway meta-tools across refreshes', async () => {

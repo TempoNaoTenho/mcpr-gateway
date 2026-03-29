@@ -258,7 +258,7 @@
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
             <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Tools on tools/list
-              <InfoTooltip text="Count of tools returned to the MCP client on tools/list after initialize (gateway mode affects this: default exposes downstream tools; compat and code expose two meta-tools each)." />
+              <InfoTooltip text="Count of tools returned to the MCP client on tools/list after initialize (gateway mode affects this: default exposes downstream tools; compat exposes search/call/server discovery tools; code exposes gateway_run_code and gateway_help)." />
             </div>
             <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{selectedNamespace.metrics.toolCount}</p>
           </div>
