@@ -20,7 +20,7 @@ The gateway uses a **two-tier configuration model**:
 │  • servers, namespaces, policies: used to seed SQLite           │
 │                                                                 │
 │  After first start, changes to this file are IGNORED            │
-│  (except for auth which is always merged from the file)         │
+│  runtime saves can manage auth too; bootstrap remains optional  │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ First startup only (if SQLite is empty)
                       ▼
@@ -80,7 +80,7 @@ This default is intentional: binding to loopback avoids accidentally exposing ad
 | Section        | Purpose                                                                                                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `servers`      | Downstream MCP servers (stdio or HTTP). Optional in the file; the WebUI can manage them later. See [`DownstreamServerSchema`](../src/types/server.ts).                                                                   |
-| `auth`         | Bootstrap auth section. **ALWAYS sourced from file** (merged at runtime). In normal use, client Bearer tokens are managed from the WebUI and stored in `staticKeys`. See [`AuthConfigSchema`](../src/config/schemas.ts). |
+| `auth`         | Inbound client auth section. It can be seeded from `bootstrap.json`, but normal operation may manage it from the WebUI/runtime config. See [`AuthConfigSchema`](../src/config/schemas.ts). |
 | `namespaces`   | Per-namespace tool window sizes and allowed modes/roles.                                                                                                                                                                 |
 | `roles`        | Which namespaces each role may use and optional `denyModes`.                                                                                                                                                             |
 | `selector`     | BM25/lexical ranking, discovery-tool controls, scoring penalties, and **`publication`** (how descriptions and schemas are projected to MCP clients). See [Selector publication](#selector-publication).                  |
@@ -196,7 +196,7 @@ If `bootstrap.json` does not exist, the gateway starts with **no downstream serv
 
 In the SQLite case:
 
-- **Bootstrap auth still comes from `bootstrap.json`** (merged with the active SQLite row at runtime).
+- **Bootstrap auth can seed the instance**, but the active auth config may also be managed from the WebUI/runtime config.
 - **`servers`, namespaces, roles, selector, session, triggers, resilience, debug, and starter packs** can be managed from the WebUI and are versioned in SQLite.
 - **Client access tokens** are managed from the WebUI and persisted in the admin config slice inside SQLite.
 - The admin API `GET /admin/config` returns the admin-managed config plus a read-only auth summary.
