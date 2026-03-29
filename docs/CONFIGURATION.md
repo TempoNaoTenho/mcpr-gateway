@@ -255,6 +255,10 @@ Bootstrap `auth.mode` is a discriminated union (see [`AuthConfigSchema`](../src/
 
 These metadata endpoints return browser CORS headers for loopback origins and for exact matches from `auth.oauth.allowedBrowserOrigins`. Configured entries are treated as origins, not prefixes or wildcard patterns.
 
+`auth.oauth.allowedBrowserOrigins` is only a browser `Origin`/CORS allowlist for the metadata routes and `/mcp/:namespace`. It is **not** an OAuth redirect/callback URI allowlist.
+
+For `provider: "embedded"`, remote clients register their own `redirect_uris` through dynamic client registration (`POST /oauth/register`). For external issuers, configure callback allowlists in the upstream IdP itself. For Claude remote MCP connectors, Anthropic currently documents `https://claude.ai/api/mcp/auth_callback` and recommends also allowing `https://claude.com/api/mcp/auth_callback`.
+
 The protected-resource routes identify this gateway resource (`resource`, `authorization_servers`, `scopes_supported`). The authorization-server and OpenID routes proxy normalized issuer discovery metadata from the configured inbound IdP and include `resource` on namespace-specific aliases.
 
 When `auth.mode` is `static_key` only, all of these URLs return **404**.

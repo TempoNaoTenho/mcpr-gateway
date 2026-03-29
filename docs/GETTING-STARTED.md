@@ -110,6 +110,8 @@ For streamable HTTP clients such as MCP Inspector, ChatGPT, or Claude:
 3. `POST notifications/initialized`
 4. Continue with `tools/list` and `tools/call`
 
+When inbound OAuth is enabled for browser-based clients, `auth.oauth.allowedBrowserOrigins` must allow the browser `Origin` that opens the MCP connection. That field is separate from OAuth callback URLs: in embedded mode the client registers `redirect_uris` dynamically, while external issuers must be configured in the upstream IdP. For Claude remote MCP connectors, Anthropic currently documents `https://claude.ai/api/mcp/auth_callback` and recommends also allowing `https://claude.com/api/mcp/auth_callback`.
+
 Invalid namespace or body returns **400** with error details.
 Tool and downstream execution failures are returned as **HTTP 200** with a JSON-RPC `error` object in the body. Treat the JSON-RPC payload as the source of truth, not the HTTP status alone.
 

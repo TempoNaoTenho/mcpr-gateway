@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- 2026-03-29 - Fixed - Embedded inbound OAuth now includes `https://claude.com` in the default browser-origin allowlist, logs now distinguish rejected browser origins from OAuth `401` initialize challenges, and docs/UI now clarify that `allowedBrowserOrigins` is not an OAuth callback allowlist
 - 2026-03-29 - Fixed - Inbound OAuth browser origin checks now require exact origin matches, protected-resource metadata routes emit CORS headers for allowed browser origins, and `PUT /admin/config/policies` no longer overwrites newer bearer tokens from dedicated auth endpoints
 - 2026-03-28 - Fixed - stdio downstream transport now converts `stdin` `EPIPE` / closed-pipe writes into rejected MCP transport errors instead of leaking unhandled exceptions during tests and benchmark flows
 - 2026-03-28 - Fixed - `npm test`, `npm run test:coverage`, and `npm run test:watch` now run the native runtime preflight, auto-rebuild stale `isolated-vm` / `better-sqlite3` binaries, and force `--no-node-snapshot` before starting Vitest
