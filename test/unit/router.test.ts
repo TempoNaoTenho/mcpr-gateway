@@ -11,6 +11,7 @@ import {
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
   GATEWAY_LIST_SERVERS_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
@@ -206,12 +207,19 @@ describe('ExecutionRouter', () => {
       { name: 'read_email', serverId: 'gmail-primary', arguments: {} },
       session.id,
     )
+    const searchAndCallOutcome = await router.route(
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+      { query: 'read email', arguments: {} },
+      session.id,
+    )
     const listServersOutcome = await router.route(GATEWAY_LIST_SERVERS_TOOL_NAME, {}, session.id)
 
     expect(searchOutcome.outcome).toBe(OutcomeClass.ToolError)
     expect(searchOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(callOutcome.outcome).toBe(OutcomeClass.ToolError)
     expect(callOutcome.error).toBe('TOOL_NOT_VISIBLE')
+    expect(searchAndCallOutcome.outcome).toBe(OutcomeClass.ToolError)
+    expect(searchAndCallOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(listServersOutcome.outcome).toBe(OutcomeClass.ToolError)
     expect(listServersOutcome.error).toBe('TOOL_NOT_VISIBLE')
     expect(registry.getServer).not.toHaveBeenCalled()

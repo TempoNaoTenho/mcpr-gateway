@@ -197,6 +197,27 @@ describe('CatalogRuntimeApi', () => {
     expect(full[0]).toHaveProperty('description', 'Search documentation')
   })
 
+  it('returns the best match from searchOne', () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: () => [
+        {
+          server: makeServer('github-main'),
+          records: [
+            makeToolRecord('search_docs', 'Search documentation'),
+            makeToolRecord('search_issues', 'Search issues'),
+          ],
+        },
+      ],
+    }
+
+    const api = new CatalogRuntimeApi(session, registry as never, new HandleRegistry())
+    const result = api.searchOne('documentation', { detail: 'summary' }) as Record<string, unknown>
+
+    expect(result.name).toBe('search_docs')
+    expect(result).toHaveProperty('handle')
+  })
+
   it('filters search results by serverId and requiredArgs', () => {
     const session = makeSession()
     const registry = {

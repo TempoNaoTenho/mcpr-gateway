@@ -11,6 +11,7 @@ import {
   GATEWAY_HELP_TOOL_NAME,
   GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_SERVER_ID,
 } from '../../src/gateway/discovery.js'
@@ -355,6 +356,68 @@ describe('handleToolsCall', () => {
     })
   })
 
+  it('wraps gateway_search_and_call_tool results as MCP CallToolResult content', async () => {
+    const session = {
+      ...makeSession(),
+      toolWindow: [
+        {
+          name: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+          description: 'search and call',
+          inputSchema: { type: 'object' },
+          serverId: GATEWAY_SERVER_ID,
+          namespace: 'gmail',
+          riskLevel: 'Low',
+          tags: [],
+        },
+      ],
+    } as SessionState
+    const store = makeMockStore(session)
+    const result = {
+      query: 'fastmcp quickstart',
+      match: {
+        name: 'search_fast_mcp',
+        serverId: 'fastmcp',
+      },
+      result: { content: [{ type: 'text', text: 'Quickstart docs' }] },
+    }
+    const router = {
+      route: vi.fn().mockResolvedValue({
+        toolName: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId: session.id,
+        outcome: OutcomeClass.Success,
+        result,
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      }),
+    }
+
+    const response = await handleToolsCall(
+      makeCtx(session.id),
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+          arguments: { query: 'fastmcp quickstart', arguments: { query: 'quickstart' } },
+        },
+      },
+      store as never,
+      router as never,
+      makeTriggerEngine(),
+    )
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [{ type: 'text', text: expect.stringContaining('Selected match: search_fast_mcp (fastmcp)') }],
+        structuredContent: result,
+      },
+    })
+  })
+
   it('wraps gateway_list_servers results as MCP CallToolResult content', async () => {
     const session = {
       ...makeSession(),
@@ -430,7 +493,19 @@ describe('handleToolsCall', () => {
       ],
     } as SessionState
     const store = makeMockStore(session)
-    const result = { backend: 'isolated-vm', value: 2 }
+    const result = {
+      backend: 'isolated-vm',
+      value: 2,
+      telemetry: {
+        latencyMs: 12,
+        requestBytes: 10,
+        responseBytes: 12,
+        requestTokensEstimate: 3,
+        responseTokensEstimate: 3,
+        totalTokensEstimate: 6,
+        toolCalls: [],
+      },
+    }
     const router = {
       route: vi.fn().mockResolvedValue({
         toolName: GATEWAY_RUN_CODE_TOOL_NAME,
@@ -438,6 +513,14 @@ describe('handleToolsCall', () => {
         sessionId: session.id,
         outcome: OutcomeClass.Success,
         result,
+        telemetry: {
+          latencyMs: 12,
+          requestBytes: 10,
+          responseBytes: 12,
+          requestTokensEstimate: 3,
+          responseTokensEstimate: 3,
+          totalTokensEstimate: 6,
+        },
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }),

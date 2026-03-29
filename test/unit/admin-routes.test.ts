@@ -2165,7 +2165,7 @@ describe('adminRoutes', () => {
       expect.objectContaining({
         key: 'gmail',
         metrics: expect.objectContaining({
-          toolCount: 3,
+          toolCount: 4,
           customizedTools: 0,
           serverCount: 1,
           totalTokens: expect.any(Number),

@@ -33,11 +33,21 @@ const tools = await catalog.search('fastmcp docs', {
   k: 5,                    // max results (prefer k over deprecated limit)
 })
 
+const best = await catalog.searchOne('fastmcp docs', {
+  serverId: 'fastmcp',
+  requiredArgs: ['query'],
+  detail: 'signature',
+})
+
 // 📋 Inspect a tool's full signature before calling
 const details = await catalog.describe(tools[0].handle, { detail: 'signature' })
 
 // 📞 Call a single tool
-const out = await mcp.call(tools[0].handle, { query: 'quickstart' })
+const out = await mcp.call(tools[0], { query: 'quickstart' })
+const fast = await mcp.callMatch('fastmcp docs', { query: 'quickstart' }, {
+  serverId: 'fastmcp',
+  requiredArgs: ['query'],
+})
 
 // 🗂️ Process results
 const text = result.text(out)           // extract text content from content[]
@@ -62,12 +72,16 @@ return { saved, count: result.count(filtered), sample: text }
 
 - `result` is a **reserved global** — do not assign to it; use `return` or an expression as the snippet's final value
 - `catalog.servers()` returns the exact downstream `serverId` values available in the namespace; use it only when the target integration is unclear
+- `catalog.searchOne()` returns only the best match or `null` when nothing matches
 - Snippets may be a single expression or a block with `return`; the final value must be JSON-serializable
 - `catalog.search()` returns handles scoped to the current session — do not persist them across calls
+- `mcp.call()` accepts either the handle string or the tool object returned by `catalog.search()` / `catalog.list()`
+- `mcp.callMatch()` collapses search + call into one helper when the highest-ranked match is sufficient
 - `catalog.describe(..., { detail: "signature" })` returns required args plus short property metadata (`type`, `description`, `enum` when present)
 - `result.limit()` expects an array; `result.items()` and `result.text()` unwrap MCP `content[]` arrays
 - For `mcp.batch`, only combine handles that accept compatible arg shapes; use `catalog.describe` when unsure and verify the search returned enough tools before indexing
 - For large or rich payloads, prefer `result.pick`, `result.limit`, `artifacts.save`, or `JSON.parse(JSON.stringify(value))` to avoid serialization issues
+- `gateway_run_code` responses now include estimated telemetry (`latencyMs`, byte size, token estimate, and per-tool-call traces) in `structuredContent.telemetry`
 
 ## Configuration
 

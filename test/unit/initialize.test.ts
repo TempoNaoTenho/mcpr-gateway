@@ -20,6 +20,7 @@ import type { ToolRecord } from '../../src/types/tools.js'
 import type { DownstreamServer } from '../../src/types/server.js'
 import {
   GATEWAY_SEARCH_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
@@ -185,9 +186,10 @@ describe('handleInitialize', () => {
 
     const session = await store.get(response.id)
     // toolWindow now contains only gateway compat tools
-    expect(session?.toolWindow).toHaveLength(3)
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
       GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
@@ -218,9 +220,10 @@ describe('handleInitialize', () => {
 
     const session = await store.get(response.id)
     // toolWindow now contains only gateway compat tools regardless of downstream tools
-    expect(session?.toolWindow).toHaveLength(3)
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
       GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
@@ -318,9 +321,10 @@ describe('handleInitialize', () => {
       'Read API docs SDK reference for FastMCP Need product documentation'
     )
     // toolWindow now has only gateway compat tools; intent text is stored for future use
-    expect(session?.toolWindow).toHaveLength(3)
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
       GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
@@ -344,9 +348,10 @@ describe('handleInitialize', () => {
     const session = await store.get(response.id)
     const toolNames = session?.toolWindow.map((tool) => tool.name) ?? []
     expect(toolNames).toContain(GATEWAY_SEARCH_TOOL_NAME)
+    expect(toolNames).toContain(GATEWAY_SEARCH_AND_CALL_TOOL_NAME)
     expect(toolNames).toContain(GATEWAY_CALL_TOOL_NAME)
     expect(toolNames).toContain(GATEWAY_LIST_SERVERS_TOOL_NAME)
-    expect(session?.toolWindow).toHaveLength(3)
+    expect(session?.toolWindow).toHaveLength(4)
   })
 
   it('publishes gateway_run_code and gateway_help when the namespace uses code mode', async () => {
@@ -462,9 +467,10 @@ describe('handleInitialize', () => {
 
     const session = await store.get(response.id)
     // toolWindow now contains only gateway compat tools
-    expect(session?.toolWindow).toHaveLength(3)
+    expect(session?.toolWindow).toHaveLength(4)
     expect(session?.toolWindow.map((t) => t.name)).toEqual([
       GATEWAY_SEARCH_TOOL_NAME,
+      GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
       GATEWAY_CALL_TOOL_NAME,
       GATEWAY_LIST_SERVERS_TOOL_NAME,
     ])
@@ -492,6 +498,7 @@ describe('handleInitialize', () => {
     const result = (response.result as { result: { instructions?: string } }).result
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).toContain('gateway_search_and_call_tool')
     expect(result.instructions).toContain('gateway_call_tool')
     expect(result.instructions).toContain('gateway_list_servers')
     expect(result.instructions).toContain('exact name and serverId returned by the search result')
@@ -519,6 +526,7 @@ describe('handleInitialize', () => {
     const result = (response.result as { result: { instructions?: string } }).result
     expect(result.instructions).toBeDefined()
     expect(result.instructions).toContain('gateway_search_tools')
+    expect(result.instructions).toContain('gateway_search_and_call_tool')
     expect(result.instructions).toContain('gateway_list_servers')
     expect(result.instructions).not.toContain('Available servers')
   })
@@ -667,9 +675,10 @@ describe('handleInitialize', () => {
       const session = await store.get(response.id)
       expect(session?.namespace).toBe('all')
       // toolWindow now contains only gateway compat tools
-      expect(session?.toolWindow).toHaveLength(3)
+      expect(session?.toolWindow).toHaveLength(4)
       expect(session?.toolWindow.map((t) => t.name)).toEqual([
         GATEWAY_SEARCH_TOOL_NAME,
+        GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
         GATEWAY_CALL_TOOL_NAME,
         GATEWAY_LIST_SERVERS_TOOL_NAME,
       ])

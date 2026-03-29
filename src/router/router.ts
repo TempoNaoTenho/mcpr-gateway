@@ -17,6 +17,11 @@ import { isDownstreamAuthError } from '../registry/auth/index.js'
 import { getConfig } from '../config/index.js'
 import { isToolDisabledForNamespace } from '../config/disabled-tool-keys.js'
 import {
+  buildToolCallTelemetry,
+  type ToolCallTelemetry,
+  type ToolCallTrace,
+} from '../observability/tool-telemetry.js'
+import {
   executeCodeModeHelp,
   executeCodeMode,
   type SandboxDiagnosticEvent,
@@ -25,9 +30,11 @@ import {
   executeGatewayListServers,
   executeGatewaySearch,
   parseGatewayCallArgs,
+  parseGatewaySearchAndCallArgs,
   parseGatewayRunCodeArgs,
   GATEWAY_SERVER_ID,
   GATEWAY_SEARCH_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
   GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
@@ -184,9 +191,17 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result,
+        telemetry: buildToolCallTelemetry(args, result, 0),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
+    }
+
+    if (
+      toolName === GATEWAY_SEARCH_AND_CALL_TOOL_NAME &&
+      isToolVisible(session.toolWindow, GATEWAY_SEARCH_AND_CALL_TOOL_NAME, GATEWAY_SERVER_ID)
+    ) {
+      return this.handleGatewaySearchAndCall(session, sessionId, args, rateLimiter)
     }
 
     // gateway_call_tool — proxy to any downstream tool (bypasses visibility)
@@ -208,6 +223,7 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result,
+        telemetry: buildToolCallTelemetry(args, result, 0),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -247,6 +263,7 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.Success,
         result: executeCodeModeHelp(topic, gatewayMode),
+        telemetry: buildToolCallTelemetry(args, executeCodeModeHelp(topic, gatewayMode), 0),
         durationMs: 0,
         timestamp: new Date().toISOString(),
       }
@@ -370,6 +387,144 @@ export class ExecutionRouter implements IExecutionRouter {
     )
   }
 
+  private async handleGatewaySearchAndCall(
+    session: SessionState,
+    sessionId: SessionId,
+    args: unknown,
+    rateLimiter: RateLimiter | undefined
+  ): Promise<ExecutionOutcome> {
+    const parsed = parseGatewaySearchAndCallArgs(args)
+    if ('error' in parsed) {
+      return {
+        toolName: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId,
+        outcome: OutcomeClass.ToolError,
+        error: parsed.error,
+        telemetry: buildToolCallTelemetry(args, { error: parsed.error }, 0),
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      }
+    }
+
+    const searchStartedAt = Date.now()
+    const { result } = await executeGatewaySearch(
+      session,
+      { query: parsed.query, serverId: parsed.serverId, limit: parsed.limit },
+      this.registry
+    )
+    const searchLatencyMs = Date.now() - searchStartedAt
+    const searchTelemetry = buildToolCallTelemetry(
+      { query: parsed.query, serverId: parsed.serverId, limit: parsed.limit },
+      result,
+      searchLatencyMs
+    )
+
+    const matches =
+      result &&
+      typeof result === 'object' &&
+      !Array.isArray(result) &&
+      Array.isArray((result as Record<string, unknown>)['matches'])
+        ? ((result as Record<string, unknown>)['matches'] as Array<Record<string, unknown>>)
+        : []
+    const match = matches[parsed.matchIndex]
+
+    if (!match || typeof match.name !== 'string' || typeof match.serverId !== 'string') {
+      const error =
+        matches.length === 0
+          ? `No matching tools found for "${parsed.query}".`
+          : `No ranked match at index ${parsed.matchIndex} for "${parsed.query}".`
+      return {
+        toolName: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId,
+        outcome: OutcomeClass.ToolError,
+        error,
+        telemetry: buildToolCallTelemetry(args, { error, result }, searchLatencyMs),
+        durationMs: searchLatencyMs,
+        timestamp: new Date().toISOString(),
+      }
+    }
+
+    const liveConfig = getConfig()
+    if (isToolDisabledForNamespace(liveConfig, session.namespace, match.serverId, match.name)) {
+      const error = 'Tool is disabled for this namespace'
+      return {
+        toolName: match.name,
+        serverId: match.serverId,
+        sessionId,
+        outcome: OutcomeClass.ToolError,
+        error,
+        telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs),
+        durationMs: searchLatencyMs,
+        timestamp: new Date().toISOString(),
+      }
+    }
+
+    const server = await this.registry.getServer(match.serverId)
+    if (!server || !server.enabled) {
+      const error = 'Downstream server is unavailable or disabled'
+      return {
+        toolName: match.name,
+        serverId: match.serverId,
+        sessionId,
+        outcome: OutcomeClass.UnavailableDownstream,
+        error,
+        telemetry: buildToolCallTelemetry(args, { error }, searchLatencyMs),
+        durationMs: searchLatencyMs,
+        timestamp: new Date().toISOString(),
+      }
+    }
+
+    const callOutcome = await this.executeDownstream(
+      server,
+      match.name,
+      parsed.arguments,
+      session,
+      sessionId,
+      rateLimiter
+    )
+
+    if (callOutcome.outcome !== OutcomeClass.Success) {
+      return callOutcome
+    }
+
+    const combinedResult = {
+      query: parsed.query,
+      matchIndex: parsed.matchIndex,
+      match: {
+        name: match.name,
+        serverId: match.serverId,
+        description: typeof match.description === 'string' ? match.description : undefined,
+      },
+      result: callOutcome.result,
+      telemetry: {
+        search: searchTelemetry,
+        call: {
+          toolName: match.name,
+          serverId: match.serverId,
+          outcome: callOutcome.outcome,
+          ...(callOutcome.telemetry ??
+            buildToolCallTelemetry(parsed.arguments, callOutcome.result, callOutcome.durationMs)),
+        },
+        totalLatencyMs: searchLatencyMs + callOutcome.durationMs,
+        totalTokensEstimate:
+          searchTelemetry.totalTokensEstimate + (callOutcome.telemetry?.totalTokensEstimate ?? 0),
+      },
+    }
+
+    return {
+      toolName: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+      serverId: GATEWAY_SERVER_ID,
+      sessionId,
+      outcome: OutcomeClass.Success,
+      result: combinedResult,
+      telemetry: buildToolCallTelemetry(args, combinedResult, searchLatencyMs + callOutcome.durationMs),
+      durationMs: searchLatencyMs + callOutcome.durationMs,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
   private async handleGatewayRunCode(
     session: SessionState,
     sessionId: SessionId,
@@ -463,6 +618,7 @@ export class ExecutionRouter implements IExecutionRouter {
     }
 
     try {
+      const toolCalls: ToolCallTrace[] = []
       const result = await executeCodeMode(
         parsed.code,
         session,
@@ -481,6 +637,21 @@ export class ExecutionRouter implements IExecutionRouter {
             sessionId,
             rateLimiter
           )
+          const telemetry =
+            outcome.telemetry ??
+            buildToolCallTelemetry(
+              toolArgs,
+              outcome.outcome === OutcomeClass.Success
+                ? outcome.result
+                : { error: outcome.error ?? outcome.outcome },
+              outcome.durationMs
+            )
+          toolCalls.push({
+            toolName: name,
+            serverId,
+            outcome: outcome.outcome,
+            ...telemetry,
+          })
           if (outcome.outcome !== OutcomeClass.Success) {
             throw new Error(outcome.error ?? outcome.outcome)
           }
@@ -490,6 +661,14 @@ export class ExecutionRouter implements IExecutionRouter {
       )
 
       const durationMs = Date.now() - startTime
+      const runtimeTelemetry: ToolCallTelemetry & { toolCalls: ToolCallTrace[] } = {
+        ...buildToolCallTelemetry({ code: parsed.code }, result, durationMs),
+        toolCalls,
+      }
+      const enrichedResult =
+        result && typeof result === 'object' && !Array.isArray(result)
+          ? { ...(result as Record<string, unknown>), telemetry: runtimeTelemetry }
+          : { value: result, telemetry: runtimeTelemetry }
       this.log?.info(
         {
           sessionId,
@@ -497,9 +676,13 @@ export class ExecutionRouter implements IExecutionRouter {
           method: 'tools/call',
           toolName: GATEWAY_RUN_CODE_TOOL_NAME,
           latencyMs: durationMs,
-          resultBytes: codeBytes(JSON.stringify(result) ?? 'null'),
+          resultBytes: codeBytes(JSON.stringify(enrichedResult) ?? 'null'),
+          totalTokensEstimate: runtimeTelemetry.totalTokensEstimate,
+          toolCallCount: toolCalls.length,
           storedAsArtifact:
-            !!result && typeof result === 'object' && 'artifactRef' in (result as Record<string, unknown>),
+            !!enrichedResult &&
+            typeof enrichedResult === 'object' &&
+            'artifactRef' in (enrichedResult as Record<string, unknown>),
         },
         'gateway_run_code completed'
       )
@@ -509,7 +692,8 @@ export class ExecutionRouter implements IExecutionRouter {
         serverId: GATEWAY_SERVER_ID,
         sessionId,
         outcome: OutcomeClass.Success,
-        result,
+        result: enrichedResult,
+        telemetry: runtimeTelemetry,
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -532,6 +716,7 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: OutcomeClass.ToolError,
         error: error instanceof Error ? error.message : String(error),
+        telemetry: buildToolCallTelemetry({ code: parsed.code }, { error: error instanceof Error ? error.message : String(error) }, durationMs),
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -669,6 +854,7 @@ export class ExecutionRouter implements IExecutionRouter {
         sessionId,
         outcome: outcomeClass,
         error: errMsg,
+        telemetry: buildToolCallTelemetry(args, { error: errMsg }, durationMs),
         durationMs,
         timestamp: new Date().toISOString(),
       }
@@ -690,6 +876,11 @@ export class ExecutionRouter implements IExecutionRouter {
       serverId: server.id,
       sessionId,
       outcome: outcomeClass,
+      telemetry: buildToolCallTelemetry(
+        args,
+        outcomeClass === OutcomeClass.Success ? callResult.result : { error: downstreamErr },
+        durationMs
+      ),
       durationMs,
       timestamp: new Date().toISOString(),
       ...(outcomeClass === OutcomeClass.Success

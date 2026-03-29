@@ -376,17 +376,12 @@ export BENCH_AUTH_HEADER="Bearer key"
 npm run benchmark -- real --namespaces name_space1, name_space_2, ...
 ```
 
-`~10 common dev mcp servers` with `~30 tools total` (context7, tavily, supabase, etc)
+`~10 common dev mcp servers` with `~30 tools total` (context7, tavily, etc)
 
-| Configured Mode | Executed Mode | Retrieval Recall@3 | MRR | E2E Success | Avg Context |
-| --------------- | ------------- | ------------------ | --- | ----------- | ----------- |
-| code            | code          | 1                  | 1   | 1           | 654.2       |
-| code            | default       | 1                  | 1   | 1           | 9200.6      |
-| compat          | compat        | 0                  | 0   | 0           | 3883        |
-| compat          | default       | 1                  | 1   | 1           | 9155.2      |
-| compat          | code          | 1                  | 1   | 1           | 654.2       |
-| default         | default       | 1                  | 1   | 1           | 9162.8      |
-| default         | code          | 1                  | 1   | 1           | 654.2       |
+| Mode    | Retrieval recall@3 | MRR | E2E Success | Avg Tokens Loaded in Context |
+| ------- | ------------------ | --- | ----------- | ---------------------------- |
+| code    | 1                  | 1   | 1           | 703.2                        |
+| default | 1                  | 1   | 1           | 9138.2                       |
 
 **Scenario: real-usage on MCP Client**
 

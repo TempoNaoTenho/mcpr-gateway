@@ -8,6 +8,7 @@ describe('buildGatewayHelp', () => {
 
     expect(help.text).toContain('catalog.servers()')
     expect(help.text).toContain('catalog.search(query, { k, limit, serverId, risk, tags, requiredArgs, detail })')
+    expect(help.text).toContain('catalog.searchOne(query')
     expect(help.text).toContain('requiredArgs: keep only tools whose required args include all listed fields')
     expect(help.text).toContain('detail=signature adds args, required, and a short properties map')
   })
@@ -15,6 +16,7 @@ describe('buildGatewayHelp', () => {
   it('documents batch schema compatibility guidance', () => {
     const help = buildGatewayHelp('mcp', GatewayMode.Code)
 
+    expect(help.text).toContain('mcp.callMatch(query, args')
     expect(help.text).toContain('Batch does not validate schema compatibility across handles')
     expect(help.text).toContain('if (tools.length < 2)')
     expect(help.text).toContain('requiredArgs: ["query"]')

@@ -15,6 +15,7 @@ import { GATEWAY_SERVER_ID } from './gateway-constants.js'
 
 export const GATEWAY_SEARCH_TOOL_NAME = 'gateway_search_tools'
 export const GATEWAY_CALL_TOOL_NAME = 'gateway_call_tool'
+export const GATEWAY_SEARCH_AND_CALL_TOOL_NAME = 'gateway_search_and_call_tool'
 export const GATEWAY_LIST_SERVERS_TOOL_NAME = 'gateway_list_servers'
 export const GATEWAY_RUN_CODE_TOOL_NAME = 'gateway_run_code'
 export const GATEWAY_HELP_TOOL_NAME = 'gateway_help'
@@ -30,6 +31,7 @@ export const GATEWAY_DISCOVERY_SERVER_ID = GATEWAY_SERVER_ID
 const GATEWAY_TOOL_NAMES = new Set([
   GATEWAY_SEARCH_TOOL_NAME,
   GATEWAY_CALL_TOOL_NAME,
+  GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
   GATEWAY_LIST_SERVERS_TOOL_NAME,
   GATEWAY_RUN_CODE_TOOL_NAME,
   GATEWAY_HELP_TOOL_NAME,
@@ -129,6 +131,50 @@ function buildGatewayCallTool(namespace: string): VisibleTool {
   }
 }
 
+function buildGatewaySearchAndCallTool(namespace: string): VisibleTool {
+  return {
+    name: GATEWAY_SEARCH_AND_CALL_TOOL_NAME,
+    description:
+      'Search for a downstream tool and execute the best match in one step. Useful in compat mode when you want fewer round trips than gateway_search_tools + gateway_call_tool.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query used to find the tool to execute.',
+        },
+        serverId: {
+          type: 'string',
+          description: 'Optional exact downstream server ID filter.',
+        },
+        arguments: {
+          type: 'object',
+          description: 'Arguments to pass to the selected downstream tool.',
+          default: {},
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 10,
+          description: 'How many ranked matches to inspect before selecting matchIndex.',
+        },
+        matchIndex: {
+          type: 'integer',
+          minimum: 0,
+          maximum: 9,
+          description: 'Which ranked match to execute (default 0 = top match).',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    serverId: GATEWAY_SERVER_ID,
+    namespace,
+    riskLevel: ToolRiskLevel.Low,
+    tags: ['search', 'execution', 'proxy'],
+  }
+}
+
 function buildGatewayRunCodeTool(namespace: string): VisibleTool {
   return {
     name: GATEWAY_RUN_CODE_TOOL_NAME,
@@ -190,6 +236,7 @@ function buildGatewayHelpTool(namespace: string): VisibleTool {
 export function buildGatewayToolWindow(namespace: string): VisibleTool[] {
   return [
     buildGatewaySearchTool(namespace),
+    buildGatewaySearchAndCallTool(namespace),
     buildGatewayCallTool(namespace),
     buildGatewayListServersTool(namespace),
   ]
@@ -303,6 +350,14 @@ export type GatewayRunCodeArgs = {
   code: string
 }
 
+export type GatewaySearchAndCallArgs = {
+  query: string
+  serverId?: string
+  arguments: Record<string, unknown>
+  limit: number
+  matchIndex: number
+}
+
 export function parseGatewayCallArgs(args: unknown): GatewayCallArgs | { error: string } {
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
     return { error: 'Arguments must be an object with name and serverId' }
@@ -334,4 +389,28 @@ export function parseGatewayRunCodeArgs(args: unknown): GatewayRunCodeArgs | { e
     return { error: 'Missing required field: code' }
   }
   return { code: obj.code }
+}
+
+export function parseGatewaySearchAndCallArgs(
+  args: unknown
+): GatewaySearchAndCallArgs | { error: string } {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return { error: 'Arguments must be an object with query' }
+  }
+  const obj = args as Record<string, unknown>
+  if (typeof obj.query !== 'string' || obj.query.trim().length === 0) {
+    return { error: 'Missing required field: query' }
+  }
+  const toolArgs = obj.arguments ?? {}
+  if (typeof toolArgs !== 'object' || Array.isArray(toolArgs)) {
+    return { error: 'Field arguments must be an object' }
+  }
+  const rawMatchIndex = typeof obj.matchIndex === 'number' ? obj.matchIndex : 0
+  return {
+    query: obj.query.trim(),
+    serverId: typeof obj.serverId === 'string' && obj.serverId.trim().length > 0 ? obj.serverId.trim() : undefined,
+    arguments: toolArgs as Record<string, unknown>,
+    limit: Math.max(1, Math.min(10, typeof obj.limit === 'number' ? obj.limit : 5)),
+    matchIndex: Math.max(0, Math.min(9, rawMatchIndex)),
+  }
 }
