@@ -1,14 +1,55 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { app } from '../../src/index.js'
 import { buildServer } from '../../src/gateway/server.js'
 import { healthRoutes } from '../../src/gateway/routes/health.js'
+import { initConfig, setConfig } from '../../src/config/index.js'
+import {
+  defaultDebug,
+  defaultResilience,
+  defaultSelector,
+  defaultSession,
+  defaultTestStaticKeys,
+  defaultTriggers,
+} from '../fixtures/bootstrap-json.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const TMP = join(__dirname, '__tmp_health_config__')
 
 beforeAll(async () => {
+  mkdirSync(TMP, { recursive: true })
+  writeFileSync(
+    join(TMP, 'bootstrap.json'),
+    JSON.stringify(
+      {
+        servers: [],
+        auth: { mode: 'static_key' },
+        namespaces: {},
+        roles: {},
+        selector: defaultSelector,
+        session: defaultSession,
+        triggers: defaultTriggers,
+        resilience: defaultResilience,
+        debug: defaultDebug,
+        starterPacks: {},
+      },
+      null,
+      2,
+    ),
+  )
+  const config = initConfig(TMP)
+  setConfig({
+    ...config,
+    auth: { ...config.auth, staticKeys: defaultTestStaticKeys },
+  })
   await app.ready()
 })
 
 afterAll(async () => {
   await app?.close()
+  rmSync(TMP, { recursive: true, force: true })
 })
 
 describe('GET /health', () => {

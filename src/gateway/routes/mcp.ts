@@ -15,7 +15,9 @@ import {
 } from '../jsonrpc.js'
 import { mcpContextFromFastifyRequest } from '../mcp-handler-context.js'
 import { getConfig } from '../../config/index.js'
+import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
 import { getInboundOAuth } from '../../auth/oauth-config.js'
+import { resolveMcpIdentityForInitialize } from '../../auth/mcp-identity.js'
 import { getRequestOrigin } from '../request-origin.js'
 import {
   isBrowserOriginAllowed,
@@ -173,6 +175,37 @@ export async function mcpRoutes(app: FastifyInstance, opts: McpRouteOptions): Pr
     }
 
     assertMcpOrigin(request, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
+    const config = getConfig()
+    const namespace = namespaceResult.data
+    const requestOrigin = getRequestOrigin(request)
+    const idResult = await resolveMcpIdentityForInitialize(
+      typeof request.headers.authorization === 'string' ? request.headers.authorization : undefined,
+      config.auth,
+      namespace,
+      new Set(Object.keys(config.namespaces)),
+      requestOrigin,
+    )
+    if (idResult.kind === 'oauth_required' || idResult.kind === 'oauth_invalid') {
+      const oauth = getInboundOAuth(config.auth, requestOrigin)
+      if (!oauth) {
+        throw new GatewayError(GatewayErrorCode.INTERNAL_GATEWAY_ERROR)
+      }
+      const { wwwAuthenticate } = buildOAuthChallenge(
+        oauth,
+        namespace,
+        idResult.kind === 'oauth_invalid' ? 'invalid_token' : undefined,
+      )
+      return reply.header('WWW-Authenticate', wwwAuthenticate).status(401).send({
+        error:
+          idResult.kind === 'oauth_invalid'
+            ? GatewayErrorCode.OAUTH_INVALID_TOKEN
+            : GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED,
+        message:
+          idResult.kind === 'oauth_invalid'
+            ? 'Invalid or expired OAuth access token'
+            : 'OAuth authentication required for this MCP namespace',
+      })
+    }
     openSseStream(request, reply, typeof request.headers.origin === 'string' ? request.headers.origin : undefined)
   })
 

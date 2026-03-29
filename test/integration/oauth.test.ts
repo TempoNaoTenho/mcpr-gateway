@@ -274,6 +274,22 @@ describe('OAuth initialize challenge', () => {
     expect(String(www)).toContain('resource_metadata=')
     expect(String(www)).toContain('scope=')
   })
+
+  it('returns 401 with WWW-Authenticate when SSE GET has no Bearer token', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/mcp/gmail',
+      headers: {
+        Accept: 'text/event-stream',
+        Origin: 'https://claude.com',
+      },
+    })
+
+    expect(res.statusCode).toBe(401)
+    expect(String(res.headers['www-authenticate'])).toContain('resource_metadata=')
+    expect(String(res.headers['www-authenticate'])).toContain('scope=')
+    expect(res.headers['content-type']).not.toContain('text/event-stream')
+  })
 })
 
 describe('metadata disabled for static_key', () => {
