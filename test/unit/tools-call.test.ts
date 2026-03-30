@@ -544,7 +544,85 @@ describe('handleToolsCall', () => {
       id: 1,
       result: {
         content: [{ type: 'text', text: '2' }],
-        structuredContent: result,
+        structuredContent: {
+          ...result,
+          durationMs: 0,
+          telemetry: {
+            ...result.telemetry,
+            tokenEstimate: 6,
+            toolCount: 0,
+            durationMs: 12,
+          },
+        },
+      },
+    })
+  })
+
+  it('attaches normalized telemetry metadata to internal tool structuredContent', async () => {
+    const session = {
+      ...makeSession(),
+      toolWindow: [
+        {
+          name: GATEWAY_LIST_SERVERS_TOOL_NAME,
+          description: 'servers',
+          inputSchema: { type: 'object' },
+          serverId: GATEWAY_SERVER_ID,
+          namespace: 'gmail',
+          riskLevel: 'Low',
+          tags: [],
+        },
+      ],
+    } as SessionState
+    const store = makeMockStore(session)
+    const router = {
+      route: vi.fn().mockResolvedValue({
+        toolName: GATEWAY_LIST_SERVERS_TOOL_NAME,
+        serverId: GATEWAY_SERVER_ID,
+        sessionId: session.id,
+        outcome: OutcomeClass.Success,
+        result: {
+          servers: [{ serverId: 'gmail-primary' }],
+        },
+        telemetry: {
+          latencyMs: 9,
+          requestBytes: 10,
+          responseBytes: 20,
+          requestTokensEstimate: 2,
+          responseTokensEstimate: 4,
+          totalTokensEstimate: 6,
+        },
+        durationMs: 11,
+        timestamp: new Date().toISOString(),
+      }),
+    }
+
+    const response = await handleToolsCall(
+      makeCtx(session.id),
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: GATEWAY_LIST_SERVERS_TOOL_NAME, arguments: {} },
+      },
+      store as never,
+      router as never,
+      makeTriggerEngine(),
+    )
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        structuredContent: {
+          servers: [{ serverId: 'gmail-primary' }],
+          durationMs: 11,
+          telemetry: {
+            latencyMs: 9,
+            totalTokensEstimate: 6,
+            tokenEstimate: 6,
+            durationMs: 9,
+          },
+        },
       },
     })
   })

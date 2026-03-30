@@ -72,6 +72,7 @@ const HELP_TOPICS: Record<string, string> = {
     '  Flatten nested arrays',
     'result.summarize(value)',
     '  Generate concise summary of any value',
+    '  Prefer structured fields from tool results instead of regex parsing rendered text',
     '',
     'Example:',
     '  return result.limit(result.pick(rows, ["number", "title", "state"]), 10)',
@@ -146,6 +147,7 @@ const MODE_GUIDANCE: Record<string, string[]> = {
     '4. RETURN: Simple expressions can be sent without return, for example `1 + 1`',
     '   Multi-line snippets should use `return` for the final value',
     '   `result` is reserved by the runtime and should not be redeclared',
+    '   When embedding literals into generated code, prefer JSON.stringify(value) over hand-escaped regex or string fragments',
     '   Return serializable data; if needed, normalize with JSON.parse(JSON.stringify(value))',
     '   Use result.limit() to keep responses small',
     '   For large data, use artifacts.save() instead',
@@ -175,6 +177,7 @@ const COMMON_ERRORS = [
   '• "Permission denied": Contact admin to enable tool for namespace',
   '• "Rate limited": Wait and retry with fewer requests (use mcp.batch)',
   '• "Connection failed": Downstream server may be unavailable',
+  '• "Invalid regular expression": The snippet was rejected before execution; prefer JSON.stringify(...) for literals and avoid fragile regex parsing of rendered text',
   '• "`result` is reserved": Rename your local variable to `rows`, `out`, or `data`',
   '• "Could not be serialized": Return JSON-friendly data or use JSON.parse(JSON.stringify(value))',
 ]

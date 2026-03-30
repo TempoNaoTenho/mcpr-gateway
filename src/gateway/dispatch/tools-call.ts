@@ -49,6 +49,11 @@ type CallToolResult = {
   structuredContent?: unknown
 }
 
+type InternalToolResultMeta = {
+  telemetry?: unknown
+  durationMs?: number
+}
+
 function isToolArguments(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -83,13 +88,70 @@ function stringifyForToolText(value: unknown): string {
   }
 }
 
-function normalizeInternalToolResult(toolName: string, value: unknown): CallToolResult {
+function enrichTelemetryCompatibility(
+  telemetry: unknown,
+  durationMs?: number
+): Record<string, unknown> | undefined {
+  if (!isRecord(telemetry)) return undefined
+
+  const enriched: Record<string, unknown> = { ...telemetry }
+  const totalTokensEstimate =
+    typeof telemetry['totalTokensEstimate'] === 'number' ? telemetry['totalTokensEstimate'] : undefined
+  const latencyMs =
+    typeof telemetry['latencyMs'] === 'number'
+      ? telemetry['latencyMs']
+      : typeof durationMs === 'number'
+        ? durationMs
+        : undefined
+  const toolCalls = Array.isArray(telemetry['toolCalls']) ? telemetry['toolCalls'] : undefined
+
+  if (totalTokensEstimate !== undefined && typeof enriched['tokenEstimate'] !== 'number') {
+    enriched['tokenEstimate'] = totalTokensEstimate
+  }
+  if (latencyMs !== undefined && typeof enriched['durationMs'] !== 'number') {
+    enriched['durationMs'] = latencyMs
+  }
+  if (toolCalls && typeof enriched['toolCount'] !== 'number') {
+    enriched['toolCount'] = toolCalls.length
+  }
+
+  return enriched
+}
+
+function attachInternalResultMeta(
+  structuredContent: unknown,
+  meta: InternalToolResultMeta
+): unknown {
+  if (!isRecord(structuredContent)) return structuredContent
+
+  const enriched: Record<string, unknown> = { ...structuredContent }
+  const telemetry =
+    enrichTelemetryCompatibility(
+      isRecord(enriched['telemetry']) ? enriched['telemetry'] : meta.telemetry,
+      meta.durationMs
+    )
+
+  if (telemetry) {
+    enriched['telemetry'] = telemetry
+  }
+  if (typeof meta.durationMs === 'number' && typeof enriched['durationMs'] !== 'number') {
+    enriched['durationMs'] = meta.durationMs
+  }
+
+  return enriched
+}
+
+function normalizeInternalToolResult(
+  toolName: string,
+  value: unknown,
+  meta: InternalToolResultMeta = {}
+): CallToolResult {
   if (isCallToolResult(value)) return value
 
   if (toolName === GATEWAY_HELP_TOOL_NAME && isRecord(value) && typeof value['text'] === 'string') {
     return {
       content: [{ type: 'text', text: value['text'] }],
-      structuredContent: value,
+      structuredContent: attachInternalResultMeta(value, meta),
     }
   }
 
@@ -118,7 +180,7 @@ function normalizeInternalToolResult(toolName: string, value: unknown): CallTool
 
     return {
       content: [{ type: 'text', text }],
-      structuredContent: value,
+      structuredContent: attachInternalResultMeta(value, meta),
     }
   }
 
@@ -138,7 +200,7 @@ function normalizeInternalToolResult(toolName: string, value: unknown): CallTool
           text: `Selected match: ${name} (${serverId})\n${stringifyForToolText(value['result'])}`,
         },
       ],
-      structuredContent: value,
+      structuredContent: attachInternalResultMeta(value, meta),
     }
   }
 
@@ -162,20 +224,20 @@ function normalizeInternalToolResult(toolName: string, value: unknown): CallTool
 
     return {
       content: [{ type: 'text', text }],
-      structuredContent: value,
+      structuredContent: attachInternalResultMeta(value, meta),
     }
   }
 
   if (toolName === GATEWAY_RUN_CODE_TOOL_NAME && isRecord(value) && 'value' in value) {
     return {
       content: [{ type: 'text', text: stringifyForToolText(value['value']) }],
-      structuredContent: value,
+      structuredContent: attachInternalResultMeta(value, meta),
     }
   }
 
   return {
     content: [{ type: 'text', text: stringifyForToolText(value) }],
-    structuredContent: value,
+    structuredContent: attachInternalResultMeta(value, meta),
   }
 }
 
@@ -306,7 +368,10 @@ export async function handleToolsCall(
         'tool executed'
       )
       const result = isGatewayInternalTool(outcome.toolName, outcome.serverId)
-        ? normalizeInternalToolResult(toolName, outcome.result)
+        ? normalizeInternalToolResult(toolName, outcome.result, {
+            telemetry: outcome.telemetry,
+            durationMs: outcome.durationMs,
+          })
         : outcome.result
       return {
         jsonrpc: '2.0',

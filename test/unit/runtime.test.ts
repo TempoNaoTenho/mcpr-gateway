@@ -219,6 +219,33 @@ describe('executeCodeMode', () => {
     })
   })
 
+  it('normalizes invalid regex syntax errors with recovery guidance', async () => {
+    const session = makeSession()
+    const registry = {
+      getToolsByNamespace: vi.fn().mockReturnValue([]),
+    }
+
+    await expect(
+      executeCodeMode(
+        `
+        const matcher = /(
+        return matcher
+        `,
+        session,
+        registry as never,
+        {
+          memoryLimitMb: 128,
+          executionTimeoutMs: 5_000,
+          maxToolCallsPerExecution: 10,
+          maxResultSizeBytes: 8_192,
+          artifactStoreTtlSeconds: 300,
+          maxConcurrentToolCalls: 5,
+        },
+        vi.fn()
+      )
+    ).rejects.toThrow('gateway_run_code rejected it before execution')
+  })
+
   it('accepts limit as a compatibility alias for catalog.search', async () => {
     const session = makeSession()
     const registry = {

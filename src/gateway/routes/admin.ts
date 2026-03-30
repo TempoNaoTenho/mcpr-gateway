@@ -36,7 +36,7 @@ import { getStaticKeysForAuth } from '../../auth/oauth-config.js'
 import { disabledToolKeysForNamespace } from '../../config/disabled-tool-keys.js'
 import { generateToolcards } from '../../toolcard/index.js'
 import { buildVisibleToolCatalog } from '../../session/catalog.js'
-import { buildGatewayInstructions } from '../dispatch/initialize.js'
+import { applyInstructionsPlaceholders, buildGatewayInstructions } from '../dispatch/initialize.js'
 import { buildGatewayToolWindowForMode } from '../discovery.js'
 import { toolCandidateKey } from '../../candidate/lexical.js'
 import { downstreamAuthManager } from '../../registry/auth/index.js'
@@ -173,9 +173,11 @@ function createDefaultNamespacePolicy(roleNames: string[]) {
     bootstrapWindowSize: 4,
     candidatePoolSize: 16,
     allowedModes: [Mode.Read, Mode.Write],
-    gatewayMode: GatewayMode.Compat,
+    gatewayMode: GatewayMode.Code,
     telemetryEnabled: false,
     disabledTools: [] as { serverId: string; name: string }[],
+    description: '',
+    customInstructions: {} as { compat?: string; code?: string },
   }
 }
 
@@ -286,7 +288,7 @@ function normalizeAdminAccessGraph(config: AdminConfig): AdminConfig {
               roles: validRoles,
             },
           ]
-        }),
+        })
       )
     : undefined
 
@@ -358,6 +360,53 @@ export function deleteNamespaceFromAdminConfig(
   }
 }
 
+export type CreateNamespaceResult =
+  | { ok: true; config: AdminConfig }
+  | { ok: false; error: 'already_exists' }
+  | { ok: false; error: 'invalid_name' }
+
+export function createNamespaceInAdminConfig(
+  current: AdminConfig,
+  namespace: string,
+  description?: string
+): CreateNamespaceResult {
+  if (!/^[a-z][a-z0-9_-]*$/.test(namespace)) {
+    return { ok: false, error: 'invalid_name' }
+  }
+
+  if (current.namespaces[namespace]) {
+    return { ok: false, error: 'already_exists' }
+  }
+
+  const roleNames = Object.keys(current.roles)
+  const newNamespacePolicy = createDefaultNamespacePolicy(roleNames)
+  if (description !== undefined) {
+    newNamespacePolicy.description = description
+  }
+
+  const roles = Object.fromEntries(
+    Object.entries(current.roles).map(([roleKey, policy]) => [
+      roleKey,
+      {
+        ...policy,
+        allowNamespaces: [...policy.allowNamespaces, namespace],
+      },
+    ])
+  )
+
+  return {
+    ok: true,
+    config: {
+      ...current,
+      namespaces: {
+        ...current.namespaces,
+        [namespace]: newNamespacePolicy,
+      },
+      roles,
+    },
+  }
+}
+
 function buildAuthSummary(effectiveAuth: {
   mode: string
   staticKeys?: Record<string, { userId: string; roles: string[] }>
@@ -383,10 +432,12 @@ function buildAuthSummary(effectiveAuth: {
 function mergeInboundAuthPolicy(
   current: AdminConfig['auth'],
   requested: unknown,
-  requestOrigin?: string,
+  requestOrigin?: string
 ): AdminConfig['auth'] {
   const normalizedRequested =
-    requestOrigin !== undefined ? inferInboundOAuthPublicBaseUrl(requested, requestOrigin) : requested
+    requestOrigin !== undefined
+      ? inferInboundOAuthPublicBaseUrl(requested, requestOrigin)
+      : requested
 
   if (!isRecord(normalizedRequested) || typeof normalizedRequested['mode'] !== 'string') {
     return current
@@ -1445,7 +1496,9 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         const token = request.params.token
         const current = configManager.getAdminConfig()
         if (current.auth.mode === 'oauth') {
-          return reply.status(400).send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
+          return reply
+            .status(400)
+            .send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
         }
         const existing = getStaticKeysForAuth(current.auth)?.[token]
         if (!existing) {
@@ -1490,7 +1543,9 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
         const token = request.params.token
         const current = configManager.getAdminConfig()
         if (current.auth.mode === 'oauth') {
-          return reply.status(400).send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
+          return reply
+            .status(400)
+            .send({ error: 'Bearer tokens require static_key or hybrid auth mode' })
         }
         const existingStaticKeys = { ...(getStaticKeysForAuth(current.auth) ?? {}) }
         if (!existingStaticKeys[token]) {
@@ -1663,6 +1718,41 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
       return reply.send({ version })
     })
 
+    app.post('/admin/namespaces', async (request, reply) => {
+      const body = isRecord(request.body) ? request.body : {}
+      const namespace = typeof body['namespace'] === 'string' ? body['namespace'].trim() : ''
+      const description = typeof body['description'] === 'string' ? body['description'] : undefined
+
+      if (!namespace) {
+        return reply.status(400).send({ error: 'Namespace name is required' })
+      }
+
+      const current = configManager.getAdminConfig()
+      const result = createNamespaceInAdminConfig(current, namespace, description)
+
+      if (!result.ok) {
+        if (result.error === 'already_exists') {
+          return reply.status(409).send({ error: `Namespace '${namespace}' already exists` })
+        }
+        if (result.error === 'invalid_name') {
+          return reply.status(400).send({
+            error:
+              'Invalid namespace name. Must start with a lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores.',
+          })
+        }
+      }
+
+      const version = await configManager.saveAdminConfig(
+        buildValidatedAdminConfig(configManager, result.config),
+        {
+          source: 'ui_edit',
+          createdBy: (request.headers['x-user-id'] as string | undefined) ?? 'admin',
+          comment: `Created namespace ${namespace}`,
+        }
+      )
+      return reply.send({ version })
+    })
+
     app.get('/admin/namespaces', async (_request, reply) => {
       const current = configManager.getAdminConfig()
       const registry = opts.registry
@@ -1702,15 +1792,15 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
                       registry
                         .getToolsByNamespace(key)
                         .flatMap(({ server, records }) =>
-                          generateToolcards(records, server, server.toolOverrides),
+                          generateToolcards(records, server, server.toolOverrides)
                         ),
-                      disabledToolKeysForNamespace(getConfig(), key),
+                      disabledToolKeysForNamespace(getConfig(), key)
                     ),
-                    selector,
+                    selector
                   )
                 : summarizeClientToolWindow(
                     buildGatewayToolWindowForMode(key, gatewayMode),
-                    selector,
+                    selector
                   )
 
             if (gatewayMode === GatewayMode.Default && !registry) {
@@ -1722,17 +1812,41 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
             }
 
             const sessionCustomizedTools =
-              gatewayMode === GatewayMode.Default
-                ? catalogMetrics.customizedTools
-                : 0
+              gatewayMode === GatewayMode.Default ? catalogMetrics.customizedTools : 0
 
             const serverIdsForInstructions = registry
               ? registry.getToolsByNamespace(key).map((group) => group.server.id)
               : servers.map((server) => server.id)
-            const initializeInstructions = buildGatewayInstructions(
-              gatewayMode,
-              serverIdsForInstructions,
-            )
+            const defaultCompatInstructions =
+              buildGatewayInstructions(
+                GatewayMode.Compat,
+                serverIdsForInstructions,
+                policy.description
+              ) ?? ''
+            const defaultCodeInstructions =
+              buildGatewayInstructions(
+                GatewayMode.Code,
+                serverIdsForInstructions,
+                policy.description
+              ) ?? ''
+            const compatCustomTrim = policy.customInstructions?.compat?.trim() ?? ''
+            const codeCustomTrim = policy.customInstructions?.code?.trim() ?? ''
+            const rawInitializeInstructions =
+              gatewayMode === GatewayMode.Default
+                ? undefined
+                : gatewayMode === GatewayMode.Code
+                  ? codeCustomTrim.length > 0
+                    ? codeCustomTrim
+                    : defaultCodeInstructions
+                  : compatCustomTrim.length > 0
+                    ? compatCustomTrim
+                    : defaultCompatInstructions
+            const initializeInstructions = rawInitializeInstructions
+              ? applyInstructionsPlaceholders(
+                  rawInitializeInstructions,
+                  serverIdsForInstructions
+                )
+              : undefined
             const initializeInstructionsTokens = initializeInstructions
               ? estimateSerializedTokens(initializeInstructions)
               : 0
@@ -1741,12 +1855,27 @@ export async function adminRoutes(app: FastifyInstance, opts: AdminRouteOptions)
 
             return {
               key,
+              description: policy.description ?? '',
               allowedRoles: policy.allowedRoles,
               allowedModes: policy.allowedModes,
               gatewayMode: policy.gatewayMode,
               bootstrapWindowSize: policy.bootstrapWindowSize,
               candidatePoolSize: policy.candidatePoolSize,
               telemetryEnabled: policy.telemetryEnabled ?? false,
+              instructions: {
+                compat: {
+                  text:
+                    compatCustomTrim.length > 0 ? compatCustomTrim : defaultCompatInstructions,
+                  isCustom: compatCustomTrim.length > 0,
+                  defaultText: defaultCompatInstructions,
+                },
+                code: {
+                  text:
+                    codeCustomTrim.length > 0 ? codeCustomTrim : defaultCodeInstructions,
+                  isCustom: codeCustomTrim.length > 0,
+                  defaultText: defaultCodeInstructions,
+                },
+              },
               servers: servers.map((server) => ({
                 id: server.id,
                 transport: server.transport,

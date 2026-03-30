@@ -27,6 +27,14 @@ describe('buildGatewayHelp', () => {
 
     expect(help.text).toContain('result.items(value)')
     expect(help.text).toContain('result.text(value)')
+    expect(help.text).toContain('Prefer structured fields from tool results instead of regex parsing rendered text')
     expect(help.text).toContain('return result.text(out)')
+  })
+
+  it('documents safer literal construction for generated snippets', () => {
+    const help = buildGatewayHelp('all', GatewayMode.Code)
+
+    expect(help.text).toContain('prefer JSON.stringify(value) over hand-escaped regex or string fragments')
+    expect(help.text).toContain('"Invalid regular expression"')
   })
 })

@@ -95,6 +95,12 @@ The authoritative Zod schemas live in [`src/config/schemas.ts`](../src/config/sc
 
 Each namespace policy also supports `telemetryEnabled` (default `false`). When enabled, the gateway estimates request/response bytes, latency, and token usage for tool calls in that namespace. In `code` and `compat` modes this can also appear in returned gateway telemetry fields; in `default` mode it is primarily used for router outcomes, logs, and admin-side reporting.
 
+Optional `customInstructions` (object with optional string fields `compat` and `code`) replaces the auto-generated `initialize` instructions text for that gateway mode when the stored value is non-empty after trimming. Whitespace-only values are ignored and the built-in template (from `description` plus gateway mode boilerplate) is used instead. Default gateway mode still omits the `instructions` field entirely regardless of `customInstructions`.
+
+When using custom text, you can embed the literal token `{{SERVERS}}` one or more times. At each MCP `initialize`, the gateway replaces every occurrence with the **current** downstream server ID list in the same format as the default template (a JSON-like array string such as `["alpha", "beta"]`, or `["none"]` if the namespace has no servers). If you omit that token entirely, nothing is injected—the model only sees your static text (and can still call `catalog.servers()` / `gateway_list_servers` at runtime in code/compat).
+
+New namespaces created from the admin **Create namespace** flow default to **code** gateway mode (config/bootstrap entries that omit `gatewayMode` still use the schema default, currently compat).
+
 ### Session and Code execution options
 
 The `session` and `code` sections control resource management:

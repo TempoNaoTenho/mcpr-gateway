@@ -478,14 +478,26 @@ export interface NamespaceCatalogMetrics {
   averageTokensPerTool: number
 }
 
+/** Effective vs default MCP initialize instructions for one gateway mode (compat/code). */
+export interface NamespaceInstructionSurface {
+  text: string
+  isCustom: boolean
+  defaultText: string
+}
+
 export interface NamespaceSummary {
   key: string
+  description: string
   allowedRoles: string[]
   allowedModes: string[]
   gatewayMode: 'compat' | 'code' | 'default'
   bootstrapWindowSize: number
   candidatePoolSize: number
   telemetryEnabled: boolean
+  instructions: {
+    compat: NamespaceInstructionSurface
+    code: NamespaceInstructionSurface
+  }
   servers: Array<{
     id: string
     transport: string
@@ -498,6 +510,18 @@ export interface NamespaceSummary {
 
 export async function getNamespaces(): Promise<{ namespaces: NamespaceSummary[] }> {
   return request('/admin/namespaces')
+}
+
+export async function createNamespace(
+  key: string,
+  description?: string,
+  comment?: string
+): Promise<{ version: number }> {
+  return request('/admin/namespaces', {
+    method: 'POST',
+    body: JSON.stringify({ namespace: key, description }),
+    headers: comment ? { 'x-comment': comment } : {},
+  })
 }
 
 export async function deleteNamespace(key: string, comment?: string): Promise<{ version: number }> {
@@ -582,7 +606,11 @@ export interface InboundOAuthPolicy {
 export type PoliciesAuthConfig =
   | { mode: 'static_key'; staticKeys?: Record<string, { userId: string; roles: string[] }> }
   | { mode: 'oauth'; oauth: InboundOAuthPolicy }
-  | { mode: 'hybrid'; staticKeys?: Record<string, { userId: string; roles: string[] }>; oauth: InboundOAuthPolicy }
+  | {
+      mode: 'hybrid'
+      staticKeys?: Record<string, { userId: string; roles: string[] }>
+      oauth: InboundOAuthPolicy
+    }
 
 export type ConfigSource = 'db' | 'file'
 
@@ -678,6 +706,8 @@ export interface PoliciesConfig {
       gatewayMode: 'compat' | 'code' | 'default'
       telemetryEnabled?: boolean
       disabledTools?: { serverId: string; name: string }[]
+      description?: string
+      customInstructions?: { compat?: string; code?: string }
     }
   >
   roles: Record<
