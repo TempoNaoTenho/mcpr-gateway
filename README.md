@@ -1,6 +1,8 @@
 # MCPR Gateway
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-1.0-informational" alt="Version 1.0" />
+  <a href="https://github.com/TempoNaoTenho/mcpr-gateway"><img src="https://img.shields.io/github/stars/TempoNaoTenho/mcpr-gateway?style=social" alt="Star on GitHub" /></a>
   <img src="https://img.shields.io/badge/node-24%20LTS-brightgreen" alt="Node.js" />
   <img src="https://img.shields.io/badge/TypeScript-5-blue" alt="TypeScript" />
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License" />
