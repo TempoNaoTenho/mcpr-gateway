@@ -1,7 +1,13 @@
 import { nanoid } from 'nanoid'
 import { SessionIdSchema } from '../../types/identity.js'
 import type { SelectorDecision } from '../../types/selector.js'
-import { SessionStatus, Mode, RefreshTriggerType, ToolRiskLevel, GatewayMode } from '../../types/enums.js'
+import {
+  SessionStatus,
+  Mode,
+  RefreshTriggerType,
+  ToolRiskLevel,
+  GatewayMode,
+} from '../../types/enums.js'
 import { GatewayError, GatewayErrorCode } from '../../types/errors.js'
 import { getConfig } from '../../config/index.js'
 import { buildOAuthChallenge } from '../../auth/oauth-challenge.js'
@@ -24,24 +30,48 @@ import type { McpHandlerContext } from '../mcp-handler-context.js'
 import type { JsonRpcBody } from '../jsonrpc.js'
 import { negotiateMcpProtocolVersion } from '../mcp-protocol-version.js'
 
+/**
+ * In custom initialize instructions, this token is replaced at MCP initialize with the current
+ * downstream server ID list in the same form as the built-in template: `["id1", "id2"]` or `["none"]`.
+ */
+export const INSTRUCTIONS_SERVERS_PLACEHOLDER = '{{SERVERS}}'
+
+export function formatServerIdsForInstructions(serverIds: string[]): string {
+  return serverIds.length > 0 ? `["${serverIds.join('", "')}"]` : '["none"]'
+}
+
+/** Expands `INSTRUCTIONS_SERVERS_PLACEHOLDER` in `text` using the session's downstream servers. */
+export function applyInstructionsPlaceholders(text: string, serverIds: string[]): string {
+  if (!text.includes(INSTRUCTIONS_SERVERS_PLACEHOLDER)) return text
+  const list = formatServerIdsForInstructions(serverIds)
+  return text.split(INSTRUCTIONS_SERVERS_PLACEHOLDER).join(list)
+}
+
 /** Same string the MCP client receives in `initialize.result.instructions` (compat/code only). */
-export function buildGatewayInstructions(mode: GatewayMode, serverIds: string[]): string | undefined {
+export function buildGatewayInstructions(
+  mode: GatewayMode,
+  serverIds: string[],
+  namespaceDescription?: string
+): string | undefined {
+  const serverListText = formatServerIdsForInstructions(serverIds)
+  const descriptionSection =
+    namespaceDescription && namespaceDescription.trim().length > 0
+      ? `${namespaceDescription.trim()}\n\n`
+      : ''
+
   switch (mode) {
-    case GatewayMode.Compat: {
-      const serverList =
-        serverIds.length > 0
-          ? ` Available servers: [${serverIds.map((id) => `"${id}"`).join(', ')}].`
-          : ''
-      return `Gateway in compatibility mode. Discover available tools with gateway_search_tools, optionally constrained by serverId when you already know the target server. If you want fewer round trips, use gateway_search_and_call_tool to search and execute the best match in one step. If the target integration is unclear, call gateway_list_servers first to confirm exact server IDs. For explicit execution, invoke tools with gateway_call_tool using the exact name and serverId returned by the search result. Do not guess aliases, historical names, or call upstream tools directly.${serverList}`
-    }
+    case GatewayMode.Compat:
+      return `${descriptionSection}This is a Gateway that downstream MCP servers. Currently in compat mode.\n- How to use it:Discover available tools with gateway_search_tools, optionally constrained by serverId when you already know the target server. If you want fewer round trips, use gateway_search_and_call_tool to search and execute the best match in one step. If the target integration is unclear, call gateway_list_servers first to confirm exact server IDs. For explicit execution, invoke tools with gateway_call_tool using the exact name and serverId returned by the search result. Do not guess aliases, historical names, or call upstream tools directly. \nCurrent downstream servers are {{SERVERS}}`
     case GatewayMode.Code:
-      return 'Gateway in code mode. Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.servers(), catalog.search(query, { k | limit, serverId, requiredArgs }), catalog.searchOne(query, { serverId, requiredArgs }), catalog.list({ serverId, requiredArgs }), catalog.describe(handle, { detail }), mcp.call(handleOrTool, args), mcp.callMatch(query, args, { serverId, requiredArgs }), mcp.batch([{handle, args}]), result.limit(array, n), result.items(value), result.text(value), result.pick(fields), artifacts.save(data, { label }). Use catalog.servers() only when you need to confirm available downstream server IDs before searching. Handles returned by catalog.* are session-scoped and should be used from the current execution only. `detail: "signature"` includes required args plus short field metadata. For batch calls, prefer handles filtered by requiredArgs, inspect them with catalog.describe(), and check the result count before indexing tools[1]. The `result` global is reserved, `result.limit()` expects an array such as `out.content`, and returned values should be serializable. Call gateway_help for full API reference.'
+      return `${descriptionSection}This is a Gateway that downstream MCP servers. Currently in code mode.\n- How to use it: Use gateway_run_code to execute JavaScript. Available sandbox APIs: catalog.servers(), catalog.search(query, { k | limit, serverId, requiredArgs }), catalog.searchOne(query, { serverId, requiredArgs }), catalog.list({ serverId, requiredArgs }), catalog.describe(handle, { detail }), mcp.call(handleOrTool, args), mcp.callMatch(query, args, { serverId, requiredArgs }), mcp.batch([{handle, args}]), result.limit(array, n), result.items(value), result.text(value), result.pick(fields), artifacts.save(data, { label }).\n- Use catalog.servers() only when you need to confirm available downstream server IDs before searching. Handles returned by catalog.* are session-scoped and should be used from the current execution only. \`detail: "signature"\` includes required args plus short field metadata.\n- For batch calls, prefer handles filtered by requiredArgs, inspect them with catalog.describe(), and check the result count before indexing tools[1]. The \`result\` global is reserved, \`result.limit()\` expects an array such as \`out.content\`, and returned values should be serializable. Call gateway_help for full API reference.\n- Current downstream servers are {{SERVERS}}`
     default:
       return undefined
   }
 }
 
-function normalizeInitializeIntent(params: Record<string, unknown> | undefined): string | undefined {
+function normalizeInitializeIntent(
+  params: Record<string, unknown> | undefined
+): string | undefined {
   if (!params) return undefined
 
   const parts = ['intent', 'goal', 'query', 'taskContext']
@@ -59,7 +89,7 @@ export async function handleInitialize(
   body: JsonRpcBody,
   store: ISessionStore,
   registry: DownstreamRegistry,
-  auditLogger?: IAuditLogger,
+  auditLogger?: IAuditLogger
 ): Promise<{ id: string; negotiatedProtocolVersion: string; result: unknown }> {
   const startMs = Date.now()
   const config = getConfig()
@@ -70,7 +100,7 @@ export async function handleInitialize(
     config.auth,
     namespace,
     nsKeys,
-    ctx.requestOrigin,
+    ctx.requestOrigin
   )
 
   if (idResult.kind === 'oauth_required') {
@@ -86,7 +116,7 @@ export async function handleInitialize(
         authMode: config.auth.mode,
         oauthProvider: oauth.provider,
       },
-      '[mcp] initialize requires OAuth bearer token',
+      '[mcp] initialize requires OAuth bearer token'
     )
     const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace)
     throw new GatewayError(GatewayErrorCode.OAUTH_AUTHENTICATION_REQUIRED, undefined, undefined, {
@@ -107,7 +137,7 @@ export async function handleInitialize(
         authMode: config.auth.mode,
         oauthProvider: oauth.provider,
       },
-      '[mcp] initialize received invalid OAuth bearer token',
+      '[mcp] initialize received invalid OAuth bearer token'
     )
     const { wwwAuthenticate } = buildOAuthChallenge(oauth, namespace, 'invalid_token')
     throw new GatewayError(GatewayErrorCode.OAUTH_INVALID_TOKEN, undefined, undefined, {
@@ -132,7 +162,7 @@ export async function handleInitialize(
 
   const serverGroups = registry.getToolsByNamespace(namespace)
   const toolcards = serverGroups.flatMap(({ server, records }) =>
-    generateToolcards(records, server, server.toolOverrides),
+    generateToolcards(records, server, server.toolOverrides)
   )
   const healthStates = registry.getHealthStates()
   const disabledToolKeys = disabledToolKeysForNamespace(config, namespace)
@@ -186,12 +216,7 @@ export async function handleInitialize(
     }
     const { pool } = buildCandidatePool(candidateInput)
 
-    const bootstrapWindow = buildBootstrapWindowFromConfig(
-      pool,
-      config,
-      namespace,
-      requestedMode,
-    )
+    const bootstrapWindow = buildBootstrapWindowFromConfig(pool, config, namespace, requestedMode)
     selectorDecision = {
       selected: bootstrapWindow,
       reasoning: 'bootstrap_window',
@@ -251,17 +276,34 @@ export async function handleInitialize(
     timestamp: now,
   })
 
-  logRequest(ctx.log, {
-    requestId: ctx.requestId,
-    sessionId,
-    namespace,
-    method: 'initialize',
-    userId: identity.sub,
-    latencyMs,
-  }, 'session initialized')
+  logRequest(
+    ctx.log,
+    {
+      requestId: ctx.requestId,
+      sessionId,
+      namespace,
+      method: 'initialize',
+      userId: identity.sub,
+      latencyMs,
+    },
+    'session initialized'
+  )
 
   const serverIds = serverGroups.map((g) => g.server.id)
-  const instructions = buildGatewayInstructions(gatewayMode, serverIds)
+  const customKey = gatewayMode === GatewayMode.Code ? 'code' : 'compat'
+  const customRaw =
+    gatewayMode === GatewayMode.Default
+      ? undefined
+      : namespacePolicy.customInstructions?.[customKey]
+  const trimmedCustom = customRaw?.trim()
+  const instructionsBase =
+    trimmedCustom && trimmedCustom.length > 0
+      ? trimmedCustom
+      : buildGatewayInstructions(gatewayMode, serverIds, namespacePolicy.description)
+  const instructions =
+    instructionsBase !== undefined
+      ? applyInstructionsPlaceholders(instructionsBase, serverIds)
+      : undefined
 
   return {
     id: sessionId,

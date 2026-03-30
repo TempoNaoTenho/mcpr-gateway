@@ -5,8 +5,10 @@
   interface Props {
     text: string;
     size?: number;
+    /** When true, newline characters in `text` render as line breaks (default collapses them). */
+    preserveLineBreaks?: boolean;
   }
-  let { text, size = 13 } = $props();
+  let { text, size = 13, preserveLineBreaks = false } = $props();
 
   let anchorEl = $state<HTMLButtonElement | null>(null);
   let visible = $state(false);
@@ -67,7 +69,9 @@
 {#if visible}
   <div
     use:portal
-    class="pointer-events-none fixed z-[48] w-max max-w-xs rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs leading-snug whitespace-normal text-white shadow-lg dark:bg-slate-700"
+    class="pointer-events-none fixed z-[48] w-max max-w-xs rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs leading-snug text-white shadow-lg dark:bg-slate-700 {preserveLineBreaks
+      ? 'whitespace-pre-line'
+      : 'whitespace-normal'}"
     style:left="{pos.left}px"
     style:top="{pos.top}px"
     style:transform="translate(-50%, -100%)"

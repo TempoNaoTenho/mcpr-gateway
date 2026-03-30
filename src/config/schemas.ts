@@ -26,6 +26,13 @@ const NamespacePolicySchema = z.object({
   gatewayMode: z.nativeEnum(GatewayMode).default(GatewayMode.Compat),
   telemetryEnabled: z.boolean().default(false),
   disabledTools: z.array(DisabledToolRefSchema).default([]),
+  description: z.string().default(''),
+  customInstructions: z
+    .object({
+      compat: z.string().optional(),
+      code: z.string().optional(),
+    })
+    .default({}),
 })
 
 const RolePolicySchema = z.object({
@@ -104,10 +111,12 @@ export const BootstrapAuthConfigSchema = z.discriminatedUnion('mode', [
     mode: z.literal('oauth'),
     oauth: InboundOAuthSchema,
   }),
-  z.object({
-    mode: z.literal('hybrid'),
-    oauth: InboundOAuthSchema,
-  }).strict(),
+  z
+    .object({
+      mode: z.literal('hybrid'),
+      oauth: InboundOAuthSchema,
+    })
+    .strict(),
 ])
 
 export type BootstrapAuthConfig = z.infer<typeof BootstrapAuthConfigSchema>

@@ -2165,6 +2165,18 @@ describe('adminRoutes', () => {
       expect.objectContaining({
         key: 'gmail',
         telemetryEnabled: false,
+        instructions: {
+          compat: expect.objectContaining({
+            text: expect.any(String),
+            isCustom: false,
+            defaultText: expect.any(String),
+          }),
+          code: expect.objectContaining({
+            text: expect.any(String),
+            isCustom: false,
+            defaultText: expect.any(String),
+          }),
+        },
         metrics: expect.objectContaining({
           toolCount: 4,
           customizedTools: 0,

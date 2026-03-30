@@ -7,16 +7,19 @@
     savePolicies,
     updateConfigServer,
     deleteNamespace,
+    createNamespace,
     ApiError,
     type NamespaceSummary,
     type PoliciesConfig,
     type ConfigServer,
   } from '$lib/api.js';
+  import { INSTRUCTIONS_SERVERS_PLACEHOLDER } from '$lib/instructions-placeholder.js';
   import { notifications } from '$lib/stores/notifications.js';
   import Badge from '../../components/ui/Badge.svelte';
   import InfoTooltip from '../../components/ui/InfoTooltip.svelte';
   import Switch from '../../components/ui/Switch.svelte';
   import Modal from '../../components/ui/Modal.svelte';
+  import DescriptionEditor from '../../components/domain/DescriptionEditor.svelte';
 
   const ALL_MODES = ['read', 'write', 'admin'];
 
@@ -35,9 +38,31 @@
     telemetryEnabled: boolean;
     selectedServerIds: string[];
     disabledTools: { serverId: string; name: string }[];
+    customInstructions: { compat: string; code: string };
   } | null>(null);
 
   let deleteConfirmOpen = $state(false);
+  let createNamespaceOpen = $state(false);
+  let newNamespaceName = $state('');
+  let newNamespaceDescription = $state('');
+  let creating = $state(false);
+
+  async function confirmCreateNamespace() {
+    if (!newNamespaceName.trim()) return;
+    creating = true;
+    try {
+      await createNamespace(newNamespaceName.trim(), newNamespaceDescription.trim() || undefined, `Created namespace ${newNamespaceName}`);
+      notifications.success(`Created namespace ${newNamespaceName}`);
+      createNamespaceOpen = false;
+      newNamespaceName = '';
+      newNamespaceDescription = '';
+      await load();
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : 'Failed to create namespace');
+    } finally {
+      creating = false;
+    }
+  }
 
   async function load() {
     loading = true;
@@ -75,6 +100,10 @@
           telemetryEnabled: ns.telemetryEnabled ?? false,
           selectedServerIds: ns.servers.map((server) => server.id),
           disabledTools: [...(nsPolicy?.disabledTools ?? [])],
+          customInstructions: {
+            compat: nsPolicy?.customInstructions?.compat ?? '',
+            code: nsPolicy?.customInstructions?.code ?? '',
+          },
         }
       : null;
   }
@@ -111,6 +140,16 @@
 
     saving = true;
     try {
+      const customPayload: { compat?: string; code?: string } = {};
+      const ct = draft.customInstructions.compat.trim();
+      if (ct.length > 0 && ct !== currentNamespace.instructions.compat.defaultText) {
+        customPayload.compat = ct;
+      }
+      const dt = draft.customInstructions.code.trim();
+      if (dt.length > 0 && dt !== currentNamespace.instructions.code.defaultText) {
+        customPayload.code = dt;
+      }
+
       const nextPolicies: PoliciesConfig = {
         ...policies,
         namespaces: {
@@ -123,6 +162,7 @@
             gatewayMode: draft.gatewayMode,
             telemetryEnabled: draft.telemetryEnabled,
             disabledTools: draft.disabledTools,
+            customInstructions: customPayload,
           },
         },
       };
@@ -206,13 +246,23 @@
       <h1 class="text-xl font-semibold text-slate-900 dark:text-white">Namespaces</h1>
       <InfoTooltip text="Namespaces are the operational workspace for tool budgets, server composition, and future advanced tuning. Access control stays focused on profiles and client tokens." />
     </div>
-    <button
-      onclick={saveSelectedNamespace}
-      disabled={!draft || saving || loading}
-      class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
-    >
-      {saving ? 'Saving…' : 'Save Namespace'}
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        onclick={() => (createNamespaceOpen = true)}
+        disabled={loading}
+        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        Create Namespace
+      </button>
+      <button
+        onclick={saveSelectedNamespace}
+        disabled={!draft || saving || loading}
+        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {saving ? 'Saving…' : 'Save Namespace'}
+      </button>
+    </div>
   </div>
 
   <div class="grid gap-6 xl:grid-cols-[320px_1fr]">
@@ -295,7 +345,7 @@
             <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <div class="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Initialize instructions (est.)
-                <InfoTooltip text="Separate from tools/list: the instructions field returned on MCP initialize in compat/code (UTF-8 length ÷ 4), matching server buildGatewayInstructions." />
+                <InfoTooltip text="Separate from tools/list: the instructions field on MCP initialize in compat/code (UTF-8 length ÷ 4). Uses custom text when set, otherwise the generated template." />
               </div>
               <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
                 ~{selectedNamespace.metrics.initializeInstructionsTokens}
@@ -363,7 +413,15 @@
           <div class="space-y-3">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
               Gateway mode
-              <InfoTooltip text="Default mode exposes enabled downstream tools directly. Compat mode exposes search/call meta-tools. Code mode exposes gateway_run_code and help." />
+              <InfoTooltip
+                preserveLineBreaks
+                text={
+                  `Mode details:
+• Default: Exposes all enabled downstream tools directly.
+• Code: Exposes 2 tools — gateway_run_code and gateway_help. The agent will figure it out by itself (Recommended)
+• Compat: Exposes 4 tools allowing the agent to explore and call other tools (Advanced workflows and settings).`
+                }
+              />
             </div>
             <div class="flex gap-4">
               <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -401,6 +459,85 @@
               </label>
             </div>
           </div>
+
+          {#if !defaultModeActive && selectedNamespace && draft}
+            {@const mode = draft.gatewayMode === 'code' ? 'code' : 'compat'}
+            {@const draftPart = mode === 'compat' ? draft.customInstructions.compat : draft.customInstructions.code}
+            {@const defaultPart =
+              mode === 'compat'
+                ? selectedNamespace.instructions.compat.defaultText
+                : selectedNamespace.instructions.code.defaultText}
+            {@const editorValue = draftPart.trim().length > 0 ? draftPart : defaultPart}
+            {@const showCustomBadge = draftPart.trim().length > 0}
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+                  Initialize instructions ({mode})
+                  <InfoTooltip
+                    text={`Full MCP initialize instructions for the selected gateway mode. Use the ${INSTRUCTIONS_SERVERS_PLACEHOLDER} token anywhere in custom text: it is replaced at connect time with the current downstream server IDs (same JSON-array shape as the default template). Reset restores the generated default.`}
+                  />
+                </div>
+                <p class="text-xs text-amber-800/90 dark:text-amber-200/90">
+                  Custom text replaces the built-in template—you can still embed {INSTRUCTIONS_SERVERS_PLACEHOLDER} for a live server list; keep tool-discovery guidance correct or use Reset.
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <Badge variant={showCustomBadge ? 'info' : 'default'}>
+                    {showCustomBadge ? 'Custom' : 'Default'}
+                  </Badge>
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onclick={() => {
+                        const d = draft;
+                        const ns = selectedNamespace;
+                        if (!d || !ns) return;
+                        const key = mode === 'compat' ? 'compat' : 'code';
+                        const defaultTxt =
+                          mode === 'compat' ? ns.instructions.compat.defaultText : ns.instructions.code.defaultText;
+                        const draftTxt = mode === 'compat' ? d.customInstructions.compat : d.customInstructions.code;
+                        const base = draftTxt.trim().length > 0 ? draftTxt : defaultTxt;
+                        if (base.includes(INSTRUCTIONS_SERVERS_PLACEHOLDER)) return;
+                        const line = `- Current downstream servers are ${INSTRUCTIONS_SERVERS_PLACEHOLDER}`;
+                        d.customInstructions[key] =
+                          base.trim().length > 0 ? `${base.trimEnd()}\n${line}` : line;
+                      }}
+                      class="text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline"
+                    >
+                      Insert server list ({INSTRUCTIONS_SERVERS_PLACEHOLDER})
+                    </button>
+                    <button
+                      type="button"
+                      onclick={() => {
+                        const d = draft;
+                        if (!d) return;
+                        if (mode === 'compat') d.customInstructions.compat = '';
+                        else d.customInstructions.code = '';
+                      }}
+                      class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Reset to default
+                    </button>
+                  </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  {#key `${selectedNamespaceKey}-${mode}`}
+                    <DescriptionEditor
+                      value={editorValue}
+                      placeholder={`Initialize instructions (${mode} mode)`}
+                      scrollerMinHeight="12rem"
+                      oninput={(val) => {
+                        if (!draft) return;
+                        if (mode === 'compat') draft.customInstructions.compat = val;
+                        else draft.customInstructions.code = val;
+                      }}
+                    />
+                  {/key}
+                </div>
+              </div>
+            </div>
+          {/if}
 
           <div class="space-y-3">
             <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
@@ -542,6 +679,50 @@
     </div>
   </div>
 </div>
+
+<Modal open={createNamespaceOpen} title="Create namespace" onclose={() => (createNamespaceOpen = false)}>
+  <div class="space-y-4">
+    <div class="space-y-2">
+      <label for="ns-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
+      <input
+        id="ns-name"
+        type="text"
+        bind:value={newNamespaceName}
+        placeholder="e.g. my-namespace"
+        autocomplete="off"
+        class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition-colors"
+      />
+      <p class="text-xs text-slate-500 dark:text-slate-400">Must start with a letter and contain only lowercase letters, numbers, hyphens, and underscores.</p>
+    </div>
+    <div class="space-y-2">
+      <label for="ns-desc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Description (optional)</label>
+      <textarea
+        id="ns-desc"
+        bind:value={newNamespaceDescription}
+        placeholder="A brief description of this namespace"
+        rows="3"
+        class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 resize-none transition-colors"
+      ></textarea>
+    </div>
+  </div>
+  {#snippet footer()}
+    <button
+      type="button"
+      onclick={() => (createNamespaceOpen = false)}
+      class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+    >
+      Cancel
+    </button>
+    <button
+      type="button"
+      onclick={confirmCreateNamespace}
+      disabled={creating || !newNamespaceName.trim()}
+      class="px-4 py-2 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+    >
+      {creating ? 'Creating…' : 'Create'}
+    </button>
+  {/snippet}
+</Modal>
 
 <Modal open={deleteConfirmOpen} title="Delete namespace" onclose={() => (deleteConfirmOpen = false)}>
   <p class="text-sm text-slate-700 dark:text-slate-300">

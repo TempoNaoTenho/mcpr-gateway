@@ -3,7 +3,11 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FastifyRequest } from 'fastify'
-import { handleInitialize } from '../../src/gateway/dispatch/initialize.js'
+import {
+  applyInstructionsPlaceholders,
+  handleInitialize,
+  INSTRUCTIONS_SERVERS_PLACEHOLDER,
+} from '../../src/gateway/dispatch/initialize.js'
 import type { McpHandlerContext } from '../../src/gateway/mcp-handler-context.js'
 import { getConfig, initConfig, setConfig } from '../../src/config/index.js'
 import {
@@ -505,6 +509,113 @@ describe('handleInitialize', () => {
     expect(result.instructions).toContain('"gmail-server"')
   })
 
+  it('uses namespace customInstructions.compat when set (non-whitespace)', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            customInstructions: { compat: 'Use only the frobnicate tool for this workspace.' },
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeHandlerContext(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toBe('Use only the frobnicate tool for this workspace.')
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
+  it('expands {{SERVERS}} in custom compat instructions at initialize', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            customInstructions: {
+              compat: `Custom briefing.\n- Current downstream servers are ${INSTRUCTIONS_SERVERS_PLACEHOLDER}\nTail.`,
+            },
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeHandlerContext(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toBe(
+        'Custom briefing.\n- Current downstream servers are ["gmail-server"]\nTail.',
+      )
+      expect(result.instructions).not.toContain(INSTRUCTIONS_SERVERS_PLACEHOLDER)
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
+  it('ignores whitespace-only customInstructions.compat and uses built template', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            customInstructions: { compat: '   \n\t  ' },
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeHandlerContext(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toContain('gateway_search_tools')
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
   it('omits server list from compat instructions when no servers available', async () => {
     const { store, close } = createTempSqliteSessionStore()
     disposeStore = () => {
@@ -564,6 +675,41 @@ describe('handleInitialize', () => {
       expect(result.instructions).toContain('catalog.servers')
       expect(result.instructions).toContain('catalog.search')
       expect(result.instructions).toContain('mcp.call')
+    } finally {
+      setConfig(previousConfig)
+    }
+  })
+
+  it('uses namespace customInstructions.code when in code mode', async () => {
+    const { store, close } = createTempSqliteSessionStore()
+    disposeStore = () => {
+      store.stop()
+      close()
+    }
+    const previousConfig = getConfig()
+    try {
+      setConfig({
+        ...previousConfig,
+        namespaces: {
+          ...previousConfig.namespaces,
+          gmail: {
+            ...previousConfig.namespaces.gmail,
+            gatewayMode: GatewayMode.Code,
+            customInstructions: { code: 'Custom code-mode briefing.' },
+          },
+        },
+      })
+      const registry = makeRegistry([makeToolRecord('read_message')])
+
+      const response = await handleInitialize(
+        makeHandlerContext(Mode.Read),
+        { jsonrpc: '2.0', id: 1, method: 'initialize', params: { mode: Mode.Read } },
+        store,
+        registry as never
+      )
+
+      const result = (response.result as { result: { instructions?: string } }).result
+      expect(result.instructions).toBe('Custom code-mode briefing.')
     } finally {
       setConfig(previousConfig)
     }
@@ -744,5 +890,26 @@ describe('handleInitialize', () => {
     } finally {
       setConfig(previousConfig)
     }
+  })
+})
+
+describe('applyInstructionsPlaceholders', () => {
+  it('replaces each token with the server id list', () => {
+    expect(
+      applyInstructionsPlaceholders(
+        `a${INSTRUCTIONS_SERVERS_PLACEHOLDER}b${INSTRUCTIONS_SERVERS_PLACEHOLDER}`,
+        ['u', 'v'],
+      ),
+    ).toBe('a["u", "v"]b["u", "v"]')
+  })
+
+  it('uses ["none"] when there are no servers', () => {
+    expect(applyInstructionsPlaceholders(`x ${INSTRUCTIONS_SERVERS_PLACEHOLDER}`, [])).toBe(
+      'x ["none"]',
+    )
+  })
+
+  it('returns text unchanged when token absent', () => {
+    expect(applyInstructionsPlaceholders('plain', ['z'])).toBe('plain')
   })
 })
