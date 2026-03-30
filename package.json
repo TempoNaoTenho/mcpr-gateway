@@ -1,6 +1,10 @@
 {
   "name": "mcpr-gateway",
-  "version": "0.1.0",
+  "version": "1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tempont/mcpr-gateway.git"
+  },
   "license": "MIT",
   "engines": {
     "node": "24.x"

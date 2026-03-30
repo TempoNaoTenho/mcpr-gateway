@@ -53,7 +53,6 @@ export function buildGatewayInstructions(
   serverIds: string[],
   namespaceDescription?: string
 ): string | undefined {
-  const serverListText = formatServerIdsForInstructions(serverIds)
   const descriptionSection =
     namespaceDescription && namespaceDescription.trim().length > 0
       ? `${namespaceDescription.trim()}\n\n`
@@ -320,7 +319,7 @@ export async function handleInitialize(
         },
         serverInfo: {
           name: 'mcpr-gateway',
-          version: '0.1.0',
+          version: '1.0',
         },
         ...(instructions !== undefined && { instructions }),
       },
