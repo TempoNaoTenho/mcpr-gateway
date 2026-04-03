@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/MCP-2025--03--26-purple" alt="MCP Protocol" />
 </p>
 
-**A self-hosted MCP gateway that gives you full control over which tools your AI client sees — and how it interacts with them. Primarly focused on sandboxed code execution so LLM can auto-discover downstreams servers and tools, also supports a compat mode (two tools) and default mode (all tools).**
+**A self-hosted Model Context Protocol (MCP) gateway that exposes only the right tools to each AI client — with sandboxed code execution, dynamic tool discovery, and namespace-aware access control.**
 
 > Some say MCP is dead, hopefully we can give it **CPR**.. 🥁
 
